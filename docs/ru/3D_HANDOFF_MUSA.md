@@ -8,7 +8,15 @@
    ```sh
    PYTHONPATH=src .venv/bin/python scripts/export_3d_pack.py --out artifacts/3d-pack --seed 11
    ```
-   Поддерживаются также флаги нескольких сидов (`--seeds 11 29 47` или `--all-dev-seeds`). Перед записью `index.json` каждый сменный пакет проверяется функцией `validate_shift_bundle(...)` на все инварианты автомата заказов, очередей `Q2/Q3/Q4` и `R`, маршрутизации `bypass`/`all`, интервалов `jam`/`assist`/`walk`/`break`, закона сохранения заказов и 10 статей расходов `Economy`.
+   Поддерживаются флаги нескольких сидов (`--seeds 11 29 47` или `--all-dev-seeds`), а также повторяемый флаг `--extra-plan <slug>=<plan_json_path>` для side-by-side сравнения планов Frontier-моделей и компактной Post-RL модели (`schema_version: 1` или `2`) в одном пакете:
+   ```sh
+   PYTHONPATH=src .venv/bin/python scripts/export_3d_pack.py \
+     --out artifacts/3d-pack \
+     --seed 11 \
+     --extra-plan frontier-gemini-4-carbon=evidence/plans/frontier_gemini_4_carbon.json \
+     --extra-plan post-rl-qwen2.5-7b=evidence/plans/post_rl_qwen2_5_7b.json
+   ```
+   Перед записью `index.json` каждый сменный пакет проверяется функцией `validate_shift_bundle(...)` на все инварианты автомата заказов, очередей `Q2/Q3/Q4` и `R`, маршрутизации `bypass`/`all`, интервалов `jam`/`assist`/`walk`/`break`, закона сохранения заказов и 10 статей расходов `Economy`, а каждый квартальный пакет проверяется функцией `validate_quarter_pack(...)`.
 
 2. **Поднять локальный read-only HTTP-сервер с поддержкой CORS на `127.0.0.1:8765`:**
    ```sh
@@ -20,7 +28,7 @@
 
 - **Корневой каталог прогонов и парных сравнений:**
   - `http://127.0.0.1:8765/index.json`
-  - Содержит список всех экспортированных прогонов (`runs`), явный список публичных сидов оценки (`evaluation_seeds`), сводки `summary` / `evaluation` и готовые пары для side-by-side сравнения (`comparisons`) на одном и том же `seed` (ключ сущности в 3D-сцене: `(runId, order_id)`).
+  - Содержит список всех экспортированных прогонов (`runs`, включая дополнительные планы `--extra-plan` с флагом `extra_plan: true` и полем `plan_name`), явный список сидов оценки (`evaluation_seeds`), сводки `summary` / `evaluation` и готовые пары для side-by-side сравнения (`comparisons`, включая пары `manual` vs `frontier-gemini-4-carbon`, `frontier-gemini-4-carbon` vs `post-rl-qwen2.5-7b` и др.) на одном и том же `seed` (ключ сущности в 3D-сцене: `(runId, order_id)`).
 
 - **Одиночные смены (`v1`, формат `robotization-bench.replay.v1`):**
   - Ручной базовый план (6 работников, `data/plans/manual.json`):
@@ -32,16 +40,26 @@
   - Оптимизированная контрольная стратегия `reference` (4 работника, `reference.solve`):
     - `http://127.0.0.1:8765/v1-reference-seed11/manifest.json`
     - `http://127.0.0.1:8765/v1-reference-seed11/events.jsonl`
+  - Любой пользовательский `v1`-план через `--extra-plan <slug>=<path>`:
+    - `http://127.0.0.1:8765/<slug>-seed11/manifest.json` и `events.jsonl`
 
-- **Квартальные 12-недельные раскатки (`v2`, недели `week-00` .. `week-11`):**
-  - Когда подключён квартальный модуль `robotization_bench.quarterly`, экспортёр автоматически создаёт 12-недельные пакеты для ручной базовой стратегии и фазированного референсного плана:
-    - Метаданные квартала (`replay_pack_format: "robotization-bench.quarter-pack.v1"`):
+- **Квартальные 12-недельные раскатки (`v2`, недели `week-00` .. `week-11`) и понедельная диагностика ошибок:**
+  - Когда подключён квартальный модуль `robotization_bench.quarterly`, экспортёр автоматически создаёт 12-недельные пакеты для ручной базовой стратегии (`quarterly-manual-seed11`), фазированного референсного плана (`quarterly-reference-seed11`) и всех переданных `v2` планов `--extra-plan` (например, `frontier-gemini-4-carbon-seed11` и `post-rl-qwen2.5-7b-seed11`):
+    - Метаданные квартала (`replay_pack_format: "robotization-bench.quarter-pack.v1"`), включающие структурированный блок понедельной диагностики ошибок `"diagnostics"` и ссылку `"diagnostics_file": "diagnostics.md"`:
       - `http://127.0.0.1:8765/quarterly-manual-seed11/quarter_manifest.json`
       - `http://127.0.0.1:8765/quarterly-reference-seed11/quarter_manifest.json`
+      - `http://127.0.0.1:8765/frontier-gemini-4-carbon-seed11/quarter_manifest.json`
+      - `http://127.0.0.1:8765/post-rl-qwen2.5-7b-seed11/quarter_manifest.json`
+    - Человекочитаемый английский отчёт понедельной диагностики операционных ошибок (`diagnostics.md`, отдаётся с `Content-Type: text/markdown; charset=utf-8`, а также указан в `index.json` в поле `diagnostics_md`):
+      - `http://127.0.0.1:8765/quarterly-manual-seed11/diagnostics.md`
+      - `http://127.0.0.1:8765/quarterly-reference-seed11/diagnostics.md`
+      - `http://127.0.0.1:8765/<quarter-bundle>/diagnostics.md`
+      - Блок `"diagnostics"` (`diagnostics_version: 1`, `counts_by_category`, `quarter_summary`, `weeks[0..11].issues`) и файл `diagnostics.md` автоматически подсвечивают 5 классов реальных операционных ошибок по неделям (всплески заклиниваний при вводе робота без помощника Зоны 3 `commissioning_jam_unassisted`, накопление износа на `route="all"` без профилактического ТО `route_all_unmaintained_wear`, трение найма/переобучения при смене бригады `hiring_retraining_friction`, сверхурочные и пробои SLA/дефектов `sla_overtime_breach`, лавины переходящего бэклога `backlog_carryover_surge`), позволяя вывести понятные пояснения в боковой панели 3D-сцены.
     - Понедельные смены (`weeks/week-00` .. `weeks/week-11`):
       - `http://127.0.0.1:8765/quarterly-manual-seed11/weeks/week-00/manifest.json` .. `http://127.0.0.1:8765/quarterly-manual-seed11/weeks/week-11/manifest.json` (+ `events.jsonl` в каждой папке)
       - `http://127.0.0.1:8765/quarterly-reference-seed11/weeks/week-00/manifest.json` .. `http://127.0.0.1:8765/quarterly-reference-seed11/weeks/week-11/manifest.json` (+ `events.jsonl` в каждой папке)
-  - **Священный контракт 3D:** каждая папка `weeks/week-XX` содержит стандартный `manifest.json` (`replay_format: "robotization-bench.replay.v1"`, эффективный `world` недели, сменный `plan` со `schema_version: 1` и 10-ключевой сменный `economy`) + неизменённый `events.jsonl` (`30s` на тик, те же 11 видов `Event`), поэтому 3D-сцена проигрывает любую неделю `00..11` тем же самым кодом без доработок!
+      - `http://127.0.0.1:8765/<slug>-seed11/weeks/week-00/manifest.json` .. `week-11/manifest.json` (+ `events.jsonl`)
+  - **Священный контракт 3D:** каждая папка `weeks/week-XX` содержит на 100% неизменённый стандартный `manifest.json` (`replay_format: "robotization-bench.replay.v1"`, ровно те же 7 ключей, эффективный `world` недели, сменный `plan` со `schema_version: 1` и 10-ключевой сменный `economy`) + неизменённый `events.jsonl` (`30s` на тик, те же 11 видов `Event`), поэтому 3D-сцена проигрывает любую неделю `00..11` тем же самым кодом без доработок!
 
 ## HTTP / CORS и безопасность `scripts/serve_3d.py`
 
@@ -56,7 +74,7 @@
 - MIME-типы: `application/json; charset=utf-8` (`.json`), `application/x-ndjson; charset=utf-8` (`.jsonl`, `.ndjson`), `text/markdown; charset=utf-8` (`.md`).
 - Защита от обхода каталогов: листинг директорий отключён (`403`), блокируются `..`, `\`, NUL-байты и любые символические ссылки (`O_NOFOLLOW` + проверка сегментов внутри `--dir`).
 
-> **Примечание о происхождении текста ниже:** в оригинальном коммите `368bf27` (на базе `1af71b6`) экспортёр пакетов и локальный HTTP-мост описывались как рекомендуемые к добавлению компоненты. Теперь они полностью реализованы в `reporting.py` (`build_shift_manifest`, `export_shift_bundle`, `export_quarter_pack`, `validate_shift_bundle`, `validate_quarter_pack`), `scripts/export_3d_pack.py` и `scripts/serve_3d.py`. Ниже без единого изменения приведён полный оригинальный промпт Мусы из `368bf27:docs/PROMPT_3D_INTEGRATION_RU.md` (466 строк, 64 169 байт UTF-8, SHA-256 `3ea0716cfb4218f1e06d3ba8f1bed655dda420aa9735725132c9ae82013bbf49`).
+> **Примечание о происхождении текста ниже:** в оригинальном коммите `368bf27` (на базе `1af71b6`) экспортёр пакетов и локальный HTTP-мост описывались как рекомендуемые к добавлению компоненты. Теперь они полностью реализованы в `reporting.py` (`build_shift_manifest`, `export_shift_bundle`, `export_quarter_pack`, `build_quarter_diagnostics`, `render_quarter_diagnostics_md`, `validate_shift_bundle`, `validate_quarter_pack`), `scripts/export_3d_pack.py` (включая `--extra-plan`) и `scripts/serve_3d.py`. Ниже без единого изменения приведён полный оригинальный промпт Мусы из `368bf27:docs/PROMPT_3D_INTEGRATION_RU.md` (466 строк, 64 169 байт UTF-8, SHA-256 `3ea0716cfb4218f1e06d3ba8f1bed655dda420aa9735725132c9ae82013bbf49`).
 
 ---
 

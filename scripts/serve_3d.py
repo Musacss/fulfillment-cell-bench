@@ -10,6 +10,7 @@ import os
 from pathlib import Path
 import stat
 import sys
+import time
 from typing import Any
 import urllib.parse
 
@@ -30,6 +31,13 @@ def _content_type_for(path: Path) -> str:
 
 def _is_ascii_digits(s: str) -> bool:
     return bool(s) and s.isascii() and s.isdigit()
+
+
+def _parse_bounded_ascii_int(s: str, cap: int = 10**20) -> int | None:
+    if not _is_ascii_digits(s):
+        return None
+    norm = s.lstrip("0") or "0"
+    return cap if len(norm) > 20 else int(norm, 10)
 
 
 def _validate_url_segments(raw_target: str) -> tuple[int, list[str] | None, str]:
@@ -112,25 +120,19 @@ def _parse_byte_range(range_header: str, total_len: int) -> tuple[str, int, int]
     start_str = start_str.strip()
     end_str = end_str.strip()
     if start_str == "":
-        if not _is_ascii_digits(end_str):
-            return ("unsatisfiable", 0, 0)
-        suffix = int(end_str, 10)
-        if suffix <= 0:
+        suffix = _parse_bounded_ascii_int(end_str)
+        if suffix is None or suffix <= 0:
             return ("unsatisfiable", 0, 0)
         start = max(0, total_len - suffix)
         end = total_len - 1
         return ("partial", start, end)
-    if not _is_ascii_digits(start_str):
-        return ("unsatisfiable", 0, 0)
-    start = int(start_str, 10)
-    if start >= total_len:
+    start = _parse_bounded_ascii_int(start_str)
+    if start is None or start >= total_len:
         return ("unsatisfiable", 0, 0)
     if end_str == "":
         return ("partial", start, total_len - 1)
-    if not _is_ascii_digits(end_str):
-        return ("unsatisfiable", 0, 0)
-    end = int(end_str, 10)
-    if start > end:
+    end = _parse_bounded_ascii_int(end_str)
+    if end is None or start > end:
         return ("unsatisfiable", 0, 0)
     return ("partial", start, min(end, total_len - 1))
 
@@ -153,10 +155,17 @@ class PackRequestHandler(BaseHTTPRequestHandler):
     server_version = "FulfillmentCell3DBridge/1.0"
     protocol_version = "HTTP/1.1"
     default_request_version = "HTTP/1.1"
+    timeout = 5.0
 
     def log_message(self, fmt: str, *args: Any) -> None:
         if not getattr(self.server, "quiet", False):
             super().log_message(fmt, *args)
+
+    def finish(self) -> None:
+        try:
+            super().finish()
+        except (TimeoutError, ConnectionError, OSError):
+            pass
 
     def _send_common_headers(self) -> None:
         if getattr(self, "_common_headers_sent", False):
@@ -175,9 +184,58 @@ class PackRequestHandler(BaseHTTPRequestHandler):
         self._send_common_headers()
         super().end_headers()
 
+    def _drain_unread_socket(
+        self,
+        *,
+        deadline_sec: float = 0.15,
+        recv_timeout: float = 0.02,
+        stop_on_double_crlf: bool = True,
+    ) -> None:
+        drained = 0
+        deadline = time.monotonic() + deadline_sec
+        prev_timeout = self.connection.gettimeout()
+        try:
+            self.connection.settimeout(0.0)
+            try:
+                buffered = bytes(self.rfile.peek(1)) if hasattr(self.rfile, "peek") else b""
+            except (BlockingIOError, TimeoutError, OSError):
+                buffered = b""
+            seen = bytes(getattr(self, "raw_requestline", b"")) + buffered
+            already_terminated = stop_on_double_crlf and (b"\r\n\r\n" in seen)
+            tail = seen[-4:]
+            if already_terminated:
+                while drained < _MAX_DRAIN_BYTES:
+                    chunk = self.connection.recv(min(_DRAIN_CHUNK_BYTES, _MAX_DRAIN_BYTES - drained))
+                    if not chunk:
+                        break
+                    drained += len(chunk)
+            else:
+                while drained < _MAX_DRAIN_BYTES:
+                    rem = deadline - time.monotonic()
+                    if rem <= 0:
+                        break
+                    self.connection.settimeout(min(recv_timeout, rem))
+                    chunk = self.connection.recv(min(_DRAIN_CHUNK_BYTES, _MAX_DRAIN_BYTES - drained))
+                    if not chunk:
+                        break
+                    drained += len(chunk)
+                    if stop_on_double_crlf and b"\r\n\r\n" in (tail + chunk):
+                        break
+                    tail = (tail + chunk)[-4:]
+        except (BlockingIOError, TimeoutError, OSError):
+            pass
+        finally:
+            try:
+                self.connection.settimeout(prev_timeout)
+            except OSError:
+                pass
+
     def parse_request(self) -> bool:
         if not super().parse_request():
             self.close_connection = True
+            if not getattr(self, "_common_headers_sent", False):
+                self.request_version = "HTTP/1.1"
+                self._send_json_error(400, "Bad Request")
             return False
         if self.request_version == "HTTP/0.9" or len(self.requestline.split()) < 3:
             self.request_version = "HTTP/1.1"
@@ -192,16 +250,19 @@ class PackRequestHandler(BaseHTTPRequestHandler):
         self._drain_request_body()
         self.close_connection = True
         body = (json.dumps({"error": message}) + "\n").encode("utf-8")
-        self.send_response(status)
-        if extra_headers:
-            for k, v in extra_headers.items():
-                self.send_header(k, v)
-        self.send_header("Connection", "close")
-        self.send_header("Content-Type", "application/json; charset=utf-8")
-        self.send_header("Content-Length", str(len(body)))
-        self.end_headers()
-        if getattr(self, "command", "GET") != "HEAD":
-            self.wfile.write(body)
+        try:
+            self.send_response(status)
+            if extra_headers:
+                for k, v in extra_headers.items():
+                    self.send_header(k, v)
+            self.send_header("Connection", "close")
+            self.send_header("Content-Type", "application/json; charset=utf-8")
+            self.send_header("Content-Length", str(len(body)))
+            self.end_headers()
+            if getattr(self, "command", "GET") != "HEAD":
+                self.wfile.write(body)
+        except (TimeoutError, ConnectionError):
+            self.close_connection = True
 
     def _drain_request_body(self) -> None:
         if getattr(self, "_body_drained", False):
@@ -215,19 +276,27 @@ class PackRequestHandler(BaseHTTPRequestHandler):
             if headers.get("Transfer-Encoding"):
                 self.close_connection = True
             return
-        stripped_len = raw_len.strip()
-        if not _is_ascii_digits(stripped_len):
+        length = _parse_bounded_ascii_int(raw_len.strip())
+        if length is None:
             self.close_connection = True
             return
-        length = int(stripped_len, 10)
         if length <= 0:
             return
-        remaining = min(length, _MAX_DRAIN_BYTES)
+        if length > _MAX_DRAIN_BYTES:
+            self.close_connection = True
+            return
+        remaining = length
+        deadline = time.monotonic() + 0.5
         prev_timeout = self.connection.gettimeout()
+        read_fn = self.rfile.read1 if hasattr(self.rfile, "read1") else self.rfile.read
         try:
-            self.connection.settimeout(0.5)
             while remaining > 0:
-                chunk = self.rfile.read(min(remaining, _DRAIN_CHUNK_BYTES))
+                rem_time = deadline - time.monotonic()
+                if rem_time <= 0:
+                    self.close_connection = True
+                    break
+                self.connection.settimeout(rem_time)
+                chunk = read_fn(min(remaining, _DRAIN_CHUNK_BYTES))
                 if not chunk:
                     self.close_connection = True
                     break
@@ -239,7 +308,7 @@ class PackRequestHandler(BaseHTTPRequestHandler):
                 self.connection.settimeout(prev_timeout)
             except OSError:
                 pass
-        if length > _MAX_DRAIN_BYTES or remaining > 0:
+        if remaining > 0:
             self.close_connection = True
 
     def handle_one_request(self) -> None:
@@ -248,14 +317,31 @@ class PackRequestHandler(BaseHTTPRequestHandler):
         try:
             self.raw_requestline = self.rfile.readline(65537)
             if len(self.raw_requestline) > 65536:
+                self._drain_unread_socket(
+                    deadline_sec=0.15, recv_timeout=0.02, stop_on_double_crlf=True
+                )
                 self.requestline = ""
                 self.request_version = "HTTP/1.1"
                 self.command = ""
+                self._body_drained = True
                 self._send_json_error(414, "Request-URI Too Long")
                 self.wfile.flush()
                 return
             if not self.raw_requestline:
                 self.close_connection = True
+                return
+            stripped_line = self.raw_requestline.strip()
+            if not stripped_line or len(stripped_line.split()) < 3:
+                self._drain_unread_socket(
+                    deadline_sec=0.02, recv_timeout=0.01, stop_on_double_crlf=True
+                )
+                self.requestline = self.raw_requestline.rstrip(b"\r\n").decode("iso-8859-1")
+                self.request_version = "HTTP/1.1"
+                self.command = ""
+                self.close_connection = True
+                self._body_drained = True
+                self._send_json_error(400, "Bad Request")
+                self.wfile.flush()
                 return
             if not self.parse_request():
                 self.wfile.flush()
@@ -274,7 +360,7 @@ class PackRequestHandler(BaseHTTPRequestHandler):
                     extra_headers={"Allow": "GET, HEAD, OPTIONS"},
                 )
             self.wfile.flush()
-        except TimeoutError:
+        except (TimeoutError, ConnectionError):
             self.close_connection = True
 
     def _raw_request_target(self) -> str:
@@ -305,11 +391,14 @@ class PackRequestHandler(BaseHTTPRequestHandler):
                 self._send_json_error(403, "Path traversal forbidden")
                 return
         self.close_connection = True
-        self.send_response(204)
-        self.send_header("Connection", "close")
-        self.send_header("Allow", "GET, HEAD, OPTIONS")
-        self.send_header("Content-Length", "0")
-        self.end_headers()
+        try:
+            self.send_response(204)
+            self.send_header("Connection", "close")
+            self.send_header("Allow", "GET, HEAD, OPTIONS")
+            self.send_header("Content-Length", "0")
+            self.end_headers()
+        except (TimeoutError, ConnectionError):
+            self.close_connection = True
 
     def _serve_file(self, *, send_body: bool) -> None:
         root_dir: Path = self.server.root_dir  # type: ignore[attr-defined]
@@ -329,39 +418,42 @@ class PackRequestHandler(BaseHTTPRequestHandler):
         content_type = _content_type_for(resolved)
         range_hdr = self.headers.get("Range")
 
-        if range_hdr is not None:
-            mode, start, end = _parse_byte_range(range_hdr, total_len)
-            if mode == "unsatisfiable":
-                self.close_connection = True
-                self.send_response(416)
-                self.send_header("Connection", "close")
-                self.send_header("Content-Range", f"bytes */{total_len}")
-                self.send_header("Content-Length", "0")
-                self.end_headers()
-                return
-            if mode == "partial":
-                chunk = data[start : end + 1]
-                self.close_connection = True
-                self.send_response(206)
-                self.send_header("Connection", "close")
-                self.send_header("Content-Type", content_type)
-                self.send_header("Accept-Ranges", "bytes")
-                self.send_header("Content-Range", f"bytes {start}-{end}/{total_len}")
-                self.send_header("Content-Length", str(len(chunk)))
-                self.end_headers()
-                if send_body:
-                    self.wfile.write(chunk)
-                return
+        try:
+            if range_hdr is not None:
+                mode, start, end = _parse_byte_range(range_hdr, total_len)
+                if mode == "unsatisfiable":
+                    self.close_connection = True
+                    self.send_response(416)
+                    self.send_header("Connection", "close")
+                    self.send_header("Content-Range", f"bytes */{total_len}")
+                    self.send_header("Content-Length", "0")
+                    self.end_headers()
+                    return
+                if mode == "partial":
+                    chunk = data[start : end + 1]
+                    self.close_connection = True
+                    self.send_response(206)
+                    self.send_header("Connection", "close")
+                    self.send_header("Content-Type", content_type)
+                    self.send_header("Accept-Ranges", "bytes")
+                    self.send_header("Content-Range", f"bytes {start}-{end}/{total_len}")
+                    self.send_header("Content-Length", str(len(chunk)))
+                    self.end_headers()
+                    if send_body:
+                        self.wfile.write(chunk)
+                    return
 
-        self.close_connection = True
-        self.send_response(200)
-        self.send_header("Connection", "close")
-        self.send_header("Content-Type", content_type)
-        self.send_header("Accept-Ranges", "bytes")
-        self.send_header("Content-Length", str(total_len))
-        self.end_headers()
-        if send_body:
-            self.wfile.write(data)
+            self.close_connection = True
+            self.send_response(200)
+            self.send_header("Connection", "close")
+            self.send_header("Content-Type", content_type)
+            self.send_header("Accept-Ranges", "bytes")
+            self.send_header("Content-Length", str(total_len))
+            self.end_headers()
+            if send_body:
+                self.wfile.write(data)
+        except (TimeoutError, ConnectionError):
+            self.close_connection = True
 
     def do_GET(self) -> None:
         self._serve_file(send_body=True)
