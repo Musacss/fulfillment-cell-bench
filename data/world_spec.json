@@ -1,0 +1,24 @@
+{
+  "schema_version": 1, "world_id": "cell-v1",
+  "clock": {"tick_seconds": 30, "shift_ticks": 960, "overtime_ticks": 120, "break_at": 440, "break_length": 40, "walk_ticks": 2},
+  "capacity": {"pick": 12, "pack": 10, "qc": 8},
+  "workers": {"min": 1, "max": 8, "zones": [1,2,3,4]},
+  "kinds": ["regular","fragile","oversize"],
+  "time": {
+    "manual": {"regular":[3,5,11,3], "fragile":[4,7,14,4], "oversize":[5,9,17,5]},
+    "auto": {"bare":{"regular":6,"fragile":10,"oversize":14},"tray":{"regular":3,"fragile":8,"oversize":12}},
+    "jam_service": 8
+  },
+  "prob_bps": {
+    "jam": {"bare":{"regular":1600,"fragile":4000,"oversize":6500},"tray":{"regular":280,"fragile":2500,"oversize":5000}},
+    "defect_manual": {"regular":40,"fragile":80,"oversize":100},
+    "defect_auto": {"bare":{"regular":300,"fragile":950,"oversize":1500},"tray":{"regular":45,"fragile":650,"oversize":1100}},
+    "detect": 9500
+  },
+  "money": {"budget":1800000,"robot_purchase":1350000,"tray_purchase":180000,"depreciation_days":500,
+    "robot_service_day":700,"tray_per_order":6,"material_per_pack":12,"rework_start":70,
+    "worker_shift":15200,"overtime_per_worker_tick":25,"late_good":320,"unfulfilled":3500,"escaped":6500},
+  "threshold_bps": {"good_each_day":9400,"on_time_pooled":9000,"escaped_each_day_max":100,"auto_pack_pooled_min":2500},
+  "generator": {"waves":12,"spacing":65,"orders_min":12,"orders_span":5,"jitter_span":10,"regular_bps":7400,"fragile_bps":1800,"due_offset":150,"due_span":41},
+  "development_seeds":[11,29,47]
+}
