@@ -1991,11 +1991,26 @@ def validate_quarter_pack(
                 raise ValueError(f"Refusing symlink inside quarter pack: {entry}")
 
     actual_root_entries = {p.name for p in pack_dir.iterdir()}
-    expected_root_entries = {"quarter_manifest.json", "diagnostics.md", "weeks"}
-    if actual_root_entries != expected_root_entries:
+    required_root_entries = {"quarter_manifest.json", "diagnostics.md", "weeks"}
+    optional_root_entries = {"diagnostics.json"}
+    if not required_root_entries.issubset(actual_root_entries) or not actual_root_entries.issubset(
+        required_root_entries | optional_root_entries
+    ):
         raise ValueError(
-            f"Quarter pack root entries {sorted(actual_root_entries)!r} do not match expected {sorted(expected_root_entries)!r}"
+            f"Quarter pack root entries {sorted(actual_root_entries)!r} do not match expected {sorted(required_root_entries)!r}"
         )
+
+    diag_json_path = pack_dir / "diagnostics.json"
+    if diag_json_path.exists():
+        _ensure_not_symlink(diag_json_path)
+        if not diag_json_path.is_file() or not stat.S_ISREG(os.lstat(diag_json_path).st_mode):
+            raise ValueError(f"Invalid diagnostics.json in {pack_dir}")
+        try:
+            diag_json_obj = _strict_json_loads(diag_json_path.read_text(encoding="utf-8"))
+        except UnicodeDecodeError as exc:
+            raise ValueError(f"diagnostics.json is not valid UTF-8: {exc}") from exc
+        if type(diag_json_obj) is not dict:
+            raise ValueError("diagnostics.json must be a JSON object")
 
     if not qm_path.is_file() or not stat.S_ISREG(os.lstat(qm_path).st_mode):
         raise ValueError(f"Missing regular quarter_manifest.json in {pack_dir}")
