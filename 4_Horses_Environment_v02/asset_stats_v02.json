@@ -1,0 +1,835 @@
+{
+  "format": "four-horses.asset-stats.v02",
+  "units": "meters",
+  "measurement_source": "Actual shipped GLBs parsed by Three.js GLTFLoader0.170.0; geometry_vertices count exported POSITION accessors, not native authoring vertices",
+  "files": [
+    {
+      "file": "warehouse_environment.glb",
+      "bytes": 10071556,
+      "sha256": "5f2fca307763538e56a6370c6d601ee35742dd6878d3894b7cfef24cd5c2bfce",
+      "nodes": 705,
+      "mesh_definitions": 426,
+      "mesh_primitives": 426,
+      "mesh_instances": 526,
+      "geometry_vertices": 342161,
+      "mesh_definition_triangles": 451883,
+      "scene_instance_triangles": 468251,
+      "materials": 38,
+      "textures": 0,
+      "images": 0,
+      "skins": 0,
+      "bones": 0,
+      "animation_clips": [],
+      "bounds_gltf_y_up_m": {
+        "min": [
+          -19.00300026,
+          -0.2125,
+          -14.00300026
+        ],
+        "max": [
+          19.00300026,
+          3.69750071,
+          14.00300026
+        ],
+        "size": [
+          38.00600052,
+          3.91000071,
+          28.00600052
+        ]
+      },
+      "bounds_blender_z_up_m": {
+        "min": [
+          -19.00300026,
+          -14.00300026,
+          -0.2125
+        ],
+        "max": [
+          19.00300026,
+          14.00300026,
+          3.69750071
+        ],
+        "size": [
+          38.00600052,
+          28.00600052,
+          3.91000071
+        ]
+      }
+    },
+    {
+      "file": "modules/carton_closed.glb",
+      "bytes": 40244,
+      "sha256": "681e47fa2cb3ac42d65955b710d4e2108c5d177e8107f78ef5afbd7eea499873",
+      "nodes": 25,
+      "mesh_definitions": 8,
+      "mesh_primitives": 8,
+      "mesh_instances": 24,
+      "geometry_vertices": 1014,
+      "mesh_definition_triangles": 1220,
+      "scene_instance_triangles": 1588,
+      "materials": 4,
+      "textures": 0,
+      "images": 0,
+      "skins": 0,
+      "bones": 0,
+      "animation_clips": [],
+      "bounds_gltf_y_up_m": {
+        "min": [
+          -0.2,
+          0,
+          -0.1511
+        ],
+        "max": [
+          0.2,
+          0.25204999,
+          0.1511
+        ],
+        "size": [
+          0.40000001,
+          0.25204999,
+          0.3022
+        ]
+      },
+      "bounds_blender_z_up_m": {
+        "min": [
+          -0.2,
+          -0.1511,
+          0
+        ],
+        "max": [
+          0.2,
+          0.1511,
+          0.25204999
+        ],
+        "size": [
+          0.40000001,
+          0.3022,
+          0.25204999
+        ]
+      }
+    },
+    {
+      "file": "modules/carton_open.glb",
+      "bytes": 20532,
+      "sha256": "6cced5ad81bf1e7675e46be7829ad85f4a1ce6a1eaa988e132f044461de617d4",
+      "nodes": 14,
+      "mesh_definitions": 5,
+      "mesh_primitives": 5,
+      "mesh_instances": 9,
+      "geometry_vertices": 600,
+      "mesh_definition_triangles": 940,
+      "scene_instance_triangles": 1692,
+      "materials": 2,
+      "textures": 0,
+      "images": 0,
+      "skins": 0,
+      "bones": 0,
+      "animation_clips": [],
+      "bounds_gltf_y_up_m": {
+        "min": [
+          -0.38841174,
+          0,
+          -0.29375371
+        ],
+        "max": [
+          0.38841174,
+          0.25177289,
+          0.29375371
+        ],
+        "size": [
+          0.77682348,
+          0.25177289,
+          0.58750742
+        ]
+      },
+      "bounds_blender_z_up_m": {
+        "min": [
+          -0.38841174,
+          -0.29375371,
+          0
+        ],
+        "max": [
+          0.38841174,
+          0.29375371,
+          0.25177289
+        ],
+        "size": [
+          0.77682348,
+          0.58750742,
+          0.25177289
+        ]
+      }
+    },
+    {
+      "file": "modules/humanoid_robot.glb",
+      "bytes": 692720,
+      "sha256": "d6642cb22fe1dc9a593e16138ab46b74e53b9843d538c323c006b38211eb222d",
+      "nodes": 38,
+      "mesh_definitions": 3,
+      "mesh_primitives": 10,
+      "mesh_instances": 10,
+      "geometry_vertices": 7866,
+      "mesh_definition_triangles": 3788,
+      "scene_instance_triangles": 3788,
+      "materials": 10,
+      "textures": 0,
+      "images": 0,
+      "skins": 1,
+      "bones": 32,
+      "animation_clips": [
+        "Idle",
+        "Walk",
+        "CarryIdle",
+        "Reach",
+        "PickUp",
+        "PlaceDown",
+        "CarryWalk",
+        "RobotPack",
+        "Jammed",
+        "Service",
+        "Offline",
+        "RobotPack_Oversize",
+        "Jammed_Oversize",
+        "Service_Oversize"
+      ],
+      "bounds_gltf_y_up_m": {
+        "min": [
+          -0.45681159,
+          0,
+          -0.126
+        ],
+        "max": [
+          0.45681159,
+          1.85100004,
+          0.52999997
+        ],
+        "size": [
+          0.91362318,
+          1.85100004,
+          0.65599997
+        ]
+      },
+      "bounds_blender_z_up_m": {
+        "min": [
+          -0.45681159,
+          -0.52999997,
+          0
+        ],
+        "max": [
+          0.45681159,
+          0.126,
+          1.85100004
+        ],
+        "size": [
+          0.91362318,
+          0.65599997,
+          1.85100004
+        ]
+      }
+    },
+    {
+      "file": "modules/inspection_portal.glb",
+      "bytes": 61928,
+      "sha256": "398a264f6010efd466eb421ca2ca6bc5794e1765e102f8ca81fb1cfef3388f86",
+      "nodes": 23,
+      "mesh_definitions": 15,
+      "mesh_primitives": 15,
+      "mesh_instances": 21,
+      "geometry_vertices": 1884,
+      "mesh_definition_triangles": 2460,
+      "scene_instance_triangles": 3292,
+      "materials": 9,
+      "textures": 0,
+      "images": 0,
+      "skins": 0,
+      "bones": 0,
+      "animation_clips": [],
+      "bounds_gltf_y_up_m": {
+        "min": [
+          -0.28,
+          0,
+          -0.59000001
+        ],
+        "max": [
+          0.39250001,
+          1.80249997,
+          0.59000001
+        ],
+        "size": [
+          0.67250002,
+          1.80249997,
+          1.18000002
+        ]
+      },
+      "bounds_blender_z_up_m": {
+        "min": [
+          -0.28,
+          -0.59000001,
+          0
+        ],
+        "max": [
+          0.39250001,
+          0.59000001,
+          1.80249997
+        ],
+        "size": [
+          0.67250002,
+          1.18000002,
+          1.80249997
+        ]
+      }
+    },
+    {
+      "file": "modules/packing_bench_1800.glb",
+      "bytes": 119328,
+      "sha256": "24080d52876ca0a20ff4ee4636256605006ae77b54d7458beeeb7bd6d8f9181c",
+      "nodes": 67,
+      "mesh_definitions": 29,
+      "mesh_primitives": 29,
+      "mesh_instances": 64,
+      "geometry_vertices": 3632,
+      "mesh_definition_triangles": 5100,
+      "scene_instance_triangles": 10976,
+      "materials": 10,
+      "textures": 0,
+      "images": 0,
+      "skins": 0,
+      "bones": 0,
+      "animation_clips": [],
+      "bounds_gltf_y_up_m": {
+        "min": [
+          -0.89999998,
+          0,
+          -0.45000001
+        ],
+        "max": [
+          0.89999998,
+          2.04000002,
+          0.52499999
+        ],
+        "size": [
+          1.79999995,
+          2.04000002,
+          0.97500001
+        ]
+      },
+      "bounds_blender_z_up_m": {
+        "min": [
+          -0.89999998,
+          -0.52499999,
+          0
+        ],
+        "max": [
+          0.89999998,
+          0.45000001,
+          2.04000002
+        ],
+        "size": [
+          1.79999995,
+          0.97500001,
+          2.04000002
+        ]
+      }
+    },
+    {
+      "file": "modules/pallet_1200x800.glb",
+      "bytes": 20812,
+      "sha256": "994682fe292ce6846380d33173ef4e28ffb5323285be0b9ead066bb05674f7ab",
+      "nodes": 21,
+      "mesh_definitions": 5,
+      "mesh_primitives": 5,
+      "mesh_instances": 20,
+      "geometry_vertices": 600,
+      "mesh_definition_triangles": 940,
+      "scene_instance_triangles": 3760,
+      "materials": 1,
+      "textures": 0,
+      "images": 0,
+      "skins": 0,
+      "bones": 0,
+      "animation_clips": [],
+      "bounds_gltf_y_up_m": {
+        "min": [
+          -0.60000002,
+          0,
+          -0.40000001
+        ],
+        "max": [
+          0.60000002,
+          0.15000001,
+          0.40000001
+        ],
+        "size": [
+          1.20000005,
+          0.15000001,
+          0.80000001
+        ]
+      },
+      "bounds_blender_z_up_m": {
+        "min": [
+          -0.60000002,
+          -0.40000001,
+          0
+        ],
+        "max": [
+          0.60000002,
+          0.40000001,
+          0.15000001
+        ],
+        "size": [
+          1.20000005,
+          0.80000001,
+          0.15000001
+        ]
+      }
+    },
+    {
+      "file": "modules/roller_conveyor_1800.glb",
+      "bytes": 57156,
+      "sha256": "f4baebb0769e7adbfd22fdcb75fe645b376caa39cc4ccf2545a223f84d57a4e0",
+      "nodes": 66,
+      "mesh_definitions": 14,
+      "mesh_primitives": 14,
+      "mesh_instances": 63,
+      "geometry_vertices": 1500,
+      "mesh_definition_triangles": 2080,
+      "scene_instance_triangles": 7652,
+      "materials": 5,
+      "textures": 0,
+      "images": 0,
+      "skins": 0,
+      "bones": 0,
+      "animation_clips": [],
+      "bounds_gltf_y_up_m": {
+        "min": [
+          -0.89999998,
+          0,
+          -0.45600001
+        ],
+        "max": [
+          0.89999998,
+          0.94700001,
+          0.4365
+        ],
+        "size": [
+          1.79999995,
+          0.94700001,
+          0.89250001
+        ]
+      },
+      "bounds_blender_z_up_m": {
+        "min": [
+          -0.89999998,
+          -0.4365,
+          0
+        ],
+        "max": [
+          0.89999998,
+          0.45600001,
+          0.94700001
+        ],
+        "size": [
+          1.79999995,
+          0.89250001,
+          0.94700001
+        ]
+      }
+    },
+    {
+      "file": "modules/shelving_1800.glb",
+      "bytes": 385060,
+      "sha256": "4f518f2c80fd550f5ac21167fb251c507758ccfbca5dfd5b001d9f94c89dbc35",
+      "nodes": 404,
+      "mesh_definitions": 39,
+      "mesh_primitives": 39,
+      "mesh_instances": 391,
+      "geometry_vertices": 9892,
+      "mesh_definition_triangles": 10692,
+      "scene_instance_triangles": 58388,
+      "materials": 9,
+      "textures": 0,
+      "images": 0,
+      "skins": 0,
+      "bones": 0,
+      "animation_clips": [],
+      "bounds_gltf_y_up_m": {
+        "min": [
+          -0.94099998,
+          0,
+          -0.351
+        ],
+        "max": [
+          0.94099998,
+          2.51099995,
+          0.351
+        ],
+        "size": [
+          1.88199997,
+          2.51099995,
+          0.702
+        ]
+      },
+      "bounds_blender_z_up_m": {
+        "min": [
+          -0.94099998,
+          -0.351,
+          0
+        ],
+        "max": [
+          0.94099998,
+          0.351,
+          2.51099995
+        ],
+        "size": [
+          1.88199997,
+          0.702,
+          2.51099995
+        ]
+      }
+    },
+    {
+      "file": "modules/supply_trolley.glb",
+      "bytes": 82504,
+      "sha256": "770c81a1edf41958f7050f590da8ea0c92023d0ee8a9ffee7e18b08e725ff359",
+      "nodes": 49,
+      "mesh_definitions": 16,
+      "mesh_primitives": 16,
+      "mesh_instances": 47,
+      "geometry_vertices": 2348,
+      "mesh_definition_triangles": 3196,
+      "scene_instance_triangles": 8544,
+      "materials": 5,
+      "textures": 0,
+      "images": 0,
+      "skins": 0,
+      "bones": 0,
+      "animation_clips": [],
+      "bounds_gltf_y_up_m": {
+        "min": [
+          -0.48499998,
+          0,
+          -0.30000001
+        ],
+        "max": [
+          0.48499998,
+          1.0925,
+          0.30000001
+        ],
+        "size": [
+          0.96999997,
+          1.09250001,
+          0.60000002
+        ]
+      },
+      "bounds_blender_z_up_m": {
+        "min": [
+          -0.48499998,
+          -0.30000001,
+          0
+        ],
+        "max": [
+          0.48499998,
+          0.30000001,
+          1.0925
+        ],
+        "size": [
+          0.96999997,
+          0.60000002,
+          1.09250001
+        ]
+      }
+    },
+    {
+      "file": "modules/tote_600x400.glb",
+      "bytes": 54224,
+      "sha256": "538f459a83d1d2a2f468b6e40afe89cade5d631df42750c767441fb0c8f278b5",
+      "nodes": 26,
+      "mesh_definitions": 9,
+      "mesh_primitives": 9,
+      "mesh_instances": 25,
+      "geometry_vertices": 1524,
+      "mesh_definition_triangles": 2040,
+      "scene_instance_triangles": 5048,
+      "materials": 3,
+      "textures": 0,
+      "images": 0,
+      "skins": 0,
+      "bones": 0,
+      "animation_clips": [],
+      "bounds_gltf_y_up_m": {
+        "min": [
+          -0.30000001,
+          0,
+          -0.2
+        ],
+        "max": [
+          0.30000001,
+          0.22,
+          0.2
+        ],
+        "size": [
+          0.60000003,
+          0.22,
+          0.40000001
+        ]
+      },
+      "bounds_blender_z_up_m": {
+        "min": [
+          -0.30000001,
+          -0.2,
+          0
+        ],
+        "max": [
+          0.30000001,
+          0.2,
+          0.22
+        ],
+        "size": [
+          0.60000003,
+          0.40000001,
+          0.22
+        ]
+      }
+    },
+    {
+      "file": "modules/visual_layout.glb",
+      "bytes": 631796,
+      "sha256": "e84c52536543064e7706a31212dedb7ed266f18a61442fa7ba5eaf162a77be11",
+      "nodes": 434,
+      "mesh_definitions": 208,
+      "mesh_primitives": 208,
+      "mesh_instances": 334,
+      "geometry_vertices": 16968,
+      "mesh_definition_triangles": 15290,
+      "scene_instance_triangles": 16802,
+      "materials": 7,
+      "textures": 0,
+      "images": 0,
+      "skins": 0,
+      "bones": 0,
+      "animation_clips": [],
+      "bounds_gltf_y_up_m": {
+        "min": [
+          -11.55000001,
+          0,
+          -3.08250004
+        ],
+        "max": [
+          7.60500002,
+          0.91750002,
+          3.39549999
+        ],
+        "size": [
+          19.15500003,
+          0.91750002,
+          6.47800003
+        ]
+      },
+      "bounds_blender_z_up_m": {
+        "min": [
+          -11.55000001,
+          -3.39549999,
+          0
+        ],
+        "max": [
+          7.60500002,
+          3.08250004,
+          0.91750002
+        ],
+        "size": [
+          19.15500003,
+          6.47800003,
+          0.91750002
+        ]
+      }
+    },
+    {
+      "file": "modules/visual_support.glb",
+      "bytes": 79476,
+      "sha256": "11c3f2d0a621d560eeb613ec337a350996619ee25b8eb9750c6b601a7587bdfe",
+      "nodes": 75,
+      "mesh_definitions": 61,
+      "mesh_primitives": 61,
+      "mesh_instances": 61,
+      "geometry_vertices": 1443,
+      "mesh_definition_triangles": 721,
+      "scene_instance_triangles": 721,
+      "materials": 9,
+      "textures": 0,
+      "images": 0,
+      "skins": 0,
+      "bones": 0,
+      "animation_clips": [],
+      "bounds_gltf_y_up_m": {
+        "min": [
+          -0.55000001,
+          -0.075,
+          -0.47
+        ],
+        "max": [
+          0.55000001,
+          0.86000001,
+          0.56999999
+        ],
+        "size": [
+          1.10000002,
+          0.93500002,
+          1.03999999
+        ]
+      },
+      "bounds_blender_z_up_m": {
+        "min": [
+          -0.55000001,
+          -0.56999999,
+          -0.075
+        ],
+        "max": [
+          0.55000001,
+          0.47,
+          0.86000001
+        ],
+        "size": [
+          1.10000002,
+          1.03999999,
+          0.93500002
+        ]
+      }
+    },
+    {
+      "file": "modules/warehouse_worker.glb",
+      "bytes": 780856,
+      "sha256": "e20726849e91117a7f0330de8478c9cb3cca1c2982a0d336b241fd7984d0e60d",
+      "nodes": 33,
+      "mesh_definitions": 4,
+      "mesh_primitives": 15,
+      "mesh_instances": 15,
+      "geometry_vertices": 8843,
+      "mesh_definition_triangles": 3796,
+      "scene_instance_triangles": 3796,
+      "materials": 15,
+      "textures": 0,
+      "images": 0,
+      "skins": 1,
+      "bones": 26,
+      "animation_clips": [
+        "Idle",
+        "Walk",
+        "CarryIdle",
+        "Reach",
+        "PickUp",
+        "PlaceDown",
+        "CarryWalk",
+        "Prepare",
+        "Pick",
+        "Pack",
+        "Inspect",
+        "Assist",
+        "Break",
+        "Prepare_Oversize",
+        "Pick_Oversize",
+        "Pack_Oversize",
+        "Inspect_Oversize"
+      ],
+      "bounds_gltf_y_up_m": {
+        "min": [
+          -0.45168133,
+          0,
+          -0.149
+        ],
+        "max": [
+          0.45168133,
+          1.9440001,
+          0.52999997
+        ],
+        "size": [
+          0.90336267,
+          1.9440001,
+          0.67899998
+        ]
+      },
+      "bounds_blender_z_up_m": {
+        "min": [
+          -0.45168133,
+          -0.52999997,
+          0
+        ],
+        "max": [
+          0.45168133,
+          0.149,
+          1.9440001
+        ],
+        "size": [
+          0.90336267,
+          0.67899998,
+          1.9440001
+        ]
+      }
+    },
+    {
+      "file": "modules/workbench_1800.glb",
+      "bytes": 134200,
+      "sha256": "bd5607f3e3460a5bca3a229faaa287c49be89260f04b38174057bc1c74f7bdf7",
+      "nodes": 78,
+      "mesh_definitions": 28,
+      "mesh_primitives": 28,
+      "mesh_instances": 73,
+      "geometry_vertices": 3810,
+      "mesh_definition_triangles": 5136,
+      "scene_instance_triangles": 10380,
+      "materials": 9,
+      "textures": 0,
+      "images": 0,
+      "skins": 0,
+      "bones": 0,
+      "animation_clips": [],
+      "bounds_gltf_y_up_m": {
+        "min": [
+          -0.89999998,
+          0,
+          -0.45000001
+        ],
+        "max": [
+          0.89999998,
+          0.86000003,
+          0.52499999
+        ],
+        "size": [
+          1.79999995,
+          0.86000003,
+          0.97500001
+        ]
+      },
+      "bounds_blender_z_up_m": {
+        "min": [
+          -0.89999998,
+          -0.52499999,
+          0
+        ],
+        "max": [
+          0.89999998,
+          0.45000001,
+          0.86000003
+        ],
+        "size": [
+          1.79999995,
+          0.97500001,
+          0.86000003
+        ]
+      }
+    }
+  ],
+  "totals": {
+    "glb_files": 15,
+    "bytes": 13232392,
+    "textures": 0,
+    "images": 0
+  },
+  "worker_authored_geometry": {
+    "body_triangles": 3480,
+    "helmet_triangles": 256,
+    "body_authored_vertices": 1976,
+    "helmet_authored_vertices": 130,
+    "total_authored_vertices": 2106,
+    "materials": 12
+  },
+  "refreshed_environment_anchors": 34
+}

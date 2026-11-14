@@ -1,0 +1,556 @@
+{
+  "id": "humanoid_robot",
+  "version": "0.3.0",
+  "file": "modules/humanoid_robot.glb",
+  "units": "meters",
+  "height_rest_m": 1.851,
+  "forward": "Blender -Y / glTF +Z",
+  "origin": "floor / midpoint between feet",
+  "triangles": 3728,
+  "authored_vertices": 2004,
+  "materials": 7,
+  "bones": 32,
+  "faceless": true,
+  "flat_shaded": true,
+  "design": "human proportions; original industrial humanoid; rigid segmented armor and visible joints",
+  "human_reference": "warehouse_worker: same 20 core bone lengths and joint locations",
+  "box_handling": {
+    "box_size_m": [
+      0.36,
+      0.28,
+      0.25
+    ],
+    "source_center_blender_m": [
+      0.0,
+      -0.3400000035762787,
+      0.9850000143051147
+    ],
+    "held_center_blender_m": [
+      0.0,
+      -0.30000001192092896,
+      1.125
+    ],
+    "palm_contact_offset_z_m": 0.025,
+    "max_authored_contact_error_m": 2.5636927089222153e-07,
+    "thumb_orientation": "upper edge; flexed into surface contact when gripping",
+    "thumb_surface_fits": {
+      "thumb.L": {
+        "flex_degrees": 22.512691949959844,
+        "open_gap_m": 0.013260446190834052,
+        "closed_gap_m": 7.152557379708213e-09
+      },
+      "thumb.R": {
+        "flex_degrees": 22.512691949959844,
+        "open_gap_m": 0.013260446190834052,
+        "closed_gap_m": 7.152557379708213e-09
+      }
+    },
+    "finger_direction_blender": [
+      0,
+      -1,
+      0
+    ],
+    "finger_bones": 10,
+    "hand_scale": 1.25,
+    "prop_bones": [
+      "prop_box",
+      "prop_stand"
+    ]
+  },
+  "clips": [
+    {
+      "name": "Idle",
+      "action": "Robot_Idle",
+      "duration_seconds": 3.2,
+      "loop": true,
+      "root_motion": false
+    },
+    {
+      "name": "Walk",
+      "action": "Robot_Walk",
+      "duration_seconds": 1.0,
+      "loop": true,
+      "root_motion": false
+    },
+    {
+      "name": "CarryIdle",
+      "action": "Robot_CarryIdle",
+      "duration_seconds": 2.4,
+      "loop": true,
+      "root_motion": false
+    },
+    {
+      "name": "Reach",
+      "action": "Robot_Reach",
+      "duration_seconds": 2.4,
+      "loop": false,
+      "root_motion": false
+    },
+    {
+      "name": "PickUp",
+      "action": "Robot_PickUp",
+      "duration_seconds": 3.2,
+      "loop": false,
+      "root_motion": false
+    },
+    {
+      "name": "PlaceDown",
+      "action": "Robot_PlaceDown",
+      "duration_seconds": 3.2,
+      "loop": false,
+      "root_motion": false
+    },
+    {
+      "name": "CarryWalk",
+      "action": "Robot_CarryWalk",
+      "duration_seconds": 1.0,
+      "loop": true,
+      "root_motion": false
+    },
+    {
+      "name": "RobotPack",
+      "action": "Robot_RobotPack",
+      "duration_seconds": 2.8,
+      "loop": true,
+      "root_motion": false,
+      "visual_only": true,
+      "frozen": false,
+      "order_variant": "standard"
+    },
+    {
+      "name": "Jammed",
+      "action": "Robot_Jammed",
+      "duration_seconds": 1.0,
+      "loop": true,
+      "root_motion": false,
+      "visual_only": true,
+      "frozen": true,
+      "order_variant": "standard"
+    },
+    {
+      "name": "Service",
+      "action": "Robot_Service",
+      "duration_seconds": 1.0,
+      "loop": true,
+      "root_motion": false,
+      "visual_only": true,
+      "frozen": true,
+      "order_variant": "standard"
+    },
+    {
+      "name": "Offline",
+      "action": "Robot_Offline",
+      "duration_seconds": 1.0,
+      "loop": true,
+      "root_motion": false,
+      "visual_only": true,
+      "frozen": true,
+      "order_variant": "standard"
+    },
+    {
+      "name": "RobotPack_Oversize",
+      "action": "Robot_RobotPack_Oversize",
+      "duration_seconds": 2.8,
+      "loop": true,
+      "root_motion": false,
+      "visual_only": true,
+      "frozen": false,
+      "order_variant": "oversize"
+    },
+    {
+      "name": "Jammed_Oversize",
+      "action": "Robot_Jammed_Oversize",
+      "duration_seconds": 1.0,
+      "loop": true,
+      "root_motion": false,
+      "visual_only": true,
+      "frozen": true,
+      "order_variant": "oversize"
+    },
+    {
+      "name": "Service_Oversize",
+      "action": "Robot_Service_Oversize",
+      "duration_seconds": 1.0,
+      "loop": true,
+      "root_motion": false,
+      "visual_only": true,
+      "frozen": true,
+      "order_variant": "oversize"
+    }
+  ],
+  "attachments": [
+    "ATTACH_ROBOT_HAND_L",
+    "ATTACH_ROBOT_HAND_R"
+  ],
+  "scene_position_blender_m": [
+    3.0,
+    1.2999999523162842,
+    0.0
+  ],
+  "scene_position_gltf_m": [
+    3,
+    0,
+    -1.3
+  ],
+  "bounds_blender_rest_m": {
+    "min": [
+      -0.45681172609329224,
+      -0.148,
+      0.012
+    ],
+    "max": [
+      0.45681172609329224,
+      0.126,
+      1.851
+    ],
+    "size": [
+      0.9136234521865845,
+      0.274,
+      1.839
+    ]
+  },
+  "simulation_status": "display/animation asset; task scheduling and object grasp not connected",
+  "parts": [
+    {
+      "name": "Pelvic frame",
+      "bone": "hips",
+      "vertices": 32
+    },
+    {
+      "name": "Pelvic front inset",
+      "bone": "hips",
+      "vertices": 16
+    },
+    {
+      "name": "Pelvic ochre center",
+      "bone": "hips",
+      "vertices": 16
+    },
+    {
+      "name": "Abdominal core",
+      "bone": "spine",
+      "vertices": 24
+    },
+    {
+      "name": "Segmented abdominal rib",
+      "bone": "spine",
+      "vertices": 16
+    },
+    {
+      "name": "Segmented abdominal rib",
+      "bone": "spine",
+      "vertices": 16
+    },
+    {
+      "name": "Segmented abdominal rib",
+      "bone": "spine",
+      "vertices": 16
+    },
+    {
+      "name": "Chest armor",
+      "bone": "chest",
+      "vertices": 40
+    },
+    {
+      "name": "Chest service panel",
+      "bone": "chest",
+      "vertices": 16
+    },
+    {
+      "name": "Chest vertical marking",
+      "bone": "chest",
+      "vertices": 16
+    },
+    {
+      "name": "Back access panel",
+      "bone": "chest",
+      "vertices": 16
+    },
+    {
+      "name": "Back panel recess",
+      "bone": "chest",
+      "vertices": 16
+    },
+    {
+      "name": "Back panel recess",
+      "bone": "chest",
+      "vertices": 16
+    },
+    {
+      "name": "Neck actuator",
+      "bone": "neck",
+      "vertices": 20
+    },
+    {
+      "name": "Neck collar",
+      "bone": "neck",
+      "vertices": 20
+    },
+    {
+      "name": "Neck collar",
+      "bone": "neck",
+      "vertices": 20
+    },
+    {
+      "name": "Faceless head",
+      "bone": "head",
+      "vertices": 56
+    },
+    {
+      "name": "Occipital panel",
+      "bone": "head",
+      "vertices": 16
+    },
+    {
+      "name": "Shoulder joint",
+      "bone": "upper_arm.L",
+      "vertices": 50
+    },
+    {
+      "name": "Shoulder and upper arm armor",
+      "bone": "upper_arm.L",
+      "vertices": 48
+    },
+    {
+      "name": "Shoulder safety marking",
+      "bone": "upper_arm.L",
+      "vertices": 16
+    },
+    {
+      "name": "Elbow joint",
+      "bone": "forearm.L",
+      "vertices": 50
+    },
+    {
+      "name": "Elbow transverse hinge",
+      "bone": "forearm.L",
+      "vertices": 40
+    },
+    {
+      "name": "Forearm armor",
+      "bone": "forearm.L",
+      "vertices": 32
+    },
+    {
+      "name": "Forearm dark service strip",
+      "bone": "forearm.L",
+      "vertices": 16
+    },
+    {
+      "name": "Wrist flex joint",
+      "bone": "hand.L",
+      "vertices": 40
+    },
+    {
+      "name": "Human-sized palm",
+      "bone": "hand.L",
+      "vertices": 32
+    },
+    {
+      "name": "Finger 1",
+      "bone": "finger_1.L",
+      "vertices": 24
+    },
+    {
+      "name": "Finger 2",
+      "bone": "finger_2.L",
+      "vertices": 24
+    },
+    {
+      "name": "Finger 3",
+      "bone": "finger_3.L",
+      "vertices": 24
+    },
+    {
+      "name": "Finger 4",
+      "bone": "finger_4.L",
+      "vertices": 24
+    },
+    {
+      "name": "Thumb",
+      "bone": "thumb.L",
+      "vertices": 24
+    },
+    {
+      "name": "Hip joint",
+      "bone": "thigh.L",
+      "vertices": 50
+    },
+    {
+      "name": "Upper leg armor",
+      "bone": "thigh.L",
+      "vertices": 32
+    },
+    {
+      "name": "Thigh outer cover",
+      "bone": "thigh.L",
+      "vertices": 16
+    },
+    {
+      "name": "Knee joint",
+      "bone": "shin.L",
+      "vertices": 50
+    },
+    {
+      "name": "Knee transverse hinge",
+      "bone": "shin.L",
+      "vertices": 40
+    },
+    {
+      "name": "Knee shield",
+      "bone": "shin.L",
+      "vertices": 16
+    },
+    {
+      "name": "Knee safety marking",
+      "bone": "shin.L",
+      "vertices": 16
+    },
+    {
+      "name": "Shin armor",
+      "bone": "shin.L",
+      "vertices": 32
+    },
+    {
+      "name": "Rear calf actuator",
+      "bone": "shin.L",
+      "vertices": 16
+    },
+    {
+      "name": "Ankle joint",
+      "bone": "foot.L",
+      "vertices": 40
+    },
+    {
+      "name": "Ankle top housing",
+      "bone": "foot.L",
+      "vertices": 24
+    },
+    {
+      "name": "Shoulder joint",
+      "bone": "upper_arm.R",
+      "vertices": 50
+    },
+    {
+      "name": "Shoulder and upper arm armor",
+      "bone": "upper_arm.R",
+      "vertices": 48
+    },
+    {
+      "name": "Shoulder safety marking",
+      "bone": "upper_arm.R",
+      "vertices": 16
+    },
+    {
+      "name": "Elbow joint",
+      "bone": "forearm.R",
+      "vertices": 50
+    },
+    {
+      "name": "Elbow transverse hinge",
+      "bone": "forearm.R",
+      "vertices": 40
+    },
+    {
+      "name": "Forearm armor",
+      "bone": "forearm.R",
+      "vertices": 32
+    },
+    {
+      "name": "Forearm dark service strip",
+      "bone": "forearm.R",
+      "vertices": 16
+    },
+    {
+      "name": "Wrist flex joint",
+      "bone": "hand.R",
+      "vertices": 40
+    },
+    {
+      "name": "Human-sized palm",
+      "bone": "hand.R",
+      "vertices": 32
+    },
+    {
+      "name": "Finger 1",
+      "bone": "finger_1.R",
+      "vertices": 24
+    },
+    {
+      "name": "Finger 2",
+      "bone": "finger_2.R",
+      "vertices": 24
+    },
+    {
+      "name": "Finger 3",
+      "bone": "finger_3.R",
+      "vertices": 24
+    },
+    {
+      "name": "Finger 4",
+      "bone": "finger_4.R",
+      "vertices": 24
+    },
+    {
+      "name": "Thumb",
+      "bone": "thumb.R",
+      "vertices": 24
+    },
+    {
+      "name": "Hip joint",
+      "bone": "thigh.R",
+      "vertices": 50
+    },
+    {
+      "name": "Upper leg armor",
+      "bone": "thigh.R",
+      "vertices": 32
+    },
+    {
+      "name": "Thigh outer cover",
+      "bone": "thigh.R",
+      "vertices": 16
+    },
+    {
+      "name": "Knee joint",
+      "bone": "shin.R",
+      "vertices": 50
+    },
+    {
+      "name": "Knee transverse hinge",
+      "bone": "shin.R",
+      "vertices": 40
+    },
+    {
+      "name": "Knee shield",
+      "bone": "shin.R",
+      "vertices": 16
+    },
+    {
+      "name": "Knee safety marking",
+      "bone": "shin.R",
+      "vertices": 16
+    },
+    {
+      "name": "Shin armor",
+      "bone": "shin.R",
+      "vertices": 32
+    },
+    {
+      "name": "Rear calf actuator",
+      "bone": "shin.R",
+      "vertices": 16
+    },
+    {
+      "name": "Ankle joint",
+      "bone": "foot.R",
+      "vertices": 40
+    },
+    {
+      "name": "Ankle top housing",
+      "bone": "foot.R",
+      "vertices": 24
+    }
+  ],
+  "visual_operations": "Robotization Bench v1 document; no production timing in clips"
+}

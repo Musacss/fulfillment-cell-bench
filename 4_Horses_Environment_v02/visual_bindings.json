@@ -1,0 +1,287 @@
+{
+  "format": "four-horses.visual-bindings.v1",
+  "source_contract": "User integration document: Robotization Bench v1, claimed commit 1af71b6; private core not available for verification",
+  "units": "meters",
+  "axes": "glTF Y-up; character forward +Z",
+  "simulation_rules_in_this_file": false,
+  "assets": {
+    "environment": "warehouse_environment.glb",
+    "layout": "modules/visual_layout.glb",
+    "templates": "modules/visual_support.glb",
+    "worker": "modules/warehouse_worker.glb",
+    "robot": "modules/humanoid_robot.glb"
+  },
+  "stages": [
+    {
+      "stage": 1,
+      "actor_anchor": "VIS_STAGE_1_WORK",
+      "actor_position_gltf_m": [
+        -11,
+        0,
+        -0.9999999999999999
+      ],
+      "yaw_gltf_rad": 3.141592653589793,
+      "order_anchor": "VIS_STAGE_1_ORDER",
+      "table_height_m": 0.86,
+      "parallel_slot_spacing_m": [
+        1.6,
+        1.8
+      ],
+      "parallel_slot_columns": 2
+    },
+    {
+      "stage": 2,
+      "actor_anchor": "VIS_STAGE_2_WORK",
+      "actor_position_gltf_m": [
+        -5.4,
+        0,
+        -2.0500000000000003
+      ],
+      "yaw_gltf_rad": 3.141592653589793,
+      "order_anchor": "VIS_STAGE_2_ORDER",
+      "table_height_m": 0.86,
+      "parallel_slot_spacing_m": [
+        1.6,
+        1.8
+      ],
+      "parallel_slot_columns": 2
+    },
+    {
+      "stage": 3,
+      "actor_anchor": "VIS_STAGE_3_WORK",
+      "actor_position_gltf_m": [
+        1.8,
+        0,
+        -2.0500000000000003
+      ],
+      "yaw_gltf_rad": 3.141592653589793,
+      "order_anchor": "VIS_STAGE_3_ORDER",
+      "table_height_m": 0.86,
+      "parallel_slot_spacing_m": [
+        1.6,
+        1.8
+      ],
+      "parallel_slot_columns": 2
+    },
+    {
+      "stage": 4,
+      "actor_anchor": "VIS_STAGE_4_WORK",
+      "actor_position_gltf_m": [
+        6.0,
+        0,
+        -2.0500000000000003
+      ],
+      "yaw_gltf_rad": 3.141592653589793,
+      "order_anchor": "VIS_STAGE_4_ORDER",
+      "table_height_m": 0.86,
+      "parallel_slot_spacing_m": [
+        1.6,
+        1.8
+      ],
+      "parallel_slot_columns": 2
+    }
+  ],
+  "robot": {
+    "stage": 3,
+    "actor_anchor": "VIS_ROBOT_WORK",
+    "position_gltf_m": [
+      3.5,
+      0,
+      -2.05
+    ],
+    "yaw_gltf_rad": 3.141592653589793,
+    "order_anchor": "VIS_ROBOT_ORDER",
+    "helper_anchor": "VIS_ROBOT_ASSIST"
+  },
+  "queues": {
+    "Q1": {
+      "origin": [
+        -11,
+        3.1,
+        0.15
+      ],
+      "columns": 3,
+      "spacing": [
+        0.56,
+        0.42
+      ],
+      "preview_count": 6,
+      "bounded": false,
+      "origin_gltf_m": [
+        -11,
+        0.15,
+        -3.1
+      ],
+      "anchor": "VIS_QUEUE_Q1",
+      "capacity_source": "passed explicitly from World by the replay adapter; preview_count is not a limit"
+    },
+    "Q2": {
+      "origin": [
+        -7.3,
+        -2.3,
+        0.86
+      ],
+      "columns": 4,
+      "spacing": [
+        0.56,
+        -0.42
+      ],
+      "preview_count": 12,
+      "bounded": true,
+      "origin_gltf_m": [
+        -7.3,
+        0.86,
+        2.3
+      ],
+      "anchor": "VIS_QUEUE_Q2",
+      "capacity_source": "passed explicitly from World by the replay adapter; preview_count is not a limit"
+    },
+    "Q3": {
+      "origin": [
+        -0.7,
+        -2.3,
+        0.86
+      ],
+      "columns": 5,
+      "spacing": [
+        0.56,
+        -0.42
+      ],
+      "preview_count": 10,
+      "bounded": true,
+      "origin_gltf_m": [
+        -0.7,
+        0.86,
+        2.3
+      ],
+      "anchor": "VIS_QUEUE_Q3",
+      "capacity_source": "passed explicitly from World by the replay adapter; preview_count is not a limit"
+    },
+    "Q4": {
+      "origin": [
+        5.6,
+        -2.3,
+        0.86
+      ],
+      "columns": 4,
+      "spacing": [
+        0.56,
+        -0.42
+      ],
+      "preview_count": 8,
+      "bounded": true,
+      "origin_gltf_m": [
+        5.6,
+        0.86,
+        2.3
+      ],
+      "anchor": "VIS_QUEUE_Q4",
+      "capacity_source": "passed explicitly from World by the replay adapter; preview_count is not a limit"
+    },
+    "R": {
+      "origin": [
+        3.8,
+        -7.45,
+        0.86
+      ],
+      "columns": 3,
+      "spacing": [
+        0.56,
+        0.42
+      ],
+      "preview_count": 6,
+      "bounded": false,
+      "origin_gltf_m": [
+        3.8,
+        0.86,
+        7.45
+      ],
+      "anchor": "VIS_QUEUE_R",
+      "capacity_source": "passed explicitly from World by the replay adapter; preview_count is not a limit"
+    }
+  },
+  "outcomes": {
+    "good": {
+      "anchor": "VIS_OUTCOME_GOOD",
+      "position_gltf_m": [
+        10.0,
+        0.15,
+        -2.2
+      ]
+    },
+    "escaped": {
+      "anchor": "VIS_OUTCOME_ESCAPED",
+      "position_gltf_m": [
+        10.0,
+        0.15,
+        -4.4
+      ]
+    },
+    "scrap": {
+      "anchor": "VIS_OUTCOME_SCRAP",
+      "position_gltf_m": [
+        7.2,
+        0.02,
+        7.0
+      ]
+    }
+  },
+  "order_visual_sizes_m": {
+    "regular": [
+      0.36,
+      0.28,
+      0.25
+    ],
+    "fragile": [
+      0.36,
+      0.28,
+      0.25
+    ],
+    "oversize": [
+      0.48,
+      0.34,
+      0.32
+    ]
+  },
+  "worker_states": {
+    "idle": "Idle",
+    "walk": "Walk",
+    "prepare": "Prepare",
+    "pick": "Pick",
+    "pack": "Pack",
+    "inspect": "Inspect",
+    "assist": "Assist",
+    "break": "Break"
+  },
+  "robot_states": {
+    "not_purchased": null,
+    "disabled": "Offline",
+    "idle": "Idle",
+    "pack": "RobotPack",
+    "jammed": "Jammed",
+    "helper_walking": "Jammed",
+    "service": "Service",
+    "finished": "Idle"
+  },
+  "production_hide_embedded_props": true,
+  "oversize_clip_suffix": "_Oversize",
+  "travel_clip": "Walk",
+  "travel_has_order": false,
+  "order_ownership_source": "replay state only; assisting worker does not own the robot order",
+  "templates": [
+    "VIS_manual_bench",
+    "VIS_order_regular",
+    "VIS_order_fragile",
+    "VIS_order_oversize",
+    "VIS_empty_slot",
+    "VIS_reserved_slot",
+    "VIS_order_tray",
+    "VIS_status_jammed",
+    "VIS_status_service",
+    "VIS_status_break",
+    "VIS_status_offline",
+    "VIS_outcome_good",
+    "VIS_outcome_escaped",
+    "VIS_outcome_scrap"
+  ]
+}

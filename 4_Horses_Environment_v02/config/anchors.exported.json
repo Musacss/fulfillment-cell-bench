@@ -1,0 +1,327 @@
+{
+  "units": "meters",
+  "coordinate_system": "glTF / Three.js Y-up",
+  "anchors": [
+    {
+      "id": "ANCHOR_C01_IN",
+      "position_m": [
+        -9,
+        0.86000001,
+        0
+      ],
+      "role": "conveyor_in"
+    },
+    {
+      "id": "ANCHOR_C01_OUT",
+      "position_m": [
+        -7.20000029,
+        0.86000001,
+        0
+      ],
+      "role": "conveyor_out"
+    },
+    {
+      "id": "ANCHOR_C02_IN",
+      "position_m": [
+        -7.20000029,
+        0.86000001,
+        0
+      ],
+      "role": "conveyor_in"
+    },
+    {
+      "id": "ANCHOR_C02_OUT",
+      "position_m": [
+        -5.4000001,
+        0.86000001,
+        0
+      ],
+      "role": "conveyor_out"
+    },
+    {
+      "id": "ANCHOR_C03_IN",
+      "position_m": [
+        -5.4000001,
+        0.86000001,
+        0
+      ],
+      "role": "conveyor_in"
+    },
+    {
+      "id": "ANCHOR_C03_OUT",
+      "position_m": [
+        -3.5999999,
+        0.86000001,
+        0
+      ],
+      "role": "conveyor_out"
+    },
+    {
+      "id": "ANCHOR_C04_IN",
+      "position_m": [
+        -3.5999999,
+        0.86000001,
+        0
+      ],
+      "role": "conveyor_in"
+    },
+    {
+      "id": "ANCHOR_C04_OUT",
+      "position_m": [
+        -1.80000007,
+        0.86000001,
+        0
+      ],
+      "role": "conveyor_out"
+    },
+    {
+      "id": "ANCHOR_C05_IN",
+      "position_m": [
+        -1.79999995,
+        0.86000001,
+        0
+      ],
+      "role": "conveyor_in"
+    },
+    {
+      "id": "ANCHOR_C05_OUT",
+      "position_m": [
+        0,
+        0.86000001,
+        0
+      ],
+      "role": "conveyor_out"
+    },
+    {
+      "id": "ANCHOR_C06_IN",
+      "position_m": [
+        0,
+        0.86000001,
+        0
+      ],
+      "role": "conveyor_in"
+    },
+    {
+      "id": "ANCHOR_C06_OUT",
+      "position_m": [
+        1.79999995,
+        0.86000001,
+        0
+      ],
+      "role": "conveyor_out"
+    },
+    {
+      "id": "ANCHOR_C07_IN",
+      "position_m": [
+        1.80000007,
+        0.86000001,
+        0
+      ],
+      "role": "conveyor_in"
+    },
+    {
+      "id": "ANCHOR_C07_OUT",
+      "position_m": [
+        3.5999999,
+        0.86000001,
+        0
+      ],
+      "role": "conveyor_out"
+    },
+    {
+      "id": "ANCHOR_C08_IN",
+      "position_m": [
+        3.5999999,
+        0.86000001,
+        0
+      ],
+      "role": "conveyor_in"
+    },
+    {
+      "id": "ANCHOR_C08_OUT",
+      "position_m": [
+        5.4000001,
+        0.86000001,
+        0
+      ],
+      "role": "conveyor_out"
+    },
+    {
+      "id": "ANCHOR_C09_IN",
+      "position_m": [
+        5.4000001,
+        0.86000001,
+        0
+      ],
+      "role": "conveyor_in"
+    },
+    {
+      "id": "ANCHOR_C09_OUT",
+      "position_m": [
+        7.20000029,
+        0.86000001,
+        0
+      ],
+      "role": "conveyor_out"
+    },
+    {
+      "id": "ANCHOR_C10_IN",
+      "position_m": [
+        7.20000029,
+        0.86000001,
+        0
+      ],
+      "role": "conveyor_in"
+    },
+    {
+      "id": "ANCHOR_C10_OUT",
+      "position_m": [
+        9,
+        0.86000001,
+        0
+      ],
+      "role": "conveyor_out"
+    },
+    {
+      "id": "ANCHOR_BENCH_PICK_APPROACH",
+      "position_m": [
+        -5.4000001,
+        0,
+        -1.60000002
+      ],
+      "role": "worker_approach"
+    },
+    {
+      "id": "ANCHOR_BENCH_PICK_WORK",
+      "position_m": [
+        -5.4000001,
+        0.86000001,
+        -2.62000012
+      ],
+      "role": "work_surface"
+    },
+    {
+      "id": "ANCHOR_BENCH_PACK_APPROACH",
+      "position_m": [
+        1.79999995,
+        0,
+        -1.60000002
+      ],
+      "role": "worker_approach"
+    },
+    {
+      "id": "ANCHOR_BENCH_PACK_WORK",
+      "position_m": [
+        1.79999995,
+        0.86000001,
+        -2.62000012
+      ],
+      "role": "work_surface"
+    },
+    {
+      "id": "ANCHOR_BENCH_REWORK_APPROACH",
+      "position_m": [
+        4.5,
+        0,
+        8.10000038
+      ],
+      "role": "worker_approach"
+    },
+    {
+      "id": "ANCHOR_BENCH_REWORK_WORK",
+      "position_m": [
+        4.5,
+        0.86000001,
+        7.07999992
+      ],
+      "role": "work_surface"
+    },
+    {
+      "id": "ANCHOR_QC_CENTER",
+      "position_m": [
+        6.1500001,
+        0.86000001,
+        0
+      ],
+      "role": "inspection"
+    },
+    {
+      "id": "ANCHOR_LINE_IN",
+      "position_m": [
+        -9,
+        0.86000001,
+        0
+      ],
+      "role": "line_in"
+    },
+    {
+      "id": "ANCHOR_LINE_OUT",
+      "position_m": [
+        9,
+        0.86000001,
+        0
+      ],
+      "role": "line_out"
+    },
+    {
+      "id": "ANCHOR_PACK_GRASP",
+      "position_m": [
+        1.79999995,
+        1.11000001,
+        -2.61999989
+      ],
+      "role": "parcel_grasp"
+    },
+    {
+      "id": "ANCHOR_REWORK",
+      "position_m": [
+        4.5,
+        0.86000001,
+        7
+      ],
+      "role": "rework_surface"
+    },
+    {
+      "id": "MOUNT_actor_pack",
+      "position_m": [
+        1.79999995,
+        0,
+        2.20000005
+      ],
+      "role": "future_actor",
+      "clearance_xyz_m": [
+        1.8,
+        2.4,
+        1.8
+      ]
+    },
+    {
+      "id": "MOUNT_actor_pick",
+      "position_m": [
+        -5.4000001,
+        0,
+        2.20000005
+      ],
+      "role": "future_actor",
+      "clearance_xyz_m": [
+        1.8,
+        2.4,
+        1.8
+      ]
+    },
+    {
+      "id": "MOUNT_actor_quality",
+      "position_m": [
+        6.1500001,
+        0,
+        2.20000005
+      ],
+      "role": "future_actor",
+      "clearance_xyz_m": [
+        1.8,
+        2.4,
+        1.8
+      ]
+    }
+  ]
+}
