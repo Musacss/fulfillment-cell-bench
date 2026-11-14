@@ -25,3 +25,21 @@ def test_two_order_single_worker_downstream_first():
     r = simulate(w, p, Scenario(1, 11, (first,replace(first,id=1,due=58))), trace=True)
     assert [(e.order_id, e.tick) for e in r.events if e.kind == "good"] == [(0,28),(1,58)]
     assert r.labor_ticks == 58
+
+
+def test_other_orders_route_does_not_shift_a_regular_orders_jam():
+    from robotization_bench.contracts import draw
+    w=load_world()
+    w["prob_bps"]["jam"]["tray"].update(regular=5000,fragile=5000)
+    p=Plan(1,True,True,"all",((1,),(2,),(3,),(4,)))
+    main=Order(7,"regular",200,400)
+    other=Order(8,"fragile",0,100)
+    for seed in range(8):
+        solo=Scenario(1,seed,(main,))
+        both=Scenario(1,seed,(other,main))
+        outcomes=[]
+        for plan,day in ((p,solo),(p,both),(replace(p,route="bypass"),both)):
+            raw=simulate(w,plan,day,trace=True)
+            outcomes.append(any(e.kind=="jam" and e.order_id==7 for e in raw.events))
+        expected=draw(seed,7,3,0,"jam",10000)<5000
+        assert outcomes==[expected]*3

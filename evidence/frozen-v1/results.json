@@ -1,0 +1,752 @@
+{
+  "commit": "5f5ced2973c53f2c2c8cb3afa32acd105cf87fb2",
+  "world": "cell-v1",
+  "schema_version": 1,
+  "world_sha256": "83e17762597ffc861dfa99002caefb6f192b4167f19ad31b54e533c0ddc641f9",
+  "python": "3.12.14",
+  "runner": "local-python",
+  "model": null,
+  "pilot_limit": null,
+  "pilot_count": 39,
+  "evaluation_seeds": [
+    5343194,
+    301926751,
+    437594646,
+    653467791,
+    853984044,
+    1177674159,
+    1809728213,
+    2055338172
+  ],
+  "development": false,
+  "results": {
+    "manual": {
+      "valid": true,
+      "feasible": true,
+      "win": false,
+      "reward_num": 1,
+      "reward_den": 5,
+      "metrics": {
+        "good": 1342,
+        "on_time": 1330,
+        "escaped": 0,
+        "scrap": 0,
+        "unfinished": 0,
+        "auto_finished": 0,
+        "pack_finished": 1347,
+        "labor_ticks": 33505,
+        "orders": 1342,
+        "total_cost": 749954,
+        "base_cost": 749954,
+        "base_labor_ticks": 33505,
+        "purchase": 0
+      },
+      "reasons": [
+        "cost",
+        "labor",
+        "automation"
+      ]
+    },
+    "reference": {
+      "valid": true,
+      "feasible": true,
+      "win": true,
+      "reward_num": 766553,
+      "reward_den": 1874885,
+      "metrics": {
+        "good": 1342,
+        "on_time": 1301,
+        "escaped": 0,
+        "scrap": 0,
+        "unfinished": 0,
+        "auto_finished": 1002,
+        "pack_finished": 1347,
+        "labor_ticks": 22785,
+        "orders": 1342,
+        "total_cost": 554166,
+        "base_cost": 749954,
+        "base_labor_ticks": 33505,
+        "purchase": 1530000
+      },
+      "reasons": []
+    }
+  },
+  "days": {
+    "manual": [
+      {
+        "raw": {
+          "schema_version": 1,
+          "seed": 5343194,
+          "total": 159,
+          "good": 159,
+          "on_time": 159,
+          "escaped": 0,
+          "scrap": 0,
+          "unfinished": 0,
+          "pack_started": 160,
+          "pack_finished": 160,
+          "auto_finished": 0,
+          "trays_used": 0,
+          "rework_started": 1,
+          "labor_ticks": 3999,
+          "overtime_ticks": [
+            0,
+            0,
+            0,
+            0,
+            0,
+            0
+          ],
+          "events": []
+        },
+        "economy": {
+          "purchase": 0,
+          "costs": {
+            "depreciation": 0,
+            "service": 0,
+            "shifts": 91200,
+            "overtime": 0,
+            "trays": 0,
+            "materials": 1920,
+            "rework": 70,
+            "late": 0,
+            "unfulfilled": 0,
+            "escaped": 0
+          },
+          "total": 93190
+        }
+      },
+      {
+        "raw": {
+          "schema_version": 1,
+          "seed": 301926751,
+          "total": 163,
+          "good": 163,
+          "on_time": 163,
+          "escaped": 0,
+          "scrap": 0,
+          "unfinished": 0,
+          "pack_started": 163,
+          "pack_finished": 163,
+          "auto_finished": 0,
+          "trays_used": 0,
+          "rework_started": 0,
+          "labor_ticks": 4118,
+          "overtime_ticks": [
+            0,
+            0,
+            0,
+            0,
+            0,
+            0
+          ],
+          "events": []
+        },
+        "economy": {
+          "purchase": 0,
+          "costs": {
+            "depreciation": 0,
+            "service": 0,
+            "shifts": 91200,
+            "overtime": 0,
+            "trays": 0,
+            "materials": 1956,
+            "rework": 0,
+            "late": 0,
+            "unfulfilled": 0,
+            "escaped": 0
+          },
+          "total": 93156
+        }
+      },
+      {
+        "raw": {
+          "schema_version": 1,
+          "seed": 437594646,
+          "total": 162,
+          "good": 162,
+          "on_time": 162,
+          "escaped": 0,
+          "scrap": 0,
+          "unfinished": 0,
+          "pack_started": 162,
+          "pack_finished": 162,
+          "auto_finished": 0,
+          "trays_used": 0,
+          "rework_started": 0,
+          "labor_ticks": 4027,
+          "overtime_ticks": [
+            0,
+            0,
+            0,
+            0,
+            0,
+            0
+          ],
+          "events": []
+        },
+        "economy": {
+          "purchase": 0,
+          "costs": {
+            "depreciation": 0,
+            "service": 0,
+            "shifts": 91200,
+            "overtime": 0,
+            "trays": 0,
+            "materials": 1944,
+            "rework": 0,
+            "late": 0,
+            "unfulfilled": 0,
+            "escaped": 0
+          },
+          "total": 93144
+        }
+      },
+      {
+        "raw": {
+          "schema_version": 1,
+          "seed": 653467791,
+          "total": 175,
+          "good": 175,
+          "on_time": 170,
+          "escaped": 0,
+          "scrap": 0,
+          "unfinished": 0,
+          "pack_started": 175,
+          "pack_finished": 175,
+          "auto_finished": 0,
+          "trays_used": 0,
+          "rework_started": 0,
+          "labor_ticks": 4324,
+          "overtime_ticks": [
+            0,
+            0,
+            0,
+            0,
+            0,
+            0
+          ],
+          "events": []
+        },
+        "economy": {
+          "purchase": 0,
+          "costs": {
+            "depreciation": 0,
+            "service": 0,
+            "shifts": 91200,
+            "overtime": 0,
+            "trays": 0,
+            "materials": 2100,
+            "rework": 0,
+            "late": 1600,
+            "unfulfilled": 0,
+            "escaped": 0
+          },
+          "total": 94900
+        }
+      },
+      {
+        "raw": {
+          "schema_version": 1,
+          "seed": 853984044,
+          "total": 166,
+          "good": 166,
+          "on_time": 165,
+          "escaped": 0,
+          "scrap": 0,
+          "unfinished": 0,
+          "pack_started": 166,
+          "pack_finished": 166,
+          "auto_finished": 0,
+          "trays_used": 0,
+          "rework_started": 0,
+          "labor_ticks": 4153,
+          "overtime_ticks": [
+            0,
+            0,
+            0,
+            0,
+            0,
+            0
+          ],
+          "events": []
+        },
+        "economy": {
+          "purchase": 0,
+          "costs": {
+            "depreciation": 0,
+            "service": 0,
+            "shifts": 91200,
+            "overtime": 0,
+            "trays": 0,
+            "materials": 1992,
+            "rework": 0,
+            "late": 320,
+            "unfulfilled": 0,
+            "escaped": 0
+          },
+          "total": 93512
+        }
+      },
+      {
+        "raw": {
+          "schema_version": 1,
+          "seed": 1177674159,
+          "total": 169,
+          "good": 169,
+          "on_time": 163,
+          "escaped": 0,
+          "scrap": 0,
+          "unfinished": 0,
+          "pack_started": 171,
+          "pack_finished": 171,
+          "auto_finished": 0,
+          "trays_used": 0,
+          "rework_started": 2,
+          "labor_ticks": 4254,
+          "overtime_ticks": [
+            0,
+            0,
+            0,
+            0,
+            0,
+            0
+          ],
+          "events": []
+        },
+        "economy": {
+          "purchase": 0,
+          "costs": {
+            "depreciation": 0,
+            "service": 0,
+            "shifts": 91200,
+            "overtime": 0,
+            "trays": 0,
+            "materials": 2052,
+            "rework": 140,
+            "late": 1920,
+            "unfulfilled": 0,
+            "escaped": 0
+          },
+          "total": 95312
+        }
+      },
+      {
+        "raw": {
+          "schema_version": 1,
+          "seed": 1809728213,
+          "total": 176,
+          "good": 176,
+          "on_time": 176,
+          "escaped": 0,
+          "scrap": 0,
+          "unfinished": 0,
+          "pack_started": 176,
+          "pack_finished": 176,
+          "auto_finished": 0,
+          "trays_used": 0,
+          "rework_started": 0,
+          "labor_ticks": 4341,
+          "overtime_ticks": [
+            0,
+            0,
+            0,
+            0,
+            0,
+            0
+          ],
+          "events": []
+        },
+        "economy": {
+          "purchase": 0,
+          "costs": {
+            "depreciation": 0,
+            "service": 0,
+            "shifts": 91200,
+            "overtime": 0,
+            "trays": 0,
+            "materials": 2112,
+            "rework": 0,
+            "late": 0,
+            "unfulfilled": 0,
+            "escaped": 0
+          },
+          "total": 93312
+        }
+      },
+      {
+        "raw": {
+          "schema_version": 1,
+          "seed": 2055338172,
+          "total": 172,
+          "good": 172,
+          "on_time": 172,
+          "escaped": 0,
+          "scrap": 0,
+          "unfinished": 0,
+          "pack_started": 174,
+          "pack_finished": 174,
+          "auto_finished": 0,
+          "trays_used": 0,
+          "rework_started": 2,
+          "labor_ticks": 4289,
+          "overtime_ticks": [
+            0,
+            0,
+            0,
+            0,
+            0,
+            0
+          ],
+          "events": []
+        },
+        "economy": {
+          "purchase": 0,
+          "costs": {
+            "depreciation": 0,
+            "service": 0,
+            "shifts": 91200,
+            "overtime": 0,
+            "trays": 0,
+            "materials": 2088,
+            "rework": 140,
+            "late": 0,
+            "unfulfilled": 0,
+            "escaped": 0
+          },
+          "total": 93428
+        }
+      }
+    ],
+    "reference": [
+      {
+        "raw": {
+          "schema_version": 1,
+          "seed": 5343194,
+          "total": 159,
+          "good": 159,
+          "on_time": 157,
+          "escaped": 0,
+          "scrap": 0,
+          "unfinished": 0,
+          "pack_started": 160,
+          "pack_finished": 160,
+          "auto_finished": 118,
+          "trays_used": 159,
+          "rework_started": 1,
+          "labor_ticks": 2747,
+          "overtime_ticks": [
+            0,
+            0,
+            0,
+            0
+          ],
+          "events": []
+        },
+        "economy": {
+          "purchase": 1530000,
+          "costs": {
+            "depreciation": 3060,
+            "service": 700,
+            "shifts": 60800,
+            "overtime": 0,
+            "trays": 954,
+            "materials": 1920,
+            "rework": 70,
+            "late": 640,
+            "unfulfilled": 0,
+            "escaped": 0
+          },
+          "total": 68144
+        }
+      },
+      {
+        "raw": {
+          "schema_version": 1,
+          "seed": 301926751,
+          "total": 163,
+          "good": 163,
+          "on_time": 148,
+          "escaped": 0,
+          "scrap": 0,
+          "unfinished": 0,
+          "pack_started": 163,
+          "pack_finished": 163,
+          "auto_finished": 113,
+          "trays_used": 163,
+          "rework_started": 0,
+          "labor_ticks": 2925,
+          "overtime_ticks": [
+            0,
+            0,
+            0,
+            0
+          ],
+          "events": []
+        },
+        "economy": {
+          "purchase": 1530000,
+          "costs": {
+            "depreciation": 3060,
+            "service": 700,
+            "shifts": 60800,
+            "overtime": 0,
+            "trays": 978,
+            "materials": 1956,
+            "rework": 0,
+            "late": 4800,
+            "unfulfilled": 0,
+            "escaped": 0
+          },
+          "total": 72294
+        }
+      },
+      {
+        "raw": {
+          "schema_version": 1,
+          "seed": 437594646,
+          "total": 162,
+          "good": 162,
+          "on_time": 162,
+          "escaped": 0,
+          "scrap": 0,
+          "unfinished": 0,
+          "pack_started": 162,
+          "pack_finished": 162,
+          "auto_finished": 123,
+          "trays_used": 162,
+          "rework_started": 0,
+          "labor_ticks": 2700,
+          "overtime_ticks": [
+            0,
+            0,
+            0,
+            0
+          ],
+          "events": []
+        },
+        "economy": {
+          "purchase": 1530000,
+          "costs": {
+            "depreciation": 3060,
+            "service": 700,
+            "shifts": 60800,
+            "overtime": 0,
+            "trays": 972,
+            "materials": 1944,
+            "rework": 0,
+            "late": 0,
+            "unfulfilled": 0,
+            "escaped": 0
+          },
+          "total": 67476
+        }
+      },
+      {
+        "raw": {
+          "schema_version": 1,
+          "seed": 653467791,
+          "total": 175,
+          "good": 175,
+          "on_time": 175,
+          "escaped": 0,
+          "scrap": 0,
+          "unfinished": 0,
+          "pack_started": 175,
+          "pack_finished": 175,
+          "auto_finished": 136,
+          "trays_used": 175,
+          "rework_started": 0,
+          "labor_ticks": 2818,
+          "overtime_ticks": [
+            0,
+            0,
+            0,
+            0
+          ],
+          "events": []
+        },
+        "economy": {
+          "purchase": 1530000,
+          "costs": {
+            "depreciation": 3060,
+            "service": 700,
+            "shifts": 60800,
+            "overtime": 0,
+            "trays": 1050,
+            "materials": 2100,
+            "rework": 0,
+            "late": 0,
+            "unfulfilled": 0,
+            "escaped": 0
+          },
+          "total": 67710
+        }
+      },
+      {
+        "raw": {
+          "schema_version": 1,
+          "seed": 853984044,
+          "total": 166,
+          "good": 166,
+          "on_time": 165,
+          "escaped": 0,
+          "scrap": 0,
+          "unfinished": 0,
+          "pack_started": 166,
+          "pack_finished": 166,
+          "auto_finished": 123,
+          "trays_used": 166,
+          "rework_started": 0,
+          "labor_ticks": 2834,
+          "overtime_ticks": [
+            0,
+            0,
+            0,
+            0
+          ],
+          "events": []
+        },
+        "economy": {
+          "purchase": 1530000,
+          "costs": {
+            "depreciation": 3060,
+            "service": 700,
+            "shifts": 60800,
+            "overtime": 0,
+            "trays": 996,
+            "materials": 1992,
+            "rework": 0,
+            "late": 320,
+            "unfulfilled": 0,
+            "escaped": 0
+          },
+          "total": 67868
+        }
+      },
+      {
+        "raw": {
+          "schema_version": 1,
+          "seed": 1177674159,
+          "total": 169,
+          "good": 169,
+          "on_time": 147,
+          "escaped": 0,
+          "scrap": 0,
+          "unfinished": 0,
+          "pack_started": 171,
+          "pack_finished": 171,
+          "auto_finished": 124,
+          "trays_used": 169,
+          "rework_started": 2,
+          "labor_ticks": 2954,
+          "overtime_ticks": [
+            0,
+            0,
+            0,
+            0
+          ],
+          "events": []
+        },
+        "economy": {
+          "purchase": 1530000,
+          "costs": {
+            "depreciation": 3060,
+            "service": 700,
+            "shifts": 60800,
+            "overtime": 0,
+            "trays": 1014,
+            "materials": 2052,
+            "rework": 140,
+            "late": 7040,
+            "unfulfilled": 0,
+            "escaped": 0
+          },
+          "total": 74806
+        }
+      },
+      {
+        "raw": {
+          "schema_version": 1,
+          "seed": 1809728213,
+          "total": 176,
+          "good": 176,
+          "on_time": 176,
+          "escaped": 0,
+          "scrap": 0,
+          "unfinished": 0,
+          "pack_started": 176,
+          "pack_finished": 176,
+          "auto_finished": 132,
+          "trays_used": 176,
+          "rework_started": 0,
+          "labor_ticks": 2943,
+          "overtime_ticks": [
+            0,
+            0,
+            0,
+            0
+          ],
+          "events": []
+        },
+        "economy": {
+          "purchase": 1530000,
+          "costs": {
+            "depreciation": 3060,
+            "service": 700,
+            "shifts": 60800,
+            "overtime": 0,
+            "trays": 1056,
+            "materials": 2112,
+            "rework": 0,
+            "late": 0,
+            "unfulfilled": 0,
+            "escaped": 0
+          },
+          "total": 67728
+        }
+      },
+      {
+        "raw": {
+          "schema_version": 1,
+          "seed": 2055338172,
+          "total": 172,
+          "good": 172,
+          "on_time": 171,
+          "escaped": 0,
+          "scrap": 0,
+          "unfinished": 0,
+          "pack_started": 174,
+          "pack_finished": 174,
+          "auto_finished": 133,
+          "trays_used": 172,
+          "rework_started": 2,
+          "labor_ticks": 2864,
+          "overtime_ticks": [
+            0,
+            0,
+            0,
+            0
+          ],
+          "events": []
+        },
+        "economy": {
+          "purchase": 1530000,
+          "costs": {
+            "depreciation": 3060,
+            "service": 700,
+            "shifts": 60800,
+            "overtime": 0,
+            "trays": 1032,
+            "materials": 2088,
+            "rework": 140,
+            "late": 320,
+            "unfulfilled": 0,
+            "escaped": 0
+          },
+          "total": 68140
+        }
+      }
+    ]
+  }
+}

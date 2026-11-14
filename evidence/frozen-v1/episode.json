@@ -1,0 +1,2632 @@
+[
+  {
+    "n": 1,
+    "action": "observe"
+  },
+  {
+    "n": 2,
+    "action": "pilot",
+    "seed": 11,
+    "plan": {
+      "schema_version": 1,
+      "robot": false,
+      "trays": false,
+      "route": "manual",
+      "workers": [
+        [
+          1
+        ],
+        [
+          2
+        ],
+        [
+          3
+        ],
+        [
+          3
+        ],
+        [
+          4
+        ],
+        [
+          2,
+          3
+        ]
+      ]
+    },
+    "raw": {
+      "schema_version": 1,
+      "seed": 11,
+      "total": 166,
+      "good": 166,
+      "on_time": 166,
+      "escaped": 0,
+      "scrap": 0,
+      "unfinished": 0,
+      "pack_started": 167,
+      "pack_finished": 167,
+      "auto_finished": 0,
+      "trays_used": 0,
+      "rework_started": 1,
+      "labor_ticks": 4185,
+      "overtime_ticks": [
+        0,
+        0,
+        0,
+        0,
+        0,
+        0
+      ]
+    },
+    "economy": {
+      "purchase": 0,
+      "costs": {
+        "depreciation": 0,
+        "service": 0,
+        "shifts": 91200,
+        "overtime": 0,
+        "trays": 0,
+        "materials": 2004,
+        "rework": 70,
+        "late": 0,
+        "unfulfilled": 0,
+        "escaped": 0
+      },
+      "total": 93274
+    }
+  },
+  {
+    "n": 3,
+    "action": "pilot",
+    "seed": 29,
+    "plan": {
+      "schema_version": 1,
+      "robot": false,
+      "trays": false,
+      "route": "manual",
+      "workers": [
+        [
+          1
+        ],
+        [
+          2
+        ],
+        [
+          3
+        ],
+        [
+          3
+        ],
+        [
+          4
+        ],
+        [
+          2,
+          3
+        ]
+      ]
+    },
+    "raw": {
+      "schema_version": 1,
+      "seed": 29,
+      "total": 174,
+      "good": 174,
+      "on_time": 168,
+      "escaped": 0,
+      "scrap": 0,
+      "unfinished": 0,
+      "pack_started": 176,
+      "pack_finished": 176,
+      "auto_finished": 0,
+      "trays_used": 0,
+      "rework_started": 2,
+      "labor_ticks": 4398,
+      "overtime_ticks": [
+        0,
+        0,
+        0,
+        0,
+        0,
+        0
+      ]
+    },
+    "economy": {
+      "purchase": 0,
+      "costs": {
+        "depreciation": 0,
+        "service": 0,
+        "shifts": 91200,
+        "overtime": 0,
+        "trays": 0,
+        "materials": 2112,
+        "rework": 140,
+        "late": 1920,
+        "unfulfilled": 0,
+        "escaped": 0
+      },
+      "total": 95372
+    }
+  },
+  {
+    "n": 4,
+    "action": "pilot",
+    "seed": 47,
+    "plan": {
+      "schema_version": 1,
+      "robot": false,
+      "trays": false,
+      "route": "manual",
+      "workers": [
+        [
+          1
+        ],
+        [
+          2
+        ],
+        [
+          3
+        ],
+        [
+          3
+        ],
+        [
+          4
+        ],
+        [
+          2,
+          3
+        ]
+      ]
+    },
+    "raw": {
+      "schema_version": 1,
+      "seed": 47,
+      "total": 170,
+      "good": 170,
+      "on_time": 170,
+      "escaped": 0,
+      "scrap": 0,
+      "unfinished": 0,
+      "pack_started": 170,
+      "pack_finished": 170,
+      "auto_finished": 0,
+      "trays_used": 0,
+      "rework_started": 0,
+      "labor_ticks": 4288,
+      "overtime_ticks": [
+        0,
+        0,
+        0,
+        0,
+        0,
+        0
+      ]
+    },
+    "economy": {
+      "purchase": 0,
+      "costs": {
+        "depreciation": 0,
+        "service": 0,
+        "shifts": 91200,
+        "overtime": 0,
+        "trays": 0,
+        "materials": 2040,
+        "rework": 0,
+        "late": 0,
+        "unfulfilled": 0,
+        "escaped": 0
+      },
+      "total": 93240
+    }
+  },
+  {
+    "n": 5,
+    "action": "pilot",
+    "seed": 11,
+    "plan": {
+      "schema_version": 1,
+      "robot": true,
+      "trays": false,
+      "route": "all",
+      "workers": [
+        [
+          1
+        ],
+        [
+          2
+        ],
+        [
+          3
+        ],
+        [
+          4
+        ]
+      ]
+    },
+    "raw": {
+      "schema_version": 1,
+      "seed": 11,
+      "total": 166,
+      "good": 126,
+      "on_time": 20,
+      "escaped": 0,
+      "scrap": 0,
+      "unfinished": 40,
+      "pack_started": 132,
+      "pack_finished": 131,
+      "auto_finished": 126,
+      "trays_used": 0,
+      "rework_started": 5,
+      "labor_ticks": 1923,
+      "overtime_ticks": [
+        117,
+        118,
+        63,
+        114
+      ]
+    },
+    "economy": {
+      "purchase": 1350000,
+      "costs": {
+        "depreciation": 2700,
+        "service": 700,
+        "shifts": 60800,
+        "overtime": 10300,
+        "trays": 0,
+        "materials": 1584,
+        "rework": 350,
+        "late": 33920,
+        "unfulfilled": 140000,
+        "escaped": 0
+      },
+      "total": 250354
+    }
+  },
+  {
+    "n": 6,
+    "action": "pilot",
+    "seed": 11,
+    "plan": {
+      "schema_version": 1,
+      "robot": true,
+      "trays": false,
+      "route": "bypass",
+      "workers": [
+        [
+          1
+        ],
+        [
+          2
+        ],
+        [
+          3
+        ],
+        [
+          4
+        ]
+      ]
+    },
+    "raw": {
+      "schema_version": 1,
+      "seed": 11,
+      "total": 166,
+      "good": 165,
+      "on_time": 83,
+      "escaped": 0,
+      "scrap": 0,
+      "unfinished": 1,
+      "pack_started": 169,
+      "pack_finished": 169,
+      "auto_finished": 126,
+      "trays_used": 0,
+      "rework_started": 3,
+      "labor_ticks": 2815,
+      "overtime_ticks": [
+        0,
+        42,
+        117,
+        120
+      ]
+    },
+    "economy": {
+      "purchase": 1350000,
+      "costs": {
+        "depreciation": 2700,
+        "service": 700,
+        "shifts": 60800,
+        "overtime": 6975,
+        "trays": 0,
+        "materials": 2028,
+        "rework": 210,
+        "late": 26240,
+        "unfulfilled": 3500,
+        "escaped": 0
+      },
+      "total": 103153
+    }
+  },
+  {
+    "n": 7,
+    "action": "pilot",
+    "seed": 11,
+    "plan": {
+      "schema_version": 1,
+      "robot": true,
+      "trays": true,
+      "route": "all",
+      "workers": [
+        [
+          1
+        ],
+        [
+          2
+        ],
+        [
+          3
+        ],
+        [
+          4
+        ]
+      ]
+    },
+    "raw": {
+      "schema_version": 1,
+      "seed": 11,
+      "total": 166,
+      "good": 166,
+      "on_time": 93,
+      "escaped": 0,
+      "scrap": 0,
+      "unfinished": 0,
+      "pack_started": 170,
+      "pack_finished": 170,
+      "auto_finished": 166,
+      "trays_used": 166,
+      "rework_started": 4,
+      "labor_ticks": 2230,
+      "overtime_ticks": [
+        0,
+        31,
+        66,
+        77
+      ]
+    },
+    "economy": {
+      "purchase": 1530000,
+      "costs": {
+        "depreciation": 3060,
+        "service": 700,
+        "shifts": 60800,
+        "overtime": 4350,
+        "trays": 996,
+        "materials": 2040,
+        "rework": 280,
+        "late": 23360,
+        "unfulfilled": 0,
+        "escaped": 0
+      },
+      "total": 95586
+    }
+  },
+  {
+    "n": 8,
+    "action": "pilot",
+    "seed": 11,
+    "plan": {
+      "schema_version": 1,
+      "robot": true,
+      "trays": true,
+      "route": "bypass",
+      "workers": [
+        [
+          1
+        ],
+        [
+          2
+        ],
+        [
+          3
+        ],
+        [
+          4
+        ]
+      ]
+    },
+    "raw": {
+      "schema_version": 1,
+      "seed": 11,
+      "total": 166,
+      "good": 166,
+      "on_time": 93,
+      "escaped": 0,
+      "scrap": 0,
+      "unfinished": 0,
+      "pack_started": 167,
+      "pack_finished": 167,
+      "auto_finished": 126,
+      "trays_used": 166,
+      "rework_started": 1,
+      "labor_ticks": 2701,
+      "overtime_ticks": [
+        0,
+        31,
+        90,
+        95
+      ]
+    },
+    "economy": {
+      "purchase": 1530000,
+      "costs": {
+        "depreciation": 3060,
+        "service": 700,
+        "shifts": 60800,
+        "overtime": 5400,
+        "trays": 996,
+        "materials": 2004,
+        "rework": 70,
+        "late": 23360,
+        "unfulfilled": 0,
+        "escaped": 0
+      },
+      "total": 96390
+    }
+  },
+  {
+    "n": 9,
+    "action": "pilot",
+    "seed": 11,
+    "plan": {
+      "schema_version": 1,
+      "robot": true,
+      "trays": false,
+      "route": "all",
+      "workers": [
+        [
+          1
+        ],
+        [
+          2
+        ],
+        [
+          3,
+          4
+        ],
+        [
+          2,
+          3
+        ]
+      ]
+    },
+    "raw": {
+      "schema_version": 1,
+      "seed": 11,
+      "total": 166,
+      "good": 117,
+      "on_time": 20,
+      "escaped": 0,
+      "scrap": 0,
+      "unfinished": 49,
+      "pack_started": 123,
+      "pack_finished": 122,
+      "auto_finished": 117,
+      "trays_used": 0,
+      "rework_started": 5,
+      "labor_ticks": 1911,
+      "overtime_ticks": [
+        101,
+        100,
+        120,
+        104
+      ]
+    },
+    "economy": {
+      "purchase": 1350000,
+      "costs": {
+        "depreciation": 2700,
+        "service": 700,
+        "shifts": 60800,
+        "overtime": 10625,
+        "trays": 0,
+        "materials": 1476,
+        "rework": 350,
+        "late": 31040,
+        "unfulfilled": 171500,
+        "escaped": 0
+      },
+      "total": 279191
+    }
+  },
+  {
+    "n": 10,
+    "action": "pilot",
+    "seed": 11,
+    "plan": {
+      "schema_version": 1,
+      "robot": true,
+      "trays": false,
+      "route": "bypass",
+      "workers": [
+        [
+          1
+        ],
+        [
+          2
+        ],
+        [
+          3,
+          4
+        ],
+        [
+          2,
+          3
+        ]
+      ]
+    },
+    "raw": {
+      "schema_version": 1,
+      "seed": 11,
+      "total": 166,
+      "good": 166,
+      "on_time": 88,
+      "escaped": 0,
+      "scrap": 0,
+      "unfinished": 0,
+      "pack_started": 169,
+      "pack_finished": 169,
+      "auto_finished": 126,
+      "trays_used": 0,
+      "rework_started": 3,
+      "labor_ticks": 2953,
+      "overtime_ticks": [
+        0,
+        10,
+        65,
+        52
+      ]
+    },
+    "economy": {
+      "purchase": 1350000,
+      "costs": {
+        "depreciation": 2700,
+        "service": 700,
+        "shifts": 60800,
+        "overtime": 3175,
+        "trays": 0,
+        "materials": 2028,
+        "rework": 210,
+        "late": 24960,
+        "unfulfilled": 0,
+        "escaped": 0
+      },
+      "total": 94573
+    }
+  },
+  {
+    "n": 11,
+    "action": "pilot",
+    "seed": 11,
+    "plan": {
+      "schema_version": 1,
+      "robot": true,
+      "trays": true,
+      "route": "all",
+      "workers": [
+        [
+          1
+        ],
+        [
+          2
+        ],
+        [
+          3,
+          4
+        ],
+        [
+          2,
+          3
+        ]
+      ]
+    },
+    "raw": {
+      "schema_version": 1,
+      "seed": 11,
+      "total": 166,
+      "good": 166,
+      "on_time": 145,
+      "escaped": 0,
+      "scrap": 0,
+      "unfinished": 0,
+      "pack_started": 170,
+      "pack_finished": 170,
+      "auto_finished": 166,
+      "trays_used": 166,
+      "rework_started": 4,
+      "labor_ticks": 2296,
+      "overtime_ticks": [
+        0,
+        0,
+        0,
+        0
+      ]
+    },
+    "economy": {
+      "purchase": 1530000,
+      "costs": {
+        "depreciation": 3060,
+        "service": 700,
+        "shifts": 60800,
+        "overtime": 0,
+        "trays": 996,
+        "materials": 2040,
+        "rework": 280,
+        "late": 6720,
+        "unfulfilled": 0,
+        "escaped": 0
+      },
+      "total": 74596
+    }
+  },
+  {
+    "n": 12,
+    "action": "pilot",
+    "seed": 11,
+    "plan": {
+      "schema_version": 1,
+      "robot": true,
+      "trays": true,
+      "route": "bypass",
+      "workers": [
+        [
+          1
+        ],
+        [
+          2
+        ],
+        [
+          3,
+          4
+        ],
+        [
+          2,
+          3
+        ]
+      ]
+    },
+    "raw": {
+      "schema_version": 1,
+      "seed": 11,
+      "total": 166,
+      "good": 166,
+      "on_time": 166,
+      "escaped": 0,
+      "scrap": 0,
+      "unfinished": 0,
+      "pack_started": 167,
+      "pack_finished": 167,
+      "auto_finished": 126,
+      "trays_used": 166,
+      "rework_started": 1,
+      "labor_ticks": 2805,
+      "overtime_ticks": [
+        0,
+        0,
+        0,
+        0
+      ]
+    },
+    "economy": {
+      "purchase": 1530000,
+      "costs": {
+        "depreciation": 3060,
+        "service": 700,
+        "shifts": 60800,
+        "overtime": 0,
+        "trays": 996,
+        "materials": 2004,
+        "rework": 70,
+        "late": 0,
+        "unfulfilled": 0,
+        "escaped": 0
+      },
+      "total": 67630
+    }
+  },
+  {
+    "n": 13,
+    "action": "pilot",
+    "seed": 11,
+    "plan": {
+      "schema_version": 1,
+      "robot": true,
+      "trays": false,
+      "route": "all",
+      "workers": [
+        [
+          1
+        ],
+        [
+          2
+        ],
+        [
+          4
+        ],
+        [
+          2,
+          3
+        ]
+      ]
+    },
+    "raw": {
+      "schema_version": 1,
+      "seed": 11,
+      "total": 166,
+      "good": 121,
+      "on_time": 20,
+      "escaped": 0,
+      "scrap": 0,
+      "unfinished": 45,
+      "pack_started": 128,
+      "pack_finished": 127,
+      "auto_finished": 122,
+      "trays_used": 0,
+      "rework_started": 5,
+      "labor_ticks": 1910,
+      "overtime_ticks": [
+        117,
+        120,
+        120,
+        120
+      ]
+    },
+    "economy": {
+      "purchase": 1350000,
+      "costs": {
+        "depreciation": 2700,
+        "service": 700,
+        "shifts": 60800,
+        "overtime": 11925,
+        "trays": 0,
+        "materials": 1536,
+        "rework": 350,
+        "late": 32320,
+        "unfulfilled": 157500,
+        "escaped": 0
+      },
+      "total": 267831
+    }
+  },
+  {
+    "n": 14,
+    "action": "pilot",
+    "seed": 11,
+    "plan": {
+      "schema_version": 1,
+      "robot": true,
+      "trays": false,
+      "route": "bypass",
+      "workers": [
+        [
+          1
+        ],
+        [
+          2
+        ],
+        [
+          4
+        ],
+        [
+          2,
+          3
+        ]
+      ]
+    },
+    "raw": {
+      "schema_version": 1,
+      "seed": 11,
+      "total": 166,
+      "good": 166,
+      "on_time": 93,
+      "escaped": 0,
+      "scrap": 0,
+      "unfinished": 0,
+      "pack_started": 169,
+      "pack_finished": 169,
+      "auto_finished": 126,
+      "trays_used": 0,
+      "rework_started": 3,
+      "labor_ticks": 2875,
+      "overtime_ticks": [
+        0,
+        19,
+        106,
+        101
+      ]
+    },
+    "economy": {
+      "purchase": 1350000,
+      "costs": {
+        "depreciation": 2700,
+        "service": 700,
+        "shifts": 60800,
+        "overtime": 5650,
+        "trays": 0,
+        "materials": 2028,
+        "rework": 210,
+        "late": 23360,
+        "unfulfilled": 0,
+        "escaped": 0
+      },
+      "total": 95448
+    }
+  },
+  {
+    "n": 15,
+    "action": "pilot",
+    "seed": 11,
+    "plan": {
+      "schema_version": 1,
+      "robot": true,
+      "trays": true,
+      "route": "all",
+      "workers": [
+        [
+          1
+        ],
+        [
+          2
+        ],
+        [
+          4
+        ],
+        [
+          2,
+          3
+        ]
+      ]
+    },
+    "raw": {
+      "schema_version": 1,
+      "seed": 11,
+      "total": 166,
+      "good": 166,
+      "on_time": 150,
+      "escaped": 0,
+      "scrap": 0,
+      "unfinished": 0,
+      "pack_started": 170,
+      "pack_finished": 170,
+      "auto_finished": 166,
+      "trays_used": 166,
+      "rework_started": 4,
+      "labor_ticks": 2284,
+      "overtime_ticks": [
+        0,
+        0,
+        0,
+        0
+      ]
+    },
+    "economy": {
+      "purchase": 1530000,
+      "costs": {
+        "depreciation": 3060,
+        "service": 700,
+        "shifts": 60800,
+        "overtime": 0,
+        "trays": 996,
+        "materials": 2040,
+        "rework": 280,
+        "late": 5120,
+        "unfulfilled": 0,
+        "escaped": 0
+      },
+      "total": 72996
+    }
+  },
+  {
+    "n": 16,
+    "action": "pilot",
+    "seed": 11,
+    "plan": {
+      "schema_version": 1,
+      "robot": true,
+      "trays": true,
+      "route": "bypass",
+      "workers": [
+        [
+          1
+        ],
+        [
+          2
+        ],
+        [
+          4
+        ],
+        [
+          2,
+          3
+        ]
+      ]
+    },
+    "raw": {
+      "schema_version": 1,
+      "seed": 11,
+      "total": 166,
+      "good": 166,
+      "on_time": 165,
+      "escaped": 0,
+      "scrap": 0,
+      "unfinished": 0,
+      "pack_started": 167,
+      "pack_finished": 167,
+      "auto_finished": 126,
+      "trays_used": 166,
+      "rework_started": 1,
+      "labor_ticks": 2751,
+      "overtime_ticks": [
+        0,
+        0,
+        0,
+        0
+      ]
+    },
+    "economy": {
+      "purchase": 1530000,
+      "costs": {
+        "depreciation": 3060,
+        "service": 700,
+        "shifts": 60800,
+        "overtime": 0,
+        "trays": 996,
+        "materials": 2004,
+        "rework": 70,
+        "late": 320,
+        "unfulfilled": 0,
+        "escaped": 0
+      },
+      "total": 67950
+    }
+  },
+  {
+    "n": 17,
+    "action": "pilot",
+    "seed": 11,
+    "plan": {
+      "schema_version": 1,
+      "robot": true,
+      "trays": false,
+      "route": "all",
+      "workers": [
+        [
+          1
+        ],
+        [
+          2
+        ],
+        [
+          3
+        ],
+        [
+          4
+        ],
+        [
+          2
+        ]
+      ]
+    },
+    "raw": {
+      "schema_version": 1,
+      "seed": 11,
+      "total": 166,
+      "good": 126,
+      "on_time": 20,
+      "escaped": 0,
+      "scrap": 0,
+      "unfinished": 40,
+      "pack_started": 132,
+      "pack_finished": 131,
+      "auto_finished": 126,
+      "trays_used": 0,
+      "rework_started": 5,
+      "labor_ticks": 1923,
+      "overtime_ticks": [
+        116,
+        117,
+        62,
+        113,
+        91
+      ]
+    },
+    "economy": {
+      "purchase": 1350000,
+      "costs": {
+        "depreciation": 2700,
+        "service": 700,
+        "shifts": 76000,
+        "overtime": 12475,
+        "trays": 0,
+        "materials": 1584,
+        "rework": 350,
+        "late": 33920,
+        "unfulfilled": 140000,
+        "escaped": 0
+      },
+      "total": 267729
+    }
+  },
+  {
+    "n": 18,
+    "action": "pilot",
+    "seed": 11,
+    "plan": {
+      "schema_version": 1,
+      "robot": true,
+      "trays": false,
+      "route": "bypass",
+      "workers": [
+        [
+          1
+        ],
+        [
+          2
+        ],
+        [
+          3
+        ],
+        [
+          4
+        ],
+        [
+          2
+        ]
+      ]
+    },
+    "raw": {
+      "schema_version": 1,
+      "seed": 11,
+      "total": 166,
+      "good": 166,
+      "on_time": 117,
+      "escaped": 0,
+      "scrap": 0,
+      "unfinished": 0,
+      "pack_started": 169,
+      "pack_finished": 169,
+      "auto_finished": 126,
+      "trays_used": 0,
+      "rework_started": 3,
+      "labor_ticks": 2817,
+      "overtime_ticks": [
+        0,
+        0,
+        57,
+        62,
+        0
+      ]
+    },
+    "economy": {
+      "purchase": 1350000,
+      "costs": {
+        "depreciation": 2700,
+        "service": 700,
+        "shifts": 76000,
+        "overtime": 2975,
+        "trays": 0,
+        "materials": 2028,
+        "rework": 210,
+        "late": 15680,
+        "unfulfilled": 0,
+        "escaped": 0
+      },
+      "total": 100293
+    }
+  },
+  {
+    "n": 19,
+    "action": "pilot",
+    "seed": 11,
+    "plan": {
+      "schema_version": 1,
+      "robot": true,
+      "trays": true,
+      "route": "all",
+      "workers": [
+        [
+          1
+        ],
+        [
+          2
+        ],
+        [
+          3
+        ],
+        [
+          4
+        ],
+        [
+          2
+        ]
+      ]
+    },
+    "raw": {
+      "schema_version": 1,
+      "seed": 11,
+      "total": 166,
+      "good": 166,
+      "on_time": 163,
+      "escaped": 0,
+      "scrap": 0,
+      "unfinished": 0,
+      "pack_started": 170,
+      "pack_finished": 170,
+      "auto_finished": 166,
+      "trays_used": 166,
+      "rework_started": 4,
+      "labor_ticks": 2230,
+      "overtime_ticks": [
+        0,
+        0,
+        0,
+        0,
+        0
+      ]
+    },
+    "economy": {
+      "purchase": 1530000,
+      "costs": {
+        "depreciation": 3060,
+        "service": 700,
+        "shifts": 76000,
+        "overtime": 0,
+        "trays": 996,
+        "materials": 2040,
+        "rework": 280,
+        "late": 960,
+        "unfulfilled": 0,
+        "escaped": 0
+      },
+      "total": 84036
+    }
+  },
+  {
+    "n": 20,
+    "action": "pilot",
+    "seed": 11,
+    "plan": {
+      "schema_version": 1,
+      "robot": true,
+      "trays": true,
+      "route": "bypass",
+      "workers": [
+        [
+          1
+        ],
+        [
+          2
+        ],
+        [
+          3
+        ],
+        [
+          4
+        ],
+        [
+          2
+        ]
+      ]
+    },
+    "raw": {
+      "schema_version": 1,
+      "seed": 11,
+      "total": 166,
+      "good": 166,
+      "on_time": 165,
+      "escaped": 0,
+      "scrap": 0,
+      "unfinished": 0,
+      "pack_started": 167,
+      "pack_finished": 167,
+      "auto_finished": 126,
+      "trays_used": 166,
+      "rework_started": 1,
+      "labor_ticks": 2701,
+      "overtime_ticks": [
+        0,
+        0,
+        0,
+        0,
+        0
+      ]
+    },
+    "economy": {
+      "purchase": 1530000,
+      "costs": {
+        "depreciation": 3060,
+        "service": 700,
+        "shifts": 76000,
+        "overtime": 0,
+        "trays": 996,
+        "materials": 2004,
+        "rework": 70,
+        "late": 320,
+        "unfulfilled": 0,
+        "escaped": 0
+      },
+      "total": 83150
+    }
+  },
+  {
+    "n": 21,
+    "action": "pilot",
+    "seed": 11,
+    "plan": {
+      "schema_version": 1,
+      "robot": true,
+      "trays": false,
+      "route": "all",
+      "workers": [
+        [
+          1
+        ],
+        [
+          2
+        ],
+        [
+          3
+        ],
+        [
+          4
+        ],
+        [
+          2,
+          3
+        ]
+      ]
+    },
+    "raw": {
+      "schema_version": 1,
+      "seed": 11,
+      "total": 166,
+      "good": 126,
+      "on_time": 20,
+      "escaped": 0,
+      "scrap": 0,
+      "unfinished": 40,
+      "pack_started": 132,
+      "pack_finished": 131,
+      "auto_finished": 126,
+      "trays_used": 0,
+      "rework_started": 5,
+      "labor_ticks": 1927,
+      "overtime_ticks": [
+        116,
+        117,
+        62,
+        113,
+        91
+      ]
+    },
+    "economy": {
+      "purchase": 1350000,
+      "costs": {
+        "depreciation": 2700,
+        "service": 700,
+        "shifts": 76000,
+        "overtime": 12475,
+        "trays": 0,
+        "materials": 1584,
+        "rework": 350,
+        "late": 33920,
+        "unfulfilled": 140000,
+        "escaped": 0
+      },
+      "total": 267729
+    }
+  },
+  {
+    "n": 22,
+    "action": "pilot",
+    "seed": 11,
+    "plan": {
+      "schema_version": 1,
+      "robot": true,
+      "trays": false,
+      "route": "bypass",
+      "workers": [
+        [
+          1
+        ],
+        [
+          2
+        ],
+        [
+          3
+        ],
+        [
+          4
+        ],
+        [
+          2,
+          3
+        ]
+      ]
+    },
+    "raw": {
+      "schema_version": 1,
+      "seed": 11,
+      "total": 166,
+      "good": 166,
+      "on_time": 119,
+      "escaped": 0,
+      "scrap": 0,
+      "unfinished": 0,
+      "pack_started": 169,
+      "pack_finished": 169,
+      "auto_finished": 126,
+      "trays_used": 0,
+      "rework_started": 3,
+      "labor_ticks": 2867,
+      "overtime_ticks": [
+        0,
+        0,
+        0,
+        0,
+        0
+      ]
+    },
+    "economy": {
+      "purchase": 1350000,
+      "costs": {
+        "depreciation": 2700,
+        "service": 700,
+        "shifts": 76000,
+        "overtime": 0,
+        "trays": 0,
+        "materials": 2028,
+        "rework": 210,
+        "late": 15040,
+        "unfulfilled": 0,
+        "escaped": 0
+      },
+      "total": 96678
+    }
+  },
+  {
+    "n": 23,
+    "action": "pilot",
+    "seed": 11,
+    "plan": {
+      "schema_version": 1,
+      "robot": true,
+      "trays": true,
+      "route": "all",
+      "workers": [
+        [
+          1
+        ],
+        [
+          2
+        ],
+        [
+          3
+        ],
+        [
+          4
+        ],
+        [
+          2,
+          3
+        ]
+      ]
+    },
+    "raw": {
+      "schema_version": 1,
+      "seed": 11,
+      "total": 166,
+      "good": 166,
+      "on_time": 163,
+      "escaped": 0,
+      "scrap": 0,
+      "unfinished": 0,
+      "pack_started": 170,
+      "pack_finished": 170,
+      "auto_finished": 166,
+      "trays_used": 166,
+      "rework_started": 4,
+      "labor_ticks": 2230,
+      "overtime_ticks": [
+        0,
+        0,
+        0,
+        0,
+        0
+      ]
+    },
+    "economy": {
+      "purchase": 1530000,
+      "costs": {
+        "depreciation": 3060,
+        "service": 700,
+        "shifts": 76000,
+        "overtime": 0,
+        "trays": 996,
+        "materials": 2040,
+        "rework": 280,
+        "late": 960,
+        "unfulfilled": 0,
+        "escaped": 0
+      },
+      "total": 84036
+    }
+  },
+  {
+    "n": 24,
+    "action": "pilot",
+    "seed": 11,
+    "plan": {
+      "schema_version": 1,
+      "robot": true,
+      "trays": true,
+      "route": "bypass",
+      "workers": [
+        [
+          1
+        ],
+        [
+          2
+        ],
+        [
+          3
+        ],
+        [
+          4
+        ],
+        [
+          2,
+          3
+        ]
+      ]
+    },
+    "raw": {
+      "schema_version": 1,
+      "seed": 11,
+      "total": 166,
+      "good": 166,
+      "on_time": 166,
+      "escaped": 0,
+      "scrap": 0,
+      "unfinished": 0,
+      "pack_started": 167,
+      "pack_finished": 167,
+      "auto_finished": 126,
+      "trays_used": 166,
+      "rework_started": 1,
+      "labor_ticks": 2747,
+      "overtime_ticks": [
+        0,
+        0,
+        0,
+        0,
+        0
+      ]
+    },
+    "economy": {
+      "purchase": 1530000,
+      "costs": {
+        "depreciation": 3060,
+        "service": 700,
+        "shifts": 76000,
+        "overtime": 0,
+        "trays": 996,
+        "materials": 2004,
+        "rework": 70,
+        "late": 0,
+        "unfulfilled": 0,
+        "escaped": 0
+      },
+      "total": 82830
+    }
+  },
+  {
+    "n": 25,
+    "action": "pilot",
+    "seed": 11,
+    "plan": {
+      "schema_version": 1,
+      "robot": true,
+      "trays": false,
+      "route": "all",
+      "workers": [
+        [
+          1
+        ],
+        [
+          2
+        ],
+        [
+          3
+        ],
+        [
+          4
+        ],
+        [
+          1,
+          2,
+          3,
+          4
+        ]
+      ]
+    },
+    "raw": {
+      "schema_version": 1,
+      "seed": 11,
+      "total": 166,
+      "good": 126,
+      "on_time": 20,
+      "escaped": 0,
+      "scrap": 0,
+      "unfinished": 40,
+      "pack_started": 132,
+      "pack_finished": 131,
+      "auto_finished": 126,
+      "trays_used": 0,
+      "rework_started": 5,
+      "labor_ticks": 2001,
+      "overtime_ticks": [
+        110,
+        117,
+        62,
+        113,
+        115
+      ]
+    },
+    "economy": {
+      "purchase": 1350000,
+      "costs": {
+        "depreciation": 2700,
+        "service": 700,
+        "shifts": 76000,
+        "overtime": 12925,
+        "trays": 0,
+        "materials": 1584,
+        "rework": 350,
+        "late": 33920,
+        "unfulfilled": 140000,
+        "escaped": 0
+      },
+      "total": 268179
+    }
+  },
+  {
+    "n": 26,
+    "action": "pilot",
+    "seed": 11,
+    "plan": {
+      "schema_version": 1,
+      "robot": true,
+      "trays": false,
+      "route": "bypass",
+      "workers": [
+        [
+          1
+        ],
+        [
+          2
+        ],
+        [
+          3
+        ],
+        [
+          4
+        ],
+        [
+          1,
+          2,
+          3,
+          4
+        ]
+      ]
+    },
+    "raw": {
+      "schema_version": 1,
+      "seed": 11,
+      "total": 166,
+      "good": 166,
+      "on_time": 117,
+      "escaped": 0,
+      "scrap": 0,
+      "unfinished": 0,
+      "pack_started": 169,
+      "pack_finished": 169,
+      "auto_finished": 126,
+      "trays_used": 0,
+      "rework_started": 3,
+      "labor_ticks": 2963,
+      "overtime_ticks": [
+        0,
+        0,
+        0,
+        0,
+        0
+      ]
+    },
+    "economy": {
+      "purchase": 1350000,
+      "costs": {
+        "depreciation": 2700,
+        "service": 700,
+        "shifts": 76000,
+        "overtime": 0,
+        "trays": 0,
+        "materials": 2028,
+        "rework": 210,
+        "late": 15680,
+        "unfulfilled": 0,
+        "escaped": 0
+      },
+      "total": 97318
+    }
+  },
+  {
+    "n": 27,
+    "action": "pilot",
+    "seed": 11,
+    "plan": {
+      "schema_version": 1,
+      "robot": true,
+      "trays": true,
+      "route": "all",
+      "workers": [
+        [
+          1
+        ],
+        [
+          2
+        ],
+        [
+          3
+        ],
+        [
+          4
+        ],
+        [
+          1,
+          2,
+          3,
+          4
+        ]
+      ]
+    },
+    "raw": {
+      "schema_version": 1,
+      "seed": 11,
+      "total": 166,
+      "good": 166,
+      "on_time": 164,
+      "escaped": 0,
+      "scrap": 0,
+      "unfinished": 0,
+      "pack_started": 170,
+      "pack_finished": 170,
+      "auto_finished": 166,
+      "trays_used": 166,
+      "rework_started": 4,
+      "labor_ticks": 2368,
+      "overtime_ticks": [
+        0,
+        0,
+        0,
+        0,
+        0
+      ]
+    },
+    "economy": {
+      "purchase": 1530000,
+      "costs": {
+        "depreciation": 3060,
+        "service": 700,
+        "shifts": 76000,
+        "overtime": 0,
+        "trays": 996,
+        "materials": 2040,
+        "rework": 280,
+        "late": 640,
+        "unfulfilled": 0,
+        "escaped": 0
+      },
+      "total": 83716
+    }
+  },
+  {
+    "n": 28,
+    "action": "pilot",
+    "seed": 11,
+    "plan": {
+      "schema_version": 1,
+      "robot": true,
+      "trays": true,
+      "route": "bypass",
+      "workers": [
+        [
+          1
+        ],
+        [
+          2
+        ],
+        [
+          3
+        ],
+        [
+          4
+        ],
+        [
+          1,
+          2,
+          3,
+          4
+        ]
+      ]
+    },
+    "raw": {
+      "schema_version": 1,
+      "seed": 11,
+      "total": 166,
+      "good": 166,
+      "on_time": 166,
+      "escaped": 0,
+      "scrap": 0,
+      "unfinished": 0,
+      "pack_started": 167,
+      "pack_finished": 167,
+      "auto_finished": 126,
+      "trays_used": 166,
+      "rework_started": 1,
+      "labor_ticks": 2815,
+      "overtime_ticks": [
+        0,
+        0,
+        0,
+        0,
+        0
+      ]
+    },
+    "economy": {
+      "purchase": 1530000,
+      "costs": {
+        "depreciation": 3060,
+        "service": 700,
+        "shifts": 76000,
+        "overtime": 0,
+        "trays": 996,
+        "materials": 2004,
+        "rework": 70,
+        "late": 0,
+        "unfulfilled": 0,
+        "escaped": 0
+      },
+      "total": 82830
+    }
+  },
+  {
+    "n": 29,
+    "action": "pilot",
+    "seed": 29,
+    "plan": {
+      "schema_version": 1,
+      "robot": true,
+      "trays": true,
+      "route": "bypass",
+      "workers": [
+        [
+          1
+        ],
+        [
+          2
+        ],
+        [
+          3,
+          4
+        ],
+        [
+          2,
+          3
+        ]
+      ]
+    },
+    "raw": {
+      "schema_version": 1,
+      "seed": 29,
+      "total": 174,
+      "good": 174,
+      "on_time": 166,
+      "escaped": 0,
+      "scrap": 0,
+      "unfinished": 0,
+      "pack_started": 176,
+      "pack_finished": 176,
+      "auto_finished": 124,
+      "trays_used": 174,
+      "rework_started": 2,
+      "labor_ticks": 3058,
+      "overtime_ticks": [
+        0,
+        0,
+        0,
+        0
+      ]
+    },
+    "economy": {
+      "purchase": 1530000,
+      "costs": {
+        "depreciation": 3060,
+        "service": 700,
+        "shifts": 60800,
+        "overtime": 0,
+        "trays": 1044,
+        "materials": 2112,
+        "rework": 140,
+        "late": 2560,
+        "unfulfilled": 0,
+        "escaped": 0
+      },
+      "total": 70416
+    }
+  },
+  {
+    "n": 30,
+    "action": "pilot",
+    "seed": 47,
+    "plan": {
+      "schema_version": 1,
+      "robot": true,
+      "trays": true,
+      "route": "bypass",
+      "workers": [
+        [
+          1
+        ],
+        [
+          2
+        ],
+        [
+          3,
+          4
+        ],
+        [
+          2,
+          3
+        ]
+      ]
+    },
+    "raw": {
+      "schema_version": 1,
+      "seed": 47,
+      "total": 170,
+      "good": 170,
+      "on_time": 170,
+      "escaped": 0,
+      "scrap": 0,
+      "unfinished": 0,
+      "pack_started": 171,
+      "pack_finished": 171,
+      "auto_finished": 122,
+      "trays_used": 170,
+      "rework_started": 1,
+      "labor_ticks": 2978,
+      "overtime_ticks": [
+        0,
+        0,
+        0,
+        0
+      ]
+    },
+    "economy": {
+      "purchase": 1530000,
+      "costs": {
+        "depreciation": 3060,
+        "service": 700,
+        "shifts": 60800,
+        "overtime": 0,
+        "trays": 1020,
+        "materials": 2052,
+        "rework": 70,
+        "late": 0,
+        "unfulfilled": 0,
+        "escaped": 0
+      },
+      "total": 67702
+    }
+  },
+  {
+    "n": 31,
+    "action": "pilot",
+    "seed": 29,
+    "plan": {
+      "schema_version": 1,
+      "robot": true,
+      "trays": true,
+      "route": "bypass",
+      "workers": [
+        [
+          1
+        ],
+        [
+          2
+        ],
+        [
+          4
+        ],
+        [
+          2,
+          3
+        ]
+      ]
+    },
+    "raw": {
+      "schema_version": 1,
+      "seed": 29,
+      "total": 174,
+      "good": 174,
+      "on_time": 128,
+      "escaped": 0,
+      "scrap": 0,
+      "unfinished": 0,
+      "pack_started": 176,
+      "pack_finished": 176,
+      "auto_finished": 124,
+      "trays_used": 174,
+      "rework_started": 2,
+      "labor_ticks": 2998,
+      "overtime_ticks": [
+        0,
+        0,
+        17,
+        13
+      ]
+    },
+    "economy": {
+      "purchase": 1530000,
+      "costs": {
+        "depreciation": 3060,
+        "service": 700,
+        "shifts": 60800,
+        "overtime": 750,
+        "trays": 1044,
+        "materials": 2112,
+        "rework": 140,
+        "late": 14720,
+        "unfulfilled": 0,
+        "escaped": 0
+      },
+      "total": 83326
+    }
+  },
+  {
+    "n": 32,
+    "action": "pilot",
+    "seed": 47,
+    "plan": {
+      "schema_version": 1,
+      "robot": true,
+      "trays": true,
+      "route": "bypass",
+      "workers": [
+        [
+          1
+        ],
+        [
+          2
+        ],
+        [
+          4
+        ],
+        [
+          2,
+          3
+        ]
+      ]
+    },
+    "raw": {
+      "schema_version": 1,
+      "seed": 47,
+      "total": 170,
+      "good": 170,
+      "on_time": 151,
+      "escaped": 0,
+      "scrap": 0,
+      "unfinished": 0,
+      "pack_started": 171,
+      "pack_finished": 171,
+      "auto_finished": 122,
+      "trays_used": 170,
+      "rework_started": 1,
+      "labor_ticks": 2912,
+      "overtime_ticks": [
+        0,
+        0,
+        0,
+        0
+      ]
+    },
+    "economy": {
+      "purchase": 1530000,
+      "costs": {
+        "depreciation": 3060,
+        "service": 700,
+        "shifts": 60800,
+        "overtime": 0,
+        "trays": 1020,
+        "materials": 2052,
+        "rework": 70,
+        "late": 6080,
+        "unfulfilled": 0,
+        "escaped": 0
+      },
+      "total": 73782
+    }
+  },
+  {
+    "n": 33,
+    "action": "pilot",
+    "seed": 29,
+    "plan": {
+      "schema_version": 1,
+      "robot": true,
+      "trays": true,
+      "route": "all",
+      "workers": [
+        [
+          1
+        ],
+        [
+          2
+        ],
+        [
+          4
+        ],
+        [
+          2,
+          3
+        ]
+      ]
+    },
+    "raw": {
+      "schema_version": 1,
+      "seed": 29,
+      "total": 174,
+      "good": 170,
+      "on_time": 61,
+      "escaped": 0,
+      "scrap": 0,
+      "unfinished": 4,
+      "pack_started": 179,
+      "pack_finished": 178,
+      "auto_finished": 171,
+      "trays_used": 172,
+      "rework_started": 7,
+      "labor_ticks": 2531,
+      "overtime_ticks": [
+        0,
+        69,
+        120,
+        107
+      ]
+    },
+    "economy": {
+      "purchase": 1530000,
+      "costs": {
+        "depreciation": 3060,
+        "service": 700,
+        "shifts": 60800,
+        "overtime": 7400,
+        "trays": 1032,
+        "materials": 2148,
+        "rework": 490,
+        "late": 34880,
+        "unfulfilled": 14000,
+        "escaped": 0
+      },
+      "total": 124510
+    }
+  },
+  {
+    "n": 34,
+    "action": "pilot",
+    "seed": 47,
+    "plan": {
+      "schema_version": 1,
+      "robot": true,
+      "trays": true,
+      "route": "all",
+      "workers": [
+        [
+          1
+        ],
+        [
+          2
+        ],
+        [
+          4
+        ],
+        [
+          2,
+          3
+        ]
+      ]
+    },
+    "raw": {
+      "schema_version": 1,
+      "seed": 47,
+      "total": 170,
+      "good": 170,
+      "on_time": 68,
+      "escaped": 0,
+      "scrap": 0,
+      "unfinished": 0,
+      "pack_started": 174,
+      "pack_finished": 174,
+      "auto_finished": 170,
+      "trays_used": 170,
+      "rework_started": 4,
+      "labor_ticks": 2380,
+      "overtime_ticks": [
+        0,
+        0,
+        55,
+        34
+      ]
+    },
+    "economy": {
+      "purchase": 1530000,
+      "costs": {
+        "depreciation": 3060,
+        "service": 700,
+        "shifts": 60800,
+        "overtime": 2225,
+        "trays": 1020,
+        "materials": 2088,
+        "rework": 280,
+        "late": 32640,
+        "unfulfilled": 0,
+        "escaped": 0
+      },
+      "total": 102813
+    }
+  },
+  {
+    "n": 35,
+    "action": "pilot",
+    "seed": 29,
+    "plan": {
+      "schema_version": 1,
+      "robot": true,
+      "trays": true,
+      "route": "bypass",
+      "workers": [
+        [
+          1
+        ],
+        [
+          2
+        ],
+        [
+          3
+        ],
+        [
+          4
+        ],
+        [
+          2,
+          3
+        ]
+      ]
+    },
+    "raw": {
+      "schema_version": 1,
+      "seed": 29,
+      "total": 174,
+      "good": 174,
+      "on_time": 174,
+      "escaped": 0,
+      "scrap": 0,
+      "unfinished": 0,
+      "pack_started": 176,
+      "pack_finished": 176,
+      "auto_finished": 124,
+      "trays_used": 174,
+      "rework_started": 2,
+      "labor_ticks": 3030,
+      "overtime_ticks": [
+        0,
+        0,
+        0,
+        0,
+        0
+      ]
+    },
+    "economy": {
+      "purchase": 1530000,
+      "costs": {
+        "depreciation": 3060,
+        "service": 700,
+        "shifts": 76000,
+        "overtime": 0,
+        "trays": 1044,
+        "materials": 2112,
+        "rework": 140,
+        "late": 0,
+        "unfulfilled": 0,
+        "escaped": 0
+      },
+      "total": 83056
+    }
+  },
+  {
+    "n": 36,
+    "action": "pilot",
+    "seed": 47,
+    "plan": {
+      "schema_version": 1,
+      "robot": true,
+      "trays": true,
+      "route": "bypass",
+      "workers": [
+        [
+          1
+        ],
+        [
+          2
+        ],
+        [
+          3
+        ],
+        [
+          4
+        ],
+        [
+          2,
+          3
+        ]
+      ]
+    },
+    "raw": {
+      "schema_version": 1,
+      "seed": 47,
+      "total": 170,
+      "good": 170,
+      "on_time": 170,
+      "escaped": 0,
+      "scrap": 0,
+      "unfinished": 0,
+      "pack_started": 171,
+      "pack_finished": 171,
+      "auto_finished": 122,
+      "trays_used": 170,
+      "rework_started": 1,
+      "labor_ticks": 2932,
+      "overtime_ticks": [
+        0,
+        0,
+        0,
+        0,
+        0
+      ]
+    },
+    "economy": {
+      "purchase": 1530000,
+      "costs": {
+        "depreciation": 3060,
+        "service": 700,
+        "shifts": 76000,
+        "overtime": 0,
+        "trays": 1020,
+        "materials": 2052,
+        "rework": 70,
+        "late": 0,
+        "unfulfilled": 0,
+        "escaped": 0
+      },
+      "total": 82902
+    }
+  },
+  {
+    "n": 37,
+    "action": "pilot",
+    "seed": 29,
+    "plan": {
+      "schema_version": 1,
+      "robot": true,
+      "trays": true,
+      "route": "bypass",
+      "workers": [
+        [
+          1
+        ],
+        [
+          2
+        ],
+        [
+          3
+        ],
+        [
+          4
+        ],
+        [
+          1,
+          2,
+          3,
+          4
+        ]
+      ]
+    },
+    "raw": {
+      "schema_version": 1,
+      "seed": 29,
+      "total": 174,
+      "good": 174,
+      "on_time": 174,
+      "escaped": 0,
+      "scrap": 0,
+      "unfinished": 0,
+      "pack_started": 176,
+      "pack_finished": 176,
+      "auto_finished": 124,
+      "trays_used": 174,
+      "rework_started": 2,
+      "labor_ticks": 3076,
+      "overtime_ticks": [
+        0,
+        0,
+        0,
+        0,
+        0
+      ]
+    },
+    "economy": {
+      "purchase": 1530000,
+      "costs": {
+        "depreciation": 3060,
+        "service": 700,
+        "shifts": 76000,
+        "overtime": 0,
+        "trays": 1044,
+        "materials": 2112,
+        "rework": 140,
+        "late": 0,
+        "unfulfilled": 0,
+        "escaped": 0
+      },
+      "total": 83056
+    }
+  },
+  {
+    "n": 38,
+    "action": "pilot",
+    "seed": 47,
+    "plan": {
+      "schema_version": 1,
+      "robot": true,
+      "trays": true,
+      "route": "bypass",
+      "workers": [
+        [
+          1
+        ],
+        [
+          2
+        ],
+        [
+          3
+        ],
+        [
+          4
+        ],
+        [
+          1,
+          2,
+          3,
+          4
+        ]
+      ]
+    },
+    "raw": {
+      "schema_version": 1,
+      "seed": 47,
+      "total": 170,
+      "good": 170,
+      "on_time": 170,
+      "escaped": 0,
+      "scrap": 0,
+      "unfinished": 0,
+      "pack_started": 171,
+      "pack_finished": 171,
+      "auto_finished": 122,
+      "trays_used": 170,
+      "rework_started": 1,
+      "labor_ticks": 2992,
+      "overtime_ticks": [
+        0,
+        0,
+        0,
+        0,
+        0
+      ]
+    },
+    "economy": {
+      "purchase": 1530000,
+      "costs": {
+        "depreciation": 3060,
+        "service": 700,
+        "shifts": 76000,
+        "overtime": 0,
+        "trays": 1020,
+        "materials": 2052,
+        "rework": 70,
+        "late": 0,
+        "unfulfilled": 0,
+        "escaped": 0
+      },
+      "total": 82902
+    }
+  },
+  {
+    "n": 39,
+    "action": "pilot",
+    "seed": 29,
+    "plan": {
+      "schema_version": 1,
+      "robot": true,
+      "trays": true,
+      "route": "bypass",
+      "workers": [
+        [
+          1
+        ],
+        [
+          2
+        ],
+        [
+          3
+        ],
+        [
+          4
+        ],
+        [
+          2
+        ]
+      ]
+    },
+    "raw": {
+      "schema_version": 1,
+      "seed": 29,
+      "total": 174,
+      "good": 174,
+      "on_time": 174,
+      "escaped": 0,
+      "scrap": 0,
+      "unfinished": 0,
+      "pack_started": 176,
+      "pack_finished": 176,
+      "auto_finished": 124,
+      "trays_used": 174,
+      "rework_started": 2,
+      "labor_ticks": 2960,
+      "overtime_ticks": [
+        0,
+        0,
+        0,
+        0,
+        0
+      ]
+    },
+    "economy": {
+      "purchase": 1530000,
+      "costs": {
+        "depreciation": 3060,
+        "service": 700,
+        "shifts": 76000,
+        "overtime": 0,
+        "trays": 1044,
+        "materials": 2112,
+        "rework": 140,
+        "late": 0,
+        "unfulfilled": 0,
+        "escaped": 0
+      },
+      "total": 83056
+    }
+  },
+  {
+    "n": 40,
+    "action": "pilot",
+    "seed": 47,
+    "plan": {
+      "schema_version": 1,
+      "robot": true,
+      "trays": true,
+      "route": "bypass",
+      "workers": [
+        [
+          1
+        ],
+        [
+          2
+        ],
+        [
+          3
+        ],
+        [
+          4
+        ],
+        [
+          2
+        ]
+      ]
+    },
+    "raw": {
+      "schema_version": 1,
+      "seed": 47,
+      "total": 170,
+      "good": 170,
+      "on_time": 170,
+      "escaped": 0,
+      "scrap": 0,
+      "unfinished": 0,
+      "pack_started": 171,
+      "pack_finished": 171,
+      "auto_finished": 122,
+      "trays_used": 170,
+      "rework_started": 1,
+      "labor_ticks": 2870,
+      "overtime_ticks": [
+        0,
+        0,
+        0,
+        0,
+        0
+      ]
+    },
+    "economy": {
+      "purchase": 1530000,
+      "costs": {
+        "depreciation": 3060,
+        "service": 700,
+        "shifts": 76000,
+        "overtime": 0,
+        "trays": 1020,
+        "materials": 2052,
+        "rework": 70,
+        "late": 0,
+        "unfulfilled": 0,
+        "escaped": 0
+      },
+      "total": 82902
+    }
+  },
+  {
+    "n": 41,
+    "action": "submit",
+    "plan": {
+      "schema_version": 1,
+      "robot": true,
+      "trays": true,
+      "route": "bypass",
+      "workers": [
+        [
+          1
+        ],
+        [
+          2
+        ],
+        [
+          3,
+          4
+        ],
+        [
+          2,
+          3
+        ]
+      ]
+    }
+  }
+]
