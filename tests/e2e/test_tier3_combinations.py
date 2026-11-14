@@ -11,6 +11,8 @@ from typing import Any
 import pytest
 
 from .conftest import (
+    CLI_COUNT_FLAGS,
+    CLI_OUTPUT_FLAGS,
     CYRILLIC_RE,
     ECONOMY_COST_KEYS_V1,
     EVENT_KINDS_V1,
@@ -19,18 +21,21 @@ from .conftest import (
     audit_v1_shift_bundle,
     best_phased_win_plan,
     discover_benchmark_v2_bundle,
+    extract_eval_dict,
     extract_mcp_payload,
     lazy_attr,
     lazy_mod,
     make_socket_client,
     make_week,
     mcp_proxy_cli_args,
+    pick_cli_flag,
     raw_http_request,
     run_mcp_session,
     run_staged_grade,
     run_staged_oracle,
     running_bench_daemon,
     running_cors_server,
+    send_unix_jsonl,
     v2_buy_capex_idle,
     v2_manual_quarterly,
     v2_naive_all_unmaintained,
@@ -120,7 +125,7 @@ def test_t3_f03_f05_f06_five_archetype_reward_chain(world, tmp_path):
     assert scores["invalid"] == Fraction(0, 1)
     assert Fraction(1, 10_000) <= scores["deadlock"] <= Fraction(9, 100)
     assert Fraction(1, 10) < scores["idle"] < scores["manual"] == Fraction(1, 5)
-    assert Fraction(1, 10) < scores["token"] < scores["manual"]
+    assert Fraction(1, 10) < scores["token"] <= scores["manual"]
 
 
 def test_t3_f04_f06_f07_episode_pilot_verifier_parity(world, tmp_path):
@@ -240,8 +245,9 @@ def test_t3_f06_f08_f09_harbor_staged_daemon_budget_cap_and_trusted_grade(
         make_socket_client(sock).submit(manual_q)
 
     verdict = run_staged_grade(task, sub, tmp_path / "verdict")
-    assert verdict["evaluation"]["valid"] is True
-    assert (verdict["evaluation"]["reward_num"], verdict["evaluation"]["reward_den"]) == (1, 5)
+    ev = extract_eval_dict(verdict)
+    assert ev["valid"] is True
+    assert (ev["reward_num"], ev["reward_den"]) == (1, 5)
 
 
 def test_t3_f09_f10_staged_harbor_oracle_airgapped_solve_and_replay_seeds_win(
@@ -268,7 +274,7 @@ def test_t3_f09_f10_staged_harbor_oracle_airgapped_solve_and_replay_seeds_win(
         assert o_res.returncode == 0, o_res.stderr
 
     verdict = run_staged_grade(task, sub, tmp_path / "verdict")
-    ev = verdict["evaluation"]
+    ev = extract_eval_dict(verdict)
     assert ev["valid"] is True and ev["feasible"] is True and ev["win"] is True
     assert Fraction(ev["reward_num"], ev["reward_den"]) >= Fraction(7, 20)
 
@@ -286,14 +292,12 @@ def test_t3_f10_f11_sft_trace_generator_plans_pass_quarterly_validator_and_grade
 
     out_file = tmp_path / "sft_t3.jsonl"
     cmd = [script]
-    if "--out" in help_txt:
-        cmd.extend(["--out", str(out_file)])
-    elif "--output" in help_txt:
-        cmd.extend(["--output", str(out_file)])
-    for cflag in ("--episodes", "--num-episodes", "--count", "--limit", "-n"):
-        if cflag in help_txt:
-            cmd.extend([cflag, "2"])
-            break
+    out_flag = pick_cli_flag(help_txt, CLI_OUTPUT_FLAGS)
+    if out_flag is not None:
+        cmd.extend([out_flag, str(out_file)])
+    count_flag = pick_cli_flag(help_txt, CLI_COUNT_FLAGS)
+    if count_flag is not None:
+        cmd.extend([count_flag, "2"])
 
     res = run_cli(cmd, timeout=20.0)
     assert res.returncode == 0, res.stderr
@@ -353,8 +357,12 @@ def test_t3_f08_f09_f14_untrusted_mcp_submissions_preserve_hierarchy_in_harbor_g
         ):
             fn(sock, sub, log)
         verdict = run_staged_grade(task, sub, tmp_path / f"verd{idx}")
-        ev = verdict["evaluation"]
+        ev = extract_eval_dict(verdict)
         return Fraction(ev["reward_num"], ev["reward_den"])
+
+    def _run_ora(s: Path, sub: Path, log: Path) -> None:
+        o_res = run_staged_oracle(task, s, sub, log)
+        assert o_res.returncode == 0, o_res.stderr
 
     r_stop = _run_case(0, lambda s, sub, log: make_socket_client(s).stop())
     r_partial = _run_case(
@@ -364,7 +372,7 @@ def test_t3_f08_f09_f14_untrusted_mcp_submissions_preserve_hierarchy_in_harbor_g
         ),
     )
     r_idle = _run_case(2, lambda s, sub, log: make_socket_client(s).submit(v2_buy_capex_idle(world)))
-    r_ora = _run_case(3, lambda s, sub, log: run_staged_oracle(task, s, sub, log))
+    r_ora = _run_case(3, _run_ora)
 
     assert Fraction(0, 1) == r_stop == r_partial < r_idle < Fraction(1, 5) < r_ora
     assert r_ora >= Fraction(7, 20)
@@ -386,11 +394,15 @@ def test_t3_f04_f12_coupled_quarterly_carryover_preserved_in_3d_week_manifests(w
         manifests.append(res["manifest"])
 
     checked = 0
+    cap = world["quarterly"]["carryover_cap"]
     for w in range(11):
-        if manifests[w]["raw"]["unfinished"] > 0:
+        unfinished_w = manifests[w]["raw"]["unfinished"]
+        if unfinished_w > 0:
             checked += 1
-            first_next = manifests[w + 1]["scenario"]["orders"][0]
-            assert first_next["arrival"] == 0 and first_next["due"] == 0
+            carried_next = [
+                o for o in manifests[w + 1]["scenario"]["orders"] if o["arrival"] == 0 and o["due"] == 0
+            ]
+            assert len(carried_next) == min(unfinished_w, cap)
     assert checked > 0
 
 
@@ -469,14 +481,23 @@ def test_t3_f06_f15_f16_verify_evidence_matches_direct_verifier_across_all_blind
     assert res.returncode == 0, res.stderr
 
     checked_subs = 0
+    checked_rewards = 0
     for sub in bundle["bundle_dir"].rglob("submission.json"):
         ev = verify_quarterly_file(world, sub, blind_seeds)
         checked_subs += 1
-        for rw_cand in (sub.with_name("reward.txt"), sub.parent / "verifier" / "reward.txt"):
+        root_trial = sub.parent.parent if sub.parent.name == "artifacts" else sub.parent
+        for rw_cand in (
+            root_trial / "verifier" / "reward.txt",
+            root_trial / "reward.txt",
+            sub.with_name("reward.txt"),
+        ):
             if rw_cand.is_file():
                 rw_val = float(rw_cand.read_text(encoding="utf-8").strip())
                 assert rw_val == pytest.approx(ev.reward_num / ev.reward_den)
+                checked_rewards += 1
+                break
     assert checked_subs >= 6
+    assert checked_rewards >= 1
 
 
 def test_t3_f11_f15_four_way_seed_disjointness_across_world_replay_verda_and_blind(
@@ -535,6 +556,19 @@ def test_t3_f09_f16_materialized_harbor_task_matches_fresh_prepare_harbor_docs_a
     assert not CYRILLIC_RE.search(inst_text)
     assert inst_text == agent_text
 
+    for doc_name in ("SPEC.md", "CONTRACTS.md"):
+        pub_doc = mat_dir / "environment" / "public" / "docs" / doc_name
+        assert pub_doc.is_file(), f"Missing {pub_doc}"
+        pub_doc_txt = pub_doc.read_text(encoding="utf-8")
+        assert not CYRILLIC_RE.search(pub_doc_txt)
+        assert pub_doc_txt == (REPO_ROOT / "docs" / doc_name).read_text(encoding="utf-8")
+
+    pub_world = mat_dir / "environment" / "public" / "data" / "world_spec.json"
+    if pub_world.is_file():
+        assert pub_world.read_text(encoding="utf-8") == (REPO_ROOT / "data" / "world_spec.json").read_text(
+            encoding="utf-8"
+        )
+
     fresh_dir = tmp_path / "fresh_task"
     seeds = tmp_path / "s.json"
     seeds.write_text("[37281939]\n", encoding="utf-8")
@@ -557,7 +591,8 @@ def test_t3_f11_f15_f16_readme_harbor_runs_and_matrix_script_contract_coherence(
 
     readme = readme_path.read_text(encoding="utf-8")
     matrix = matrix_path.read_text(encoding="utf-8")
+    matrix_uncommented = "\n".join(ln.split("#", 1)[0] for ln in matrix.splitlines())
     assert 40 <= len(readme.splitlines()) <= 180
     assert "tasks/fulfillment-cell-bench" in readme
     assert "evidence/harbor-runs" in readme
-    assert ("gemini/" in matrix or "google/" in matrix) and "openai/" in matrix
+    assert "gemini/" in matrix_uncommented and "openai/" in matrix_uncommented

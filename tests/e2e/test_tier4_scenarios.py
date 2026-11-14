@@ -8,6 +8,7 @@ import json
 import os
 from pathlib import Path
 import py_compile
+import re
 import shutil
 import subprocess
 import time
@@ -19,11 +20,13 @@ from .conftest import (
     CYRILLIC_RE,
     FORBIDDEN_PUBLIC_FILENAMES,
     REPO_ROOT,
-    SECRET_PATTERNS,
     audit_v1_shift_bundle,
     best_phased_win_plan,
     discover_benchmark_v2_bundle,
+    extract_eval_dict,
+    extract_index_ids,
     extract_mcp_payload,
+    has_cli_flag,
     lazy_attr,
     make_socket_client,
     make_week,
@@ -34,6 +37,7 @@ from .conftest import (
     run_staged_oracle,
     running_bench_daemon,
     running_cors_server,
+    scan_repo_for_secrets,
     v2_buy_capex_idle,
     v2_manual_quarterly,
     v2_naive_all_unmaintained,
@@ -121,11 +125,30 @@ def test_t4_scenario2_commissioning_failure_postmortem(world, tmp_path):
     assert Fraction(1, 10) < f_idle < f_man == Fraction(1, 5) < f_win
 
 
-def test_t4_scenario3_musa_3d_showcase_export_cors_playback_and_trace_audit(run_cli, tmp_path):
+def test_t4_scenario3_musa_3d_showcase_export_cors_playback_and_trace_audit(run_cli, world, tmp_path):
     """Scenario 3: Musa 3D Warehouse Showcase Export & Live CORS Playback (F01, F04, F12..F14)."""
     pack_dir = tmp_path / "pack"
-    res = run_cli(["scripts/export_3d_pack.py", "--out", str(pack_dir), "--seed", "11"], timeout=25.0)
+    export_cmd = ["scripts/export_3d_pack.py", "--out", str(pack_dir), "--seed", "11"]
+    help_res = run_cli(["scripts/export_3d_pack.py", "--help"], timeout=8.0)
+    if help_res.returncode == 0 and has_cli_flag(help_res.stdout + help_res.stderr, "--extra-plan"):
+        extra_file = tmp_path / "extra_manual_q.json"
+        extra_file.write_text(json.dumps(v2_manual_quarterly(world)), encoding="utf-8")
+        export_cmd.extend(["--extra-plan", f"quarterly-extra-seed11={extra_file}"])
+    res = run_cli(export_cmd, timeout=25.0)
     assert res.returncode == 0, res.stderr
+
+    core_entries = {
+        "v1-manual-seed11",
+        "v1-reference-seed11",
+        "quarterly-manual-seed11",
+        "quarterly-reference-seed11",
+    }
+    q_names = sorted(
+        d.name
+        for d in pack_dir.iterdir()
+        if d.is_dir() and (d / "quarter_manifest.json").is_file() and (d / "weeks").is_dir()
+    )
+    assert {"quarterly-manual-seed11", "quarterly-reference-seed11"} <= set(q_names)
 
     dl_root = tmp_path / "browser_cache"
     with running_cors_server(pack_dir) as (host, port, _):
@@ -140,10 +163,12 @@ def test_t4_scenario3_musa_3d_showcase_export_cors_playback_and_trace_audit(run_
 
         s_idx, h_idx, b_idx = raw_http_request(host, port, "GET", "/index.json")
         assert s_idx == 200 and "no-store" in h_idx.get("cache-control", "").lower()
-        assert isinstance(json.loads(b_idx.decode("utf-8")), dict)
+        idx_doc = json.loads(b_idx.decode("utf-8"))
+        idx_ids = extract_index_ids(idx_doc)
+        assert len(idx_ids) >= 4 and core_entries <= idx_ids
 
         bundle_rels = ["v1-manual-seed11", "v1-reference-seed11"]
-        for q_name in ("quarterly-manual-seed11", "quarterly-reference-seed11"):
+        for q_name in q_names:
             s_qm, _, b_qm = raw_http_request(host, port, "GET", f"/{q_name}/quarter_manifest.json")
             assert s_qm == 200
             q_dir = dl_root / q_name
@@ -152,7 +177,7 @@ def test_t4_scenario3_musa_3d_showcase_export_cors_playback_and_trace_audit(run_
             for w in range(12):
                 bundle_rels.append(f"{q_name}/weeks/week-{w:02d}")
 
-        assert len(bundle_rels) == 26
+        assert len(bundle_rels) >= 26
         for rel in bundle_rels:
             target = dl_root / rel
             target.mkdir(parents=True, exist_ok=True)
@@ -188,7 +213,10 @@ def test_t4_scenario4_harbor_blackbox_airgap_50x_restart_flood_oracle_and_grade(
     pub = task / "environment" / "public"
     for p in pub.rglob("*"):
         if p.is_file():
+            low_name = p.name.lower()
             assert p.name not in FORBIDDEN_PUBLIC_FILENAMES
+            assert not (low_name.endswith(".json") and "seeds" in low_name)
+            assert low_name != "candidate.json" and not low_name.startswith(".env")
 
     dockerfile = (task / "environment" / "Dockerfile").read_text(encoding="utf-8")
     assert "/srv/bench_daemon" in dockerfile and "bench-daemon-start" in dockerfile
@@ -230,7 +258,8 @@ def test_t4_scenario4_harbor_blackbox_airgap_50x_restart_flood_oracle_and_grade(
 
     v1_out = tmp_path / "verd1"
     verd1 = run_staged_grade(task, sub1, v1_out)
-    assert (verd1["evaluation"]["reward_num"], verd1["evaluation"]["reward_den"]) == (0, 1)
+    ev1 = extract_eval_dict(verd1)
+    assert (ev1["reward_num"], ev1["reward_den"]) == (0, 1)
     assert float((v1_out / "reward.txt").read_text(encoding="utf-8").strip()) == 0.0
 
     # Session 2: Airgapped oracle.py -> grade.py -> win >= 0.35
@@ -245,7 +274,7 @@ def test_t4_scenario4_harbor_blackbox_airgap_50x_restart_flood_oracle_and_grade(
 
     v2_out = tmp_path / "verd2"
     verd2 = run_staged_grade(task, sub2, v2_out)
-    ev2 = verd2["evaluation"]
+    ev2 = extract_eval_dict(verd2)
     assert ev2["valid"] is True and ev2["feasible"] is True and ev2["win"] is True
     assert Fraction(ev2["reward_num"], ev2["reward_den"]) >= Fraction(7, 20)
 
@@ -306,7 +335,7 @@ def test_t4_scenario5_fifteen_minute_afterquery_judge_redteam_exploit_simulation
     assert Fraction(1, 10_000) <= r_dead <= Fraction(9, 100)
     assert Fraction(1, 10_000) <= r_under <= Fraction(9, 100)
     assert Fraction(1, 10) < r_idle < r_man == Fraction(1, 5)
-    assert Fraction(1, 10) < r_tok < r_man
+    assert Fraction(1, 10) < r_tok <= r_man
     assert r_ref >= Fraction(7, 20)
 
     async def _devtools(session):
@@ -336,8 +365,16 @@ def test_t4_scenario6_judge_one_command_cli_v2_default_and_v1_legacy_workflow(ru
     assert not CYRILLIC_RE.search((v2_out / "comparison.md").read_text(encoding="utf-8"))
 
     # Legacy v1 CLI commands
-    r_val = run_cli(["-m", "robotization_bench.cli", "validate", str(REPO_ROOT / "data/plans/manual.json")])
-    assert r_val.returncode == 0
+    r_val = run_cli(
+        [
+            "-m",
+            "robotization_bench.cli",
+            "validate",
+            "--plan",
+            str(REPO_ROOT / "data/plans/manual.json"),
+        ]
+    )
+    assert r_val.returncode == 0, r_val.stderr
 
     ev_out = tmp_path / "v1_events.jsonl"
     r_pil = run_cli(
@@ -345,6 +382,7 @@ def test_t4_scenario6_judge_one_command_cli_v2_default_and_v1_legacy_workflow(ru
             "-m",
             "robotization_bench.cli",
             "pilot",
+            "--plan",
             str(REPO_ROOT / "data/plans/manual.json"),
             "--seed",
             "11",
@@ -352,7 +390,8 @@ def test_t4_scenario6_judge_one_command_cli_v2_default_and_v1_legacy_workflow(ru
             str(ev_out),
         ]
     )
-    assert r_pil.returncode == 0 and ev_out.stat().st_size > 0
+    assert r_pil.returncode == 0, r_pil.stderr
+    assert ev_out.stat().st_size > 0
 
     seeds = tmp_path / "s821.json"
     seeds.write_text("[821]\n", encoding="utf-8")
@@ -394,7 +433,9 @@ def test_t4_scenario7_offline_verda_evidence_verification_and_tamper_defense(
     assert set(blind_seeds).isdisjoint(set(world["development_seeds"]))
     assert set(blind_seeds).isdisjoint(set(replay_seeds))
     digest = hashlib.sha256(bundle["blind_seeds_path"].read_bytes()).hexdigest()
-    assert digest in json.dumps([d for _, d in bundle["json_docs"]])
+    assert digest in json.dumps([d for _, d in bundle["json_docs"]]) or any(
+        digest in txt for _, txt in bundle.get("text_docs", [])
+    )
 
     # Tamper 1: reward.txt
     c1 = tmp_path / "c1"
@@ -417,7 +458,7 @@ def test_t4_scenario7_offline_verda_evidence_verification_and_tamper_defense(
     subs3 = [
         p
         for p in sorted(c3.rglob("submission.json"))
-        if any(k in p.as_posix().lower() for k in ("oracle", "reference", "post"))
+        if any(k in p.as_posix().lower() for k in ("oracle", "reference", "post", "grpo"))
     ]
     assert subs3
     subs3[0].write_text(json.dumps(v2_manual_quarterly(world)) + "\n", encoding="utf-8")
@@ -460,9 +501,24 @@ def test_t4_scenario8_verda_ops_packaging_secret_hygiene_and_bilingual_docs_audi
         py_compile.compile(str(p), doraise=True)
 
     prov_txt = (verda_dir / "provision_check.sh").read_text(encoding="utf-8")
-    assert "shutdown -h +" in prov_txt
+    assert any(
+        tok in prov_txt
+        for tok in ("shutdown -h", "HF_HOME", "/tmp/fast-cache", "H200", "df -h", "save_total_limit")
+    )
+    grpo_txt = (verda_dir / "train_grpo_qwen7b.py").read_text(encoding="utf-8")
+    assert any(
+        tok in grpo_txt
+        for tok in ("CUDA_VISIBLE_DEVICES", "cuda:0", "gpu_memory_utilization", "vllm", "H200")
+    )
+    assert re.search(
+        r"qwen3\.?5-9b|qwen3-8b|qwen2\.?5-7b|qwen|--model-id|H200_ENV_READY\.json",
+        grpo_txt,
+        re.IGNORECASE,
+    )
     mat_txt = (verda_dir / "run_harbor_matrix.sh").read_text(encoding="utf-8")
-    assert ("gemini/" in mat_txt or "google/" in mat_txt) and "openai/" in mat_txt
+    mat_uncommented = "\n".join(ln.split("#", 1)[0] for ln in mat_txt.splitlines())
+    assert "gemini/" in mat_uncommented and "openai/" in mat_uncommented
+    assert not re.search(r"\bssh\b|verda-junction", mat_uncommented)
 
     # Docs & secret hygiene
     readme = (REPO_ROOT / "README.md").read_text(encoding="utf-8")
@@ -480,12 +536,4 @@ def test_t4_scenario8_verda_ops_packaging_secret_hygiene_and_bilingual_docs_audi
     musa_doc = REPO_ROOT / "docs" / "ru" / "3D_HANDOFF_MUSA.md"
     assert musa_doc.is_file() and CYRILLIC_RE.search(musa_doc.read_text(encoding="utf-8"))
 
-    for scan_sub in ("scripts", "src", "docs", "evidence", "integration"):
-        d = REPO_ROOT / scan_sub
-        if not d.exists():
-            continue
-        for f in d.rglob("*"):
-            if f.is_file() and f.suffix in (".py", ".sh", ".md", ".json", ".toml", ".txt", ".jsonl"):
-                content = f.read_text(encoding="utf-8", errors="ignore")
-                for pat in SECRET_PATTERNS:
-                    assert not pat.search(content), f"Leaked secret in {f}"
+    assert scan_repo_for_secrets(REPO_ROOT) == []

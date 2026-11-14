@@ -2,8 +2,10 @@
 
 from __future__ import annotations
 
+import ast
 import asyncio
 from collections import Counter, defaultdict
+from collections.abc import Mapping
 from contextlib import contextmanager
 import copy
 from fractions import Fraction
@@ -376,6 +378,14 @@ def running_bench_daemon(
             if time.monotonic() > deadline:
                 raise TimeoutError(f"Timed out waiting for Unix socket {sock_path}")
             time.sleep(0.02)
+        for _ in range(10):
+            if proc.poll() is not None:
+                err = proc.stderr.read() if proc.stderr else ""
+                raise AssertionError(f"mcp_server exited early ({proc.returncode}): {err.strip()}")
+            if sock_path.is_socket():
+                break
+            time.sleep(0.025)
+        time.sleep(0.025)
         yield proc
     finally:
         if proc.poll() is None:
@@ -389,16 +399,24 @@ def running_bench_daemon(
 
 def send_unix_jsonl(sock_path: Path, payload: str | dict[str, Any]) -> dict[str, Any]:
     raw = (json.dumps(payload) + "\n") if isinstance(payload, dict) else payload
-    with socket.socket(socket.AF_UNIX, socket.SOCK_STREAM) as client:
-        client.settimeout(4.0)
-        client.connect(str(sock_path))
-        client.sendall(raw.encode("utf-8"))
-        buf = b""
-        while not buf.endswith(b"\n"):
-            chunk = client.recv(65_536)
-            if not chunk:
-                break
-            buf += chunk
+    buf = b""
+    for attempt in range(11):
+        try:
+            with socket.socket(socket.AF_UNIX, socket.SOCK_STREAM) as client:
+                client.settimeout(4.0)
+                client.connect(str(sock_path))
+                client.sendall(raw.encode("utf-8"))
+                buf = b""
+                while not buf.endswith(b"\n"):
+                    chunk = client.recv(65_536)
+                    if not chunk:
+                        break
+                    buf += chunk
+            break
+        except (ConnectionRefusedError, FileNotFoundError):
+            if attempt == 10:
+                raise
+            time.sleep(0.025)
     return json.loads(buf.decode("utf-8"))
 
 
@@ -437,6 +455,166 @@ def run_mcp_session(
     return asyncio.run(_runner())
 
 
+CLI_OUTPUT_FLAGS = (
+    "--output-dir",
+    "--out-dir",
+    "--output-file",
+    "--output-path",
+    "--output",
+    "--out-file",
+    "--out",
+)
+CLI_COUNT_FLAGS = (
+    "--num-episodes",
+    "--n-episodes",
+    "--episodes",
+    "--num-traces",
+    "--traces",
+    "--samples",
+    "--rollouts",
+    "--count",
+    "--limit",
+    "-n",
+)
+
+
+def has_cli_flag(help_txt: str, flag: str) -> bool:
+    """Match CLI flags using strict token boundaries so '--out' never matches '--output' or '-n' in prose."""
+    return bool(re.search(rf"(?<![\w-]){re.escape(flag)}(?:[\s,=\]|]|$)", help_txt))
+
+
+def pick_cli_flag(help_txt: str, candidates: tuple[str, ...]) -> str | None:
+    for flag in candidates:
+        if has_cli_flag(help_txt, flag):
+            return flag
+    return None
+
+
+def extract_eval_dict(payload: Any) -> dict[str, Any]:
+    """Normalize nested {'evaluation': {...}} or flat asdict(Evaluation) JSON payloads."""
+    if isinstance(payload, Mapping) and isinstance(payload.get("evaluation"), Mapping):
+        return dict(payload["evaluation"])
+    assert isinstance(payload, Mapping), f"Expected evaluation mapping, got {type(payload)}"
+    return dict(payload)
+
+
+def extract_index_ids(idx_doc: Any) -> set[str]:
+    """Extract bundle IDs/slugs from artifacts/3d-pack/index.json across dict/list layouts."""
+    ids: set[str] = set()
+    if isinstance(idx_doc, Mapping):
+        for key, val in idx_doc.items():
+            if isinstance(val, Mapping) and ("path" in val or "format" in val or "weeks" in val or "kind" in val):
+                ids.add(str(key))
+            elif isinstance(val, list):
+                for item in val:
+                    if isinstance(item, str):
+                        ids.add(item.strip("/"))
+                    elif isinstance(item, Mapping):
+                        for f in ("id", "slug", "name", "dir", "path"):
+                            if isinstance(item.get(f), str):
+                                ids.add(Path(item[f].strip("/")).name)
+        if not ids:
+            raw_s = json.dumps(idx_doc)
+            for slug in (
+                "v1-manual-seed11",
+                "v1-reference-seed11",
+                "quarterly-manual-seed11",
+                "quarterly-reference-seed11",
+            ):
+                if slug in raw_s:
+                    ids.add(slug)
+    elif isinstance(idx_doc, list):
+        for item in idx_doc:
+            if isinstance(item, str):
+                ids.add(item.strip("/"))
+            elif isinstance(item, Mapping):
+                for f in ("id", "slug", "name", "dir", "path"):
+                    if isinstance(item.get(f), str):
+                        ids.add(Path(item[f].strip("/")).name)
+    return ids
+
+
+def scan_repo_for_secrets(repo_root: Path = REPO_ROOT) -> list[str]:
+    """Scan all git-tracked files (excluding tests/e2e/) plus tasks/ and evidence/ for leaked secrets."""
+    binary_exts = frozenset(
+        {
+            ".png",
+            ".jpg",
+            ".jpeg",
+            ".gif",
+            ".webp",
+            ".ico",
+            ".pdf",
+            ".zip",
+            ".tar",
+            ".gz",
+            ".safetensors",
+            ".pt",
+            ".pth",
+            ".bin",
+            ".pyc",
+            ".so",
+            ".dylib",
+            ".woff",
+            ".woff2",
+            ".ttf",
+        }
+    )
+    candidates: set[Path] = set()
+    ls_res = subprocess.run(
+        ["git", "-C", str(repo_root), "ls-files"],
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    if ls_res.returncode == 0:
+        for rel in ls_res.stdout.splitlines():
+            rel_s = rel.strip()
+            if rel_s and not rel_s.startswith("tests/e2e/"):
+                candidates.add(repo_root / rel_s)
+
+    for extra_sub in ("tasks", "evidence"):
+        extra_dir = repo_root / extra_sub
+        if extra_dir.exists():
+            for p in extra_dir.rglob("*"):
+                if p.is_file() and not p.is_symlink():
+                    candidates.add(p)
+
+    hits: list[str] = []
+    for fpath in sorted(candidates):
+        if not fpath.is_file() or fpath.is_symlink() or fpath.suffix.lower() in binary_exts:
+            continue
+        try:
+            if fpath.stat().st_size > 5_000_000:
+                continue
+            raw_bytes = fpath.read_bytes()
+            if b"\x00" in raw_bytes[:4096]:
+                continue
+            txt = raw_bytes.decode("utf-8", errors="ignore")
+        except OSError:
+            continue
+        for pat in SECRET_PATTERNS:
+            if pat.search(txt):
+                rel_label = fpath.relative_to(repo_root).as_posix() if fpath.is_relative_to(repo_root) else str(fpath)
+                hits.append(f"{rel_label}: {pat.pattern}")
+    return hits
+
+
+def _source_registers_cli_flag(source: str, flag: str) -> bool:
+    try:
+        tree = ast.parse(source)
+    except SyntaxError:
+        return bool(re.search(rf"""add_argument\([^)]*['"]{re.escape(flag)}['"]""", source))
+    for node in ast.walk(tree):
+        if isinstance(node, ast.Call):
+            fn_name = getattr(node.func, "attr", None) or getattr(node.func, "id", None)
+            if fn_name in ("add_argument", "option"):
+                for arg in node.args:
+                    if isinstance(arg, ast.Constant) and arg.value == flag:
+                        return True
+    return False
+
+
 def mcp_proxy_cli_args(sock_path: Path, python_path: Path | None = None) -> tuple[list[str], dict[str, str]]:
     """Build CLI args and env for python -m robotization_bench.mcp_proxy across CLI/env conventions."""
     src_root = python_path or (REPO_ROOT / "src")
@@ -444,7 +622,7 @@ def mcp_proxy_cli_args(sock_path: Path, python_path: Path | None = None) -> tupl
     assert proxy_file.is_file(), f"Missing {proxy_file}"
     source = proxy_file.read_text(encoding="utf-8")
     args = ["-m", "robotization_bench.mcp_proxy"]
-    if "--socket" in source:
+    if _source_registers_cli_flag(source, "--socket"):
         args.extend(["--socket", str(sock_path)])
     env_extra = {
         "BENCH_SOCKET": str(sock_path),
@@ -459,35 +637,67 @@ def run_staged_oracle(
     sub_path: Path,
     log_path: Path,
 ) -> subprocess.CompletedProcess[str]:
-    """Run staged solution/oracle.py in isolated Python (-I -B) with ONLY public/src on sys.path."""
+    """Run staged solution/oracle.py in isolated Python (-I -B) with public/src and solution/ on sys.path."""
     public_src = task_dir / "environment" / "public" / "src"
     oracle_py = task_dir / "solution" / "oracle.py"
     code = (
         "import ast, inspect, os, runpy, sys\n"
         "from pathlib import Path\n"
         "public_src, oracle_py, sock_s, sub_s, log_s = sys.argv[1:6]\n"
+        "sys.path.insert(0, str(Path(oracle_py).parent))\n"
         "sys.path.insert(0, public_src)\n"
         "os.environ['BENCH_SOCKET'] = sock_s\n"
         "os.environ['BENCH_SUBMISSION'] = sub_s\n"
         "os.environ['BENCH_LOG'] = log_s\n"
         "os.environ['BENCH_AUTOSTART'] = '/nonexistent_bench_autostart'\n"
+        "sys.argv = [oracle_py]\n"
         "tree = ast.parse(Path(oracle_py).read_text(encoding='utf-8'))\n"
         "has_run = any(isinstance(n, ast.FunctionDef) and n.name == 'run' for n in tree.body)\n"
+        "ran = False\n"
         "if has_run:\n"
         "    ns = runpy.run_path(oracle_py)\n"
-        "    sig = inspect.signature(ns['run'])\n"
-        "    params = list(sig.parameters.keys())\n"
-        "    if len(params) == 0:\n"
-        "        ns['run']()\n"
-        "    elif len(params) == 1:\n"
-        "        ns['run'](Path(sub_s))\n"
-        "    else:\n"
-        "        kwargs = {}\n"
-        "        for k in ('socket_path', 'sock_path', 'socket'):\n"
-        "            if k in sig.parameters:\n"
-        "                kwargs[k] = Path(sock_s)\n"
-        "        ns['run'](Path(sub_s), Path(log_s), **kwargs)\n"
-        "else:\n"
+        "    run_fn = ns.get('run')\n"
+        "    if callable(run_fn):\n"
+        "        sig = inspect.signature(run_fn)\n"
+        "        name_map = {\n"
+        "            'sock': Path(sock_s),\n"
+        "            'socket': Path(sock_s),\n"
+        "            'socket_path': Path(sock_s),\n"
+        "            'sock_path': Path(sock_s),\n"
+        "            'sub': Path(sub_s),\n"
+        "            'out': Path(sub_s),\n"
+        "            'submission': Path(sub_s),\n"
+        "            'submission_path': Path(sub_s),\n"
+        "            'out_path': Path(sub_s),\n"
+        "            'log': Path(log_s),\n"
+        "            'log_path': Path(log_s),\n"
+        "            'autostart': Path('/nonexistent_bench_autostart'),\n"
+        "            'autostart_bin': Path('/nonexistent_bench_autostart'),\n"
+        "        }\n"
+        "        pos_args = []\n"
+        "        kw_args = {}\n"
+        "        can_bind = True\n"
+        "        skipped_pos_only = False\n"
+        "        for p in sig.parameters.values():\n"
+        "            if p.kind in (inspect.Parameter.VAR_POSITIONAL, inspect.Parameter.VAR_KEYWORD):\n"
+        "                continue\n"
+        "            if p.name in name_map:\n"
+        "                if p.kind == inspect.Parameter.POSITIONAL_ONLY:\n"
+        "                    if skipped_pos_only:\n"
+        "                        can_bind = False\n"
+        "                        break\n"
+        "                    pos_args.append(name_map[p.name])\n"
+        "                else:\n"
+        "                    kw_args[p.name] = name_map[p.name]\n"
+        "            elif p.default is inspect.Parameter.empty:\n"
+        "                can_bind = False\n"
+        "                break\n"
+        "            elif p.kind == inspect.Parameter.POSITIONAL_ONLY:\n"
+        "                skipped_pos_only = True\n"
+        "        if can_bind:\n"
+        "            run_fn(*pos_args, **kw_args)\n"
+        "            ran = True\n"
+        "if not ran:\n"
         "    runpy.run_path(oracle_py, run_name='__main__')\n"
     )
     return subprocess.run(
@@ -513,15 +723,122 @@ def run_staged_oracle(
 def run_staged_grade(task_dir: Path, sub_path: Path, verdict_dir: Path) -> dict[str, Any]:
     """Run staged tests/grade.py in isolated Python (-I -B) and return parsed evaluation.json."""
     grade_py = task_dir / "tests" / "grade.py"
+    seeds_py = task_dir / "tests" / "seeds.json"
+    verdict_dir.mkdir(parents=True, exist_ok=True)
     code = (
-        "import runpy, sys\n"
+        "import ast, builtins, inspect, os, pathlib, runpy, sys\n"
         "from pathlib import Path\n"
-        "grade_py, sub_s, out_s = sys.argv[1:4]\n"
-        "ns = runpy.run_path(grade_py)\n"
-        "ns['grade'](Path(sub_s), Path(out_s))\n"
+        "grade_py, sub_s, seeds_s, out_s = sys.argv[1:5]\n"
+        "sys.path.insert(0, str(Path(grade_py).parent))\n"
+        "os.environ['BENCH_SUBMISSION'] = sub_s\n"
+        "os.environ['BENCH_SEEDS'] = seeds_s\n"
+        "os.environ['BENCH_VERIFIER_DIR'] = out_s\n"
+        "os.environ['HARBOR_VERIFIER_DIR'] = out_s\n"
+        "sys.argv = [grade_py]\n"
+        "_REMAP = (\n"
+        "    ('/logs/artifacts/submission.json', sub_s),\n"
+        "    ('/logs/artifacts', str(Path(sub_s).parent)),\n"
+        "    ('/logs/verifier', out_s),\n"
+        "    ('/tests/seeds.json', seeds_s),\n"
+        "    ('/tests', str(Path(seeds_s).parent)),\n"
+        ")\n"
+        "def _remap_str(val):\n"
+        "    if isinstance(val, str):\n"
+        "        for prefix, repl in _REMAP:\n"
+        "            if val == prefix or val.startswith(prefix + '/'):\n"
+        "                return repl + val[len(prefix):]\n"
+        "    return val\n"
+        "def _remap_pathlike(p):\n"
+        "    if isinstance(p, str):\n"
+        "        return _remap_str(p)\n"
+        "    if isinstance(p, os.PathLike):\n"
+        "        s = os.fspath(p)\n"
+        "        if isinstance(s, str):\n"
+        "            rs = _remap_str(s)\n"
+        "            if rs != s:\n"
+        "                return Path(rs)\n"
+        "    return p\n"
+        "_orig_open = builtins.open\n"
+        "def _patched_open(file, *a, **kw):\n"
+        "    return _orig_open(_remap_pathlike(file), *a, **kw)\n"
+        "builtins.open = _patched_open\n"
+        "_orig_os_open = os.open\n"
+        "def _patched_os_open(path, flags, *a, **kw):\n"
+        "    return _orig_os_open(_remap_pathlike(path), flags, *a, **kw)\n"
+        "os.open = _patched_os_open\n"
+        "if pathlib.PurePath.__init__ is not object.__init__:\n"
+        "    _orig_pp_init = pathlib.PurePath.__init__\n"
+        "    def _patched_pp_init(self, *args):\n"
+        "        _orig_pp_init(self, *(_remap_pathlike(a) for a in args))\n"
+        "    pathlib.PurePath.__init__ = _patched_pp_init\n"
+        "else:\n"
+        "    _orig_pp_new = pathlib.PurePath.__new__\n"
+        "    def _patched_pp_new(cls, *args, **kwargs):\n"
+        "        return _orig_pp_new(cls, *(_remap_pathlike(a) for a in args), **kwargs)\n"
+        "    pathlib.PurePath.__new__ = staticmethod(_patched_pp_new)\n"
+        "tree = ast.parse(Path(grade_py).read_text(encoding='utf-8'))\n"
+        "has_grade = any(isinstance(n, ast.FunctionDef) and n.name == 'grade' for n in tree.body)\n"
+        "ran = False\n"
+        "if has_grade:\n"
+        "    ns = runpy.run_path(grade_py)\n"
+        "    grade_fn = ns.get('grade')\n"
+        "    if callable(grade_fn):\n"
+        "        sig = inspect.signature(grade_fn)\n"
+        "        name_map = {\n"
+        "            'sub': Path(sub_s),\n"
+        "            'submission': Path(sub_s),\n"
+        "            'submission_path': Path(sub_s),\n"
+        "            'plan_path': Path(sub_s),\n"
+        "            'path': Path(sub_s),\n"
+        "            'seeds': Path(seeds_s),\n"
+        "            'seeds_path': Path(seeds_s),\n"
+        "            'seeds_file': Path(seeds_s),\n"
+        "            'out': Path(out_s),\n"
+        "            'out_dir': Path(out_s),\n"
+        "            'output_dir': Path(out_s),\n"
+        "            'verdict_dir': Path(out_s),\n"
+        "            'verifier_dir': Path(out_s),\n"
+        "        }\n"
+        "        pos_args = []\n"
+        "        kw_args = {}\n"
+        "        can_bind = True\n"
+        "        for p in sig.parameters.values():\n"
+        "            if p.kind in (inspect.Parameter.VAR_POSITIONAL, inspect.Parameter.VAR_KEYWORD):\n"
+        "                continue\n"
+        "            if p.name in name_map:\n"
+        "                if p.kind == inspect.Parameter.POSITIONAL_ONLY:\n"
+        "                    pos_args.append(name_map[p.name])\n"
+        "                else:\n"
+        "                    kw_args[p.name] = name_map[p.name]\n"
+        "            elif p.default is inspect.Parameter.empty:\n"
+        "                can_bind = False\n"
+        "                break\n"
+        "        if can_bind:\n"
+        "            grade_fn(*pos_args, **kw_args)\n"
+        "            ran = True\n"
+        "        else:\n"
+        "            req = [p for p in sig.parameters.values() if p.kind in (inspect.Parameter.POSITIONAL_ONLY, inspect.Parameter.POSITIONAL_OR_KEYWORD)]\n"
+        "            if len(req) == 2:\n"
+        "                grade_fn(Path(sub_s), Path(out_s))\n"
+        "                ran = True\n"
+        "            elif len(req) == 3:\n"
+        "                grade_fn(Path(sub_s), Path(seeds_s), Path(out_s))\n"
+        "                ran = True\n"
+        "if not ran:\n"
+        "    runpy.run_path(grade_py, run_name='__main__')\n"
     )
     res = subprocess.run(
-        [str(PYTHON_BIN), "-I", "-B", "-c", code, str(grade_py), str(sub_path), str(verdict_dir)],
+        [
+            str(PYTHON_BIN),
+            "-I",
+            "-B",
+            "-c",
+            code,
+            str(grade_py),
+            str(sub_path),
+            str(seeds_py),
+            str(verdict_dir),
+        ],
         cwd=str(verdict_dir.parent),
         capture_output=True,
         text=True,
@@ -730,12 +1047,13 @@ def running_cors_server(serve_dir: Path):
                 err = proc.stderr.read() if proc.stderr else ""
                 raise AssertionError(f"serve_3d.py exited early ({proc.returncode}): {err.strip()}")
             try:
-                status, _, _ = raw_http_request("127.0.0.1", port, "OPTIONS", "/")
-                if status in (200, 204, 404):
+                status, _, _ = raw_http_request("127.0.0.1", port, "GET", "/index.json")
+                if status in (200, 204, 400, 403, 404):
                     ready = True
                     break
             except OSError:
-                time.sleep(0.025)
+                pass
+            time.sleep(0.025)
         assert ready, f"serve_3d.py failed readiness check on 127.0.0.1:{port}"
         yield ("127.0.0.1", port, proc)
     finally:
@@ -776,21 +1094,54 @@ def python_specifier_allows(spec_str: str, version_str: str) -> bool:
         return True
 
 
-def _classify_evidence_role(label: str) -> str | None:
-    low = label.lower()
+def _classify_single_segment(seg: str) -> str | None:
+    low = seg.lower()
+    if re.fullmatch(r"(?:trial|run|attempt|seed|ep|episode|idx)[_-]?\d+|\d+", low):
+        return None
     if "stop_early" in low or "stop-early" in low:
         return "stop_early"
-    if re.search(r"(^|[/_-])nop([/_.-]|$)", low):
+    if re.search(r"(^|[/_.-])nop([/_.-]|$)", low):
         return "nop"
-    if any(tok in low for tok in ("post_rl", "post-rl", "grpo", "rl_7b", "rl-7b", "sft_grpo", "postrl")):
-        return "post_rl_7b"
-    if any(tok in low for tok in ("base_7b", "base-7b", "qwen_base", "qwen-base", "pre_rl", "pre-rl", "base7b")):
-        return "base_7b"
-    if any(tok in low for tok in ("oracle", "reference")):
+    if re.search(r"(^|[/_.-])(oracle|reference)([/_.-]|$)", low):
         return "oracle"
-    if any(tok in low for tok in ("frontier", "opencode", "gemini", "gpt", "openai", "claude", "anthropic")):
+    is_explicit_base = bool(
+        re.search(
+            r"(base[_-]?[789]b|[789]b[_-]?base|pre[_-]?rl|qwen.*base|base.*qwen|"
+            r"qwen.*zero[_-]?shot|zero[_-]?shot.*(?:qwen|[789]b)|(?:^|[/_.-])base(?:[/_.-]|\d|$))",
+            low,
+        )
+    )
+    is_post_rl = bool(
+        re.search(
+            r"(post[_-]?rl|postrl|sft[_-]?grpo|[789]b[_-]?rl|rl[_-]?[789]b|(?:^|[/_.-])grpo(?:[/_.-]|$)|"
+            r"(?:qwen|[789]b).*(?:post|grpo|rl|lora|sft|ft|trained|tuned)|"
+            r"(?:post|grpo|lora|sft|trained|tuned).*(?:qwen|[789]b))",
+            low,
+        )
+    )
+    if is_post_rl and not is_explicit_base:
+        return "post_rl_7b"
+    if is_explicit_base or re.search(
+        r"((?:qwen|[789]b).*instruct|qwen3\.?5[_-]?9b|qwen3[_-]?8b|qwen2\.?5[_-]?7b|qwen[_-]?[789]b|qwen)",
+        low,
+    ):
+        return "base_7b"
+    if re.search(
+        r"(gemini|gpt|openai|claude|anthropic|(?<![a-z0-9])o[134](?![a-z0-9])|sonnet|opus|deepseek|frontier|opencode)",
+        low,
+    ):
         return "frontier"
     return None
+
+
+def _classify_evidence_role(label: str) -> str | None:
+    ignore = {"artifacts", "verifier", "submission.json", "reward.txt", "evaluation.json"}
+    parts = [p for p in Path(label).parts if p.lower() not in ignore]
+    for seg in reversed(parts):
+        role = _classify_single_segment(seg)
+        if role is not None:
+            return role
+    return _classify_single_segment(label)
 
 
 def discover_benchmark_v2_bundle(bundle_dir: Path | None = None) -> dict[str, Any]:
@@ -816,48 +1167,92 @@ def discover_benchmark_v2_bundle(bundle_dir: Path | None = None) -> dict[str, An
         except Exception:
             continue
 
+    text_docs: list[tuple[Path, str]] = []
+    for tf in sorted(bdir.rglob("*")):
+        if tf.is_file() and (tf.suffix.lower() in (".sha256", ".txt", ".md") or "sha256" in tf.name.lower()):
+            try:
+                text_docs.append((tf, tf.read_text(encoding="utf-8", errors="ignore")))
+            except Exception:
+                continue
+
     runs_by_role: dict[str, list[dict[str, Any]]] = defaultdict(list)
     seen_dirs: set[Path] = set()
 
     for sub in sorted(bdir.rglob("submission.json")):
-        trial_dir = sub.parent
-        rel = sub.relative_to(bdir).as_posix()
+        root_trial = sub.parent.parent if sub.parent.name == "artifacts" else sub.parent
+        if root_trial in seen_dirs:
+            continue
+        seen_dirs.add(root_trial)
+        rel = root_trial.relative_to(bdir).as_posix() if root_trial != bdir else sub.relative_to(bdir).as_posix()
         role = _classify_evidence_role(rel)
-        ev_file = trial_dir / "evaluation.json"
-        rw_file = trial_dir / "reward.txt"
-        if not rw_file.is_file() and (trial_dir / "verifier" / "reward.txt").is_file():
-            rw_file = trial_dir / "verifier" / "reward.txt"
-        if not ev_file.is_file() and (trial_dir / "verifier" / "evaluation.json").is_file():
-            ev_file = trial_dir / "verifier" / "evaluation.json"
+        ev_file = next(
+            (
+                cand
+                for cand in (
+                    root_trial / "verifier" / "evaluation.json",
+                    root_trial / "evaluation.json",
+                    sub.parent / "evaluation.json",
+                )
+                if cand.is_file()
+            ),
+            None,
+        )
+        rw_file = next(
+            (
+                cand
+                for cand in (
+                    root_trial / "verifier" / "reward.txt",
+                    root_trial / "reward.txt",
+                    sub.parent / "reward.txt",
+                )
+                if cand.is_file()
+            ),
+            None,
+        )
         rec = {
             "label": rel,
             "submission_path": sub,
-            "evaluation_path": ev_file if ev_file.is_file() else None,
-            "reward_path": rw_file if rw_file.is_file() else None,
+            "evaluation_path": ev_file,
+            "reward_path": rw_file,
         }
-        seen_dirs.add(trial_dir)
         if role:
             runs_by_role[role].append(rec)
 
     for rw in sorted(bdir.rglob("reward.txt")):
-        trial_dir = rw.parent
-        if trial_dir.name == "verifier":
-            root_trial = trial_dir.parent
-            sub_cand = root_trial / "artifacts" / "submission.json"
-            if not sub_cand.is_file():
-                sub_cand = root_trial / "submission.json"
-        else:
-            root_trial = trial_dir
-            sub_cand = trial_dir / "submission.json"
-        if root_trial in seen_dirs or trial_dir in seen_dirs:
+        root_trial = rw.parent.parent if rw.parent.name == "verifier" else rw.parent
+        if root_trial in seen_dirs:
             continue
-        rel = rw.relative_to(bdir).as_posix()
+        seen_dirs.add(root_trial)
+        sub_file = next(
+            (
+                cand
+                for cand in (
+                    root_trial / "artifacts" / "submission.json",
+                    root_trial / "submission.json",
+                    rw.parent / "submission.json",
+                )
+                if cand.is_file()
+            ),
+            None,
+        )
+        ev_file = next(
+            (
+                cand
+                for cand in (
+                    rw.with_name("evaluation.json"),
+                    root_trial / "verifier" / "evaluation.json",
+                    root_trial / "evaluation.json",
+                )
+                if cand.is_file()
+            ),
+            None,
+        )
+        rel = root_trial.relative_to(bdir).as_posix() if root_trial != bdir else rw.relative_to(bdir).as_posix()
         role = _classify_evidence_role(rel)
-        ev_cand = rw.with_name("evaluation.json")
         rec = {
             "label": rel,
-            "submission_path": sub_cand if sub_cand.is_file() else None,
-            "evaluation_path": ev_cand if ev_cand.is_file() else None,
+            "submission_path": sub_file,
+            "evaluation_path": ev_file,
             "reward_path": rw,
         }
         if role:
@@ -869,5 +1264,6 @@ def discover_benchmark_v2_bundle(bundle_dir: Path | None = None) -> dict[str, An
         "blind_seeds": blind_seeds,
         "training_metrics_path": metrics_files[0] if metrics_files else None,
         "json_docs": json_docs,
+        "text_docs": text_docs,
         "runs_by_role": runs_by_role,
     }
