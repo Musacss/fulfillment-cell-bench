@@ -26,6 +26,14 @@ def main():
     ap.add_argument("--seeds-file",type=Path,help="Operator JSON array of disjoint evaluation seeds")
     ap.add_argument("--plan", type=Path, help="Optional external plan file for independent grading")
     args = ap.parse_args()
+    names = ("submission.json","episode.json","comparison.md","results.json")
+    outputs = [args.out / name for name in names]
+    if any(path.is_symlink() for path in outputs):
+        ap.error("refusing symlink output")
+    for source in (args.plan,args.seeds_file):
+        if source is not None and any(source.resolve() == output.resolve() or
+               (output.exists() and source.exists() and output.samefile(source)) for output in outputs):
+            ap.error("input file must not be one of the output files; use another --out directory")
     world = load_world()
     dev = tuple(generate(world,s) for s in world["development_seeds"])
     seeds = json.loads(args.seeds_file.read_text()) if args.seeds_file else world["development_seeds"]
