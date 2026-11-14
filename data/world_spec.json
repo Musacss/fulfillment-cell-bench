@@ -30,22 +30,21 @@
     "commissioning": {
       "weeks": 2,
       "jam_bonus_bps": {"bare": 1400, "tray": 650},
-      "defect_bonus_bps": {"bare": 200, "tray": 30}
+      "defect_bonus_bps": {"bare": 200, "tray": 80}
     },
     "wear": {
       "per_week_bypass": 1,
       "per_week_all": 3,
       "fragile_oversize_all_bonus": 1,
-      "fragile_oversize_threshold_bps": 3000,
       "maintenance_reduction": 5,
       "maintenance_auto_slowdown_ticks": 1,
-      "jam_bps_per_wear": 400,
-      "defect_bps_per_wear": 25,
+      "jam_bps_per_wear": 350,
+      "defect_bps_per_wear": 120,
       "max_wear": 12
     },
     "money": {
       "budget": 1800000,
-      "depreciation_weeks": 100,
+      "depreciation_weeks": 52,
       "robot_service_week": 3500,
       "maintenance_cost": 4500,
       "shifts_per_week": 5,

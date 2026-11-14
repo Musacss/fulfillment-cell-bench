@@ -5,7 +5,11 @@ from dataclasses import FrozenInstanceError, asdict, replace
 from fractions import Fraction as F
 import importlib.util
 import json
+import os
+from pathlib import Path
+import socket
 import stat
+import tempfile
 
 import pytest
 
@@ -74,15 +78,15 @@ PHASED_WIN_PLAN = {
     "weeks": [
         {"robot": True, "trays": True, "route": "bypass", "maintenance": False, "workers": [[1], [2], [2, 3], [4]]},
         {"robot": True, "trays": True, "route": "bypass", "maintenance": False, "workers": [[1], [2], [2, 3], [4]]},
-        {"robot": True, "trays": True, "route": "bypass", "maintenance": False, "workers": [[1], [2], [2, 3], [4]]},
+        {"robot": True, "trays": True, "route": "bypass", "maintenance": True, "workers": [[1], [2], [2, 3], [4]]},
         {"robot": True, "trays": True, "route": "bypass", "maintenance": False, "workers": [[1], [2], [3], [4], [2, 3]]},
-        {"robot": True, "trays": True, "route": "bypass", "maintenance": False, "workers": [[1], [2], [2, 3], [4]]},
         {"robot": True, "trays": True, "route": "bypass", "maintenance": True, "workers": [[1], [2], [2, 3], [4]]},
         {"robot": True, "trays": True, "route": "bypass", "maintenance": False, "workers": [[1], [2], [2, 3], [4]]},
+        {"robot": True, "trays": True, "route": "bypass", "maintenance": True, "workers": [[1], [2], [2, 3], [4]]},
         {"robot": True, "trays": True, "route": "bypass", "maintenance": False, "workers": [[1], [2], [3], [4], [2, 3]]},
         {"robot": True, "trays": True, "route": "bypass", "maintenance": False, "workers": [[1], [2], [3], [4], [2, 3]]},
         {"robot": True, "trays": True, "route": "bypass", "maintenance": False, "workers": [[1], [2], [3], [4], [2, 3]]},
-        {"robot": True, "trays": True, "route": "bypass", "maintenance": False, "workers": [[1], [2], [2, 3], [4]]},
+        {"robot": True, "trays": True, "route": "bypass", "maintenance": True, "workers": [[1], [2], [2, 3], [4]]},
         {"robot": True, "trays": True, "route": "bypass", "maintenance": False, "workers": [[1], [2], [2, 3], [4]]},
     ],
 }
@@ -215,19 +219,33 @@ def test_quarterly_world_catalog_schema_and_12_week_profiles():
     assert q["weeks"] == 12
     assert q["max_pilots"] == 24
     assert q["carryover_cap"] == 80
-    assert set(q["commissioning"].keys()) >= {"weeks", "jam_bonus_bps", "defect_bonus_bps"}
-    assert set(q["wear"].keys()) >= {
-        "per_week_bypass",
-        "per_week_all",
-        "fragile_oversize_all_bonus",
-        "maintenance_reduction",
-        "maintenance_auto_slowdown_ticks",
-        "jam_bps_per_wear",
-        "defect_bps_per_wear",
-        "max_wear",
+    assert q["commissioning"] == {
+        "weeks": 2,
+        "jam_bonus_bps": {"bare": 1400, "tray": 650},
+        "defect_bonus_bps": {"bare": 200, "tray": 80},
     }
-    assert q["money"]["depreciation_weeks"] == 100
-    assert q["money"]["shifts_per_week"] == 5
+    assert q["wear"] == {
+        "per_week_bypass": 1,
+        "per_week_all": 3,
+        "fragile_oversize_all_bonus": 1,
+        "maintenance_reduction": 5,
+        "maintenance_auto_slowdown_ticks": 1,
+        "jam_bps_per_wear": 350,
+        "defect_bps_per_wear": 120,
+        "max_wear": 12,
+    }
+    assert q["money"] == {
+        "budget": 1800000,
+        "depreciation_weeks": 52,
+        "robot_service_week": 3500,
+        "maintenance_cost": 4500,
+        "shifts_per_week": 5,
+        "hire_cost": 9000,
+        "layoff_cost": 11000,
+        "retrain_cost": 3500,
+        "cross_skill_shift_premium": 900,
+        "backlog_holding_per_order": 600,
+    }
     assert set(q["threshold_bps"].keys()) == {
         "good_each_week",
         "good_pooled",
@@ -564,10 +582,28 @@ def test_cumulative_wear_dynamics_route_all_vs_bypass_and_maintenance_reset():
     assert all_rep.weeks[3].wear_end - all_rep.weeks[3].wear_start == 4 or all_rep.weeks[3].wear_end == 12
     assert max(wr.wear_end for wr in all_rep.weeks) == world["quarterly"]["wear"]["max_wear"] == 12
 
-    phased_rep = simulate_quarter(world, parse_quarterly_plan(PHASED_WIN_PLAN, world), 11)
-    assert phased_rep.weeks[5].wear_start == 5
+    single_w5_maint = copy.deepcopy(bypass_plan)
+    single_w5_maint["weeks"][5]["maintenance"] = True
+    single_w5_rep = simulate_quarter(world, parse_quarterly_plan(single_w5_maint, world), 11)
+    assert single_w5_rep.weeks[5].wear_start == 5
     # Week 5 maintenance reduces 5 -> 0 before adding +1 bypass wear -> wear_end == 1.
-    assert phased_rep.weeks[5].wear_end == 1
+    assert single_w5_rep.weeks[5].wear_end == 1
+
+    phased_rep = simulate_quarter(world, parse_quarterly_plan(PHASED_WIN_PLAN, world), 11)
+    assert [(wr.wear_start, wr.wear_end) for wr in phased_rep.weeks] == [
+        (0, 1),
+        (1, 2),
+        (2, 1),
+        (1, 2),
+        (2, 1),
+        (1, 2),
+        (2, 1),
+        (1, 2),
+        (2, 3),
+        (3, 4),
+        (4, 1),
+        (1, 2),
+    ]
 
     w_maint = build_week_world(world, 5, commissioning=False, wear=5, maintenance=True)
     w_clean = build_week_world(world, 5, commissioning=False, wear=0, maintenance=False)
@@ -643,6 +679,7 @@ def test_v1_calculate_unchanged_and_shift_economy_has_exact_10_v1_keys():
 @pytest.mark.parametrize(
     ("robot_price", "tray_price", "dep_weeks", "expected_dep"),
     [
+        (1_350_000, 180_000, 52, 29_423),
         (1_350_000, 180_000, 100, 15_300),
         (1, 1, 2, 1),
         (2, 1, 2, 2),
@@ -653,7 +690,7 @@ def test_weekly_depreciation_half_up_rounding_and_irreversible_owned_equipment(
     robot_price, tray_price, dep_weeks, expected_dep
 ):
     world = load_world()
-    assert world["quarterly"]["money"]["depreciation_weeks"] == 100
+    assert world["quarterly"]["money"]["depreciation_weeks"] == 52
     world["money"].update(robot_purchase=robot_price, tray_purchase=tray_price)
     world["quarterly"]["money"]["depreciation_weeks"] = dep_weeks
 
@@ -675,7 +712,7 @@ def test_weekly_depreciation_half_up_rounding_and_irreversible_owned_equipment(
     full_world = load_world()
     qrep = simulate_quarter(full_world, parse_quarterly_plan(PHASED_WIN_PLAN, full_world), 11)
     assert qrep.purchase == 1_530_000
-    assert qrep.weeks[0].week_economy.costs["depreciation"] == 15_300
+    assert qrep.weeks[0].week_economy.costs["depreciation"] == 29_423
 
 
 def test_crew_hiring_layoff_retraining_and_cross_skill_premium_in_cents():
@@ -1130,6 +1167,13 @@ def test_state_path_rejects_symlink_and_mode_mismatch(tmp_path):
     with pytest.raises(ValueError, match="mode"):
         QuarterlyEpisode(world, state_path=v1_state)
 
+    fifo_state = tmp_path / "state.fifo"
+    os.mkfifo(fifo_state)
+    with pytest.raises(ValueError, match="state_path must be a regular file"):
+        QuarterlyEpisode(world, state_path=fifo_state)
+    with pytest.raises(ValueError, match="state_path must be a regular file"):
+        Episode(world, days, state_path=fifo_state)
+
 
 def test_v1_episode_unlimited_by_default_and_optional_max_pilots_and_state_path(tmp_path):
     world = load_world()
@@ -1182,3 +1226,197 @@ def test_devtools_redteam_and_v1_regression_smoke():
     ref_plan = solve(Episode(world, days))
     ref_eval = evaluate(world, ref_plan, days)
     assert ref_eval.win and F(ref_eval.reward_num, ref_eval.reward_den) > F(1, 5)
+
+
+# ==============================================================================
+# Category G — Iteration 2 Surgical Hardening & Adversarial Regression Tests
+# ==============================================================================
+
+
+def test_oversized_integers_raise_invalid_plan_and_never_leak_value_error():
+    world = load_world()
+    seeds = [11]
+    days = (generate(world, 11),)
+    huge_pos = 10**5000
+    huge_neg = -(10**5000)
+
+    v1_bad_ver = {"schema_version": huge_pos, "robot": False, "trays": False, "route": "manual", "workers": [[1]]}
+    v1_bad_zone = {"schema_version": 1, "robot": False, "trays": False, "route": "manual", "workers": [[huge_pos]]}
+    v1_neg_zone = {"schema_version": 1, "robot": False, "trays": False, "route": "manual", "workers": [[huge_neg]]}
+
+    v2_bad_ver = copy.deepcopy(manual_quarterly_value(world))
+    v2_bad_ver["schema_version"] = huge_pos
+    v2_neg_ver = copy.deepcopy(manual_quarterly_value(world))
+    v2_neg_ver["schema_version"] = huge_neg
+    v2_bad_zone = copy.deepcopy(manual_quarterly_value(world))
+    v2_bad_zone["weeks"][0]["workers"] = [[huge_pos], [huge_neg]]
+
+    for bad_any in (
+        {"schema_version": huge_pos},
+        {"schema_version": huge_neg},
+        v1_bad_ver,
+        v1_bad_zone,
+        v1_neg_zone,
+        v2_bad_ver,
+        v2_neg_ver,
+        v2_bad_zone,
+    ):
+        with pytest.raises(InvalidPlan):
+            parse_any_plan(bad_any, world)
+        ev_any = evaluate_any(world, bad_any, seeds)
+        assert not ev_any.valid and (ev_any.reward_num, ev_any.reward_den) == (0, 1)
+
+    for bad_v2 in (v2_bad_ver, v2_neg_ver, v2_bad_zone):
+        with pytest.raises(InvalidPlan):
+            parse_quarterly_plan(bad_v2, world)
+        ev_q = evaluate_quarterly(world, bad_v2, seeds)
+        assert not ev_q.valid and (ev_q.reward_num, ev_q.reward_den) == (0, 1)
+
+    for bad_v1 in (v1_bad_ver, v1_bad_zone, v1_neg_zone):
+        with pytest.raises(InvalidPlan):
+            parse_plan(bad_v1, world)
+        ev_1 = evaluate(world, bad_v1, days)
+        assert not ev_1.valid and (ev_1.reward_num, ev_1.reward_den) == (0, 1)
+
+
+def test_grade_quarters_handles_zero_base_labor_without_zero_division():
+    world = load_world()
+    cand_plan = parse_quarterly_plan(PHASED_WIN_PLAN, world)
+    base_q = simulate_quarter(world, parse_quarterly_plan(manual_quarterly_value(world), world), 11)
+
+    zero_labor_base_weeks = tuple(
+        replace(
+            w,
+            carryover_in=0,
+            carryover_out=0,
+            raw=replace(
+                w.raw,
+                total=20,
+                good=20,
+                on_time=20,
+                escaped=0,
+                scrap=0,
+                unfinished=0,
+                pack_started=20,
+                pack_finished=20,
+                auto_finished=0,
+                labor_ticks=0,
+            ),
+            week_economy=Economy(0, {"shifts": 100_000}, 100_000),
+        )
+        for w in base_q.weeks
+    )
+    cand_weeks = tuple(
+        replace(
+            w,
+            raw=replace(w.raw, auto_finished=20),
+            week_economy=Economy(1_530_000, {"shifts": 80_000}, 80_000),
+        )
+        for w in zero_labor_base_weeks
+    )
+    synthetic_base = QuarterReport(2, 11, 0, 1_200_000, 0, zero_labor_base_weeks)
+    synthetic_cand = QuarterReport(2, 11, 1_530_000, 960_000, 0, cand_weeks)
+
+    verdict = grade_quarters(world, cand_plan, [synthetic_cand], [synthetic_base])
+    assert verdict.valid and verdict.feasible and not verdict.win
+    assert "labor" in verdict.reasons
+    score = F(verdict.reward_num, verdict.reward_den)
+    assert F(1, 10) < score < F(1, 5)
+
+
+def test_verifier_handles_unix_socket_fifo_overlong_filename_and_nul_path(tmp_path):
+    world = load_world()
+    seeds = [11]
+    days = (generate(world, 11),)
+
+    fifo_path = tmp_path / "sub.fifo"
+    os.mkfifo(fifo_path)
+    overlong_path = tmp_path / ("x" * 300 + ".json")
+    nul_path = Path(str(tmp_path / "bad\x00sub.json"))
+
+    with tempfile.TemporaryDirectory(dir="/tmp", prefix="m1s.") as short_dir:
+        sock_path = Path(short_dir) / "sub.sock"
+        sock = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
+        sock.bind(str(sock_path))
+        try:
+            for hostile_path in (sock_path, fifo_path, overlong_path, nul_path):
+                ev_q = verify_quarterly_file(world, hostile_path, seeds)
+                ev_any = verify_any_file(world, hostile_path, seeds)
+                ev_v1 = verify_file(world, hostile_path, days)
+                for ev in (ev_q, ev_any, ev_v1):
+                    assert not ev.valid and (ev.reward_num, ev.reward_den) == (0, 1)
+        finally:
+            sock.close()
+
+
+def test_episode_and_quarterly_episode_hardened_against_oversized_seed_and_log_bloat(tmp_path):
+    class _BrokenRepr:
+        def __repr__(self) -> str:
+            raise RuntimeError("boom in repr")
+
+    world = load_world()
+    manual_q = manual_quarterly_value(world)
+    manual_v1 = manual_value()
+    days = tuple(generate(world, s) for s in world["development_seeds"])
+
+    # 1. QuarterlyEpisode (v2) hardening
+    q_state = tmp_path / "q_state.json"
+    ep_q = QuarterlyEpisode(world, max_pilots=1, state_path=q_state)
+    for bad_seed in (10**5000, -(10**5000), [10**5000], _BrokenRepr()):
+        with pytest.raises(InvalidPlan):
+            ep_q.pilot({"bad": 1}, bad_seed)
+    with pytest.raises(ValueError, match="unknown public day"):
+        ep_q.pilot(manual_q, 10**5000)
+    for idx in range(150):
+        if idx == 80:
+            ep_q = QuarterlyEpisode(world, max_pilots=1, state_path=q_state)
+        with pytest.raises(InvalidPlan):
+            ep_q.pilot({"bad": 1}, "S" * 250_000)
+
+    assert ep_q.pilot_used == 0
+    assert ep_q.rejected_calls == 155
+    assert q_state.stat().st_size < 65_536
+    assert sum(1 for e in ep_q.log if "error" in e) <= 64
+    assert ep_q.log[0]["seed"] == "<oversized-int>"
+    assert ep_q.log[1]["seed"] == "<oversized-int>"
+    assert ep_q.log[2]["seed"] == "<unrepresentable list>"
+    assert ep_q.log[3]["seed"] == "<unrepresentable _BrokenRepr>"
+    assert ep_q.log[4]["seed"] == "<oversized-int>"
+    assert len(str(ep_q.log[5]["seed"])) <= 67
+
+    obs_q = ep_q.observe()
+    assert obs_q["pilot_budget"] == {"used": 0, "max": 1}
+    res_q = ep_q.pilot(manual_q, 11)
+    assert res_q["pilot_budget"] == {"used": 1, "max": 1}
+
+    with pytest.raises(PilotBudgetExceeded):
+        ep_q.pilot(manual_q, 10**5000)
+    assert not ep_q.closed
+    assert ep_q.submit(PHASED_WIN_PLAN) == {"terminal": True, "plan": PHASED_WIN_PLAN}
+    assert ep_q.log[-1]["action"] == "submit"
+
+    reloaded_q = QuarterlyEpisode(world, max_pilots=1, state_path=q_state)
+    assert reloaded_q.closed and reloaded_q.submission == PHASED_WIN_PLAN
+
+    # 2. Episode (v1) parity hardening
+    v1_state = tmp_path / "v1_state.json"
+    ep_v1 = Episode(world, days, max_pilots=1, state_path=v1_state)
+    for bad_seed in (10**5000, -(10**5000), [10**5000], _BrokenRepr()):
+        with pytest.raises(InvalidPlan):
+            ep_v1.pilot({"bad": 1}, bad_seed)
+    with pytest.raises(ValueError, match="unknown public day"):
+        ep_v1.pilot(manual_v1, 10**5000)
+    for _ in range(150):
+        with pytest.raises(InvalidPlan):
+            ep_v1.pilot({"bad": 1}, "S" * 250_000)
+
+    assert ep_v1.pilot_used == 0
+    assert v1_state.stat().st_size < 65_536
+    assert sum(1 for e in ep_v1.log if "error" in e) <= 64
+
+    ep_v1.observe()
+    ep_v1.pilot(manual_v1, 11)
+    with pytest.raises(PilotBudgetExceeded):
+        ep_v1.pilot(manual_v1, 10**5000)
+    assert ep_v1.submit(manual_v1) == {"terminal": True, "plan": manual_v1}
+    assert Episode(world, days, max_pilots=1, state_path=v1_state).closed

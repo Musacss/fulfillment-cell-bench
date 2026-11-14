@@ -2,7 +2,6 @@
 
 from collections.abc import Sequence
 from dataclasses import asdict
-import errno
 import json
 import os
 from pathlib import Path
@@ -19,10 +18,8 @@ def _read_bounded_utf8(path: Path) -> tuple[str | None, Evaluation | None]:
         fd = os.open(path, os.O_RDONLY | os.O_NONBLOCK | os.O_NOFOLLOW)
     except (FileNotFoundError, IsADirectoryError):
         return None, invalid("missing submission")
-    except OSError as exc:
-        if exc.errno in (errno.ELOOP, errno.ENOTDIR, errno.EACCES):
-            return None, invalid("unreadable submission")
-        raise
+    except (OSError, ValueError):
+        return None, invalid("unreadable submission")
     try:
         meta = os.fstat(fd)
         if not stat.S_ISREG(meta.st_mode) or meta.st_size > 16_384:
@@ -34,6 +31,8 @@ def _read_bounded_utf8(path: Path) -> tuple[str | None, Evaluation | None]:
         return contents.decode("utf-8"), None
     except UnicodeError as exc:
         return None, invalid(str(exc))
+    except (OSError, ValueError):
+        return None, invalid("unreadable submission")
     finally:
         os.close(fd)
 

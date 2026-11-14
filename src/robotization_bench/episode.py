@@ -59,8 +59,36 @@ _PUBLIC_QUARTERLY_KEYS = frozenset(
 )
 
 
+_INT64_MIN = -(1 << 63)
+_INT64_MAX = (1 << 63) - 1
+_MAX_ERROR_LOG_ENTRIES = 64
+
+
 def wire(value):
     return json.loads(json.dumps(value, allow_nan=False))
+
+
+def _safe_seed_log(seed: object) -> int | str:
+    if type(seed) is int:
+        return seed if _INT64_MIN <= seed <= _INT64_MAX else "<oversized-int>"
+    if type(seed) is str and len(seed) > 64:
+        rendered = repr(seed[:64])
+        return rendered[:64] + "..." if len(rendered) > 64 else rendered + "..."
+    if type(seed) is bytes and len(seed) > 64:
+        rendered = repr(seed[:64])
+        return rendered[:64] + "..." if len(rendered) > 64 else rendered + "..."
+    try:
+        rendered = repr(seed)
+    except Exception:
+        return f"<unrepresentable {type(seed).__name__}>"
+    if len(rendered) > 64:
+        return rendered[:64] + "..."
+    return rendered
+
+
+def _safe_error_log(exc: BaseException) -> str:
+    msg = str(exc)
+    return msg[:256] + "..." if len(msg) > 256 else msg
 
 
 def _strip_private(obj: Any) -> Any:
@@ -104,16 +132,19 @@ def _load_state(path: Path, expected_mode: str) -> dict[str, Any] | None:
     except OSError as exc:
         if exc.errno == errno.ELOOP:
             raise ValueError("state_path must not be a symlink") from exc
+        if exc.errno in (errno.EOPNOTSUPP, errno.ENXIO):
+            raise ValueError("state_path must be a regular file") from exc
         raise
     try:
         meta = os.fstat(fd)
         if not stat.S_ISREG(meta.st_mode):
             raise ValueError("state_path must be a regular file")
-        with os.fdopen(fd, "rb", closefd=False) as stream:
-            raw_bytes = stream.read()
-        data = json.loads(raw_bytes.decode("utf-8"))
-    except (UnicodeError, ValueError) as exc:
-        raise ValueError("corrupt episode state file") from exc
+        try:
+            with os.fdopen(fd, "rb", closefd=False) as stream:
+                raw_bytes = stream.read()
+            data = json.loads(raw_bytes.decode("utf-8"))
+        except (UnicodeError, json.JSONDecodeError, ValueError) as exc:
+            raise ValueError("corrupt episode state file") from exc
     finally:
         os.close(fd)
 
@@ -134,6 +165,9 @@ def _load_state(path: Path, expected_mode: str) -> dict[str, Any] | None:
     saved_log = data.get("log")
     if type(saved_log) is not list:
         raise ValueError("invalid log in state file")
+    rejected_calls = data.get("rejected_calls", 0)
+    if type(rejected_calls) is not int or rejected_calls < 0:
+        raise ValueError("invalid rejected_calls in state file")
 
     return {
         "pilot_used": used,
@@ -141,6 +175,7 @@ def _load_state(path: Path, expected_mode: str) -> dict[str, Any] | None:
         "closed": closed,
         "submission": submission,
         "log": saved_log,
+        "rejected_calls": rejected_calls,
     }
 
 
@@ -190,6 +225,7 @@ class Episode:
         self._state_path = Path(state_path) if state_path is not None else None
         self._rules_path = Path(rules_path) if rules_path is not None else None
         self._pilot_used = 0
+        self._rejected_calls = 0
         self._closed = False
         self._submission: dict[str, Any] | None = None
         self.log: list[dict[str, Any]] = []
@@ -204,6 +240,7 @@ class Episode:
                 self._closed = loaded["closed"]
                 self._submission = loaded["submission"]
                 self.log = loaded["log"]
+                self._rejected_calls = loaded["rejected_calls"]
             else:
                 self._persist()
 
@@ -214,6 +251,10 @@ class Episode:
     @property
     def pilot_used(self) -> int:
         return self._pilot_used
+
+    @property
+    def rejected_calls(self) -> int:
+        return self._rejected_calls
 
     @property
     def max_pilots(self) -> int | None:
@@ -231,6 +272,7 @@ class Episode:
                 "mode": "v1",
                 "pilot_used": self._pilot_used,
                 "pilot_count": self._pilot_used,
+                "rejected_calls": self._rejected_calls,
                 "max_pilots": self._max_pilots,
                 "closed": self._closed,
                 "submission": self._submission,
@@ -245,9 +287,35 @@ class Episode:
         self.log.append(entry)
         return entry
 
+    def _record_pilot_error(self, safe_seed: int | str, error_msg: str) -> None:
+        self._rejected_calls += 1
+        appended = False
+        error_count = sum(1 for e in self.log if e.get("action") == "pilot" and "error" in e)
+        if error_count < _MAX_ERROR_LOG_ENTRIES:
+            self.log.append(
+                {
+                    "n": len(self.log) + 1,
+                    "action": "pilot",
+                    "seed": safe_seed,
+                    "error": error_msg,
+                }
+            )
+            appended = True
+        try:
+            self._persist()
+        except BaseException:
+            self._rejected_calls -= 1
+            if appended:
+                self.log.pop()
+            raise
+
     def observe(self) -> dict[str, Any]:
         self._action("observe")
-        self._persist()
+        try:
+            self._persist()
+        except BaseException:
+            self.log.pop()
+            raise
         return wire(
             {
                 "world": _sanitize_public_world(self._world),
@@ -260,32 +328,29 @@ class Episode:
     def pilot(self, value: object, seed: int, *, trace: bool = False) -> dict[str, Any]:
         if self._closed:
             raise EpisodeClosed("episode already closed")
+        safe_seed = _safe_seed_log(seed)
         if self._max_pilots is not None and self._pilot_used >= self._max_pilots:
             msg = f"BudgetExceeded: pilot budget exhausted ({self._pilot_used}/{self._max_pilots})"
-            self.log.append(
-                {
-                    "n": len(self.log) + 1,
-                    "action": "pilot",
-                    "seed": seed if type(seed) is int else repr(seed),
-                    "error": msg,
-                }
-            )
-            self._persist()
+            self._record_pilot_error(safe_seed, msg)
             raise PilotBudgetExceeded(msg)
 
-        entry = self._action("pilot")
-        entry["seed"] = seed if type(seed) is int else repr(seed)
         try:
             plan = parse_plan(value, self._world)
             if type(seed) is not int or seed not in self._days:
                 raise ValueError("unknown public day")
         except ValueError as exc:
-            entry["error"] = str(exc)
-            self._persist()
+            self._record_pilot_error(safe_seed, _safe_error_log(exc))
             raise
 
+        entry = self._action("pilot")
+        entry["seed"] = safe_seed
         self._pilot_used += 1
-        self._persist()
+        try:
+            self._persist()
+        except BaseException:
+            self._pilot_used -= 1
+            self.log.pop()
+            raise
         raw = simulate(self._world, plan, self._days[seed], trace=trace)
         economy = calculate(self._world, plan, raw)
         summary = asdict(raw)
@@ -300,18 +365,29 @@ class Episode:
         try:
             plan = wire(asdict(parse_plan(value, self._world)))
         except InvalidPlan as exc:
-            entry["error"] = str(exc)
+            entry["error"] = _safe_error_log(exc)
             plan = None
         entry["plan"] = plan
         self._submission = plan
-        self._persist()
+        try:
+            self._persist()
+        except BaseException:
+            self._closed = False
+            self._submission = None
+            self.log.pop()
+            raise
         return wire({"terminal": True, "plan": plan})
 
     def stop(self) -> dict[str, Any]:
         self._action("stop")
         self._closed = True
         self._submission = None
-        self._persist()
+        try:
+            self._persist()
+        except BaseException:
+            self._closed = False
+            self.log.pop()
+            raise
         return {"terminal": True, "plan": None}
 
 
@@ -349,6 +425,7 @@ class QuarterlyEpisode:
         self._state_path = Path(state_path) if state_path is not None else None
         self._rules_path = Path(rules_path) if rules_path is not None else None
         self._pilot_used = 0
+        self._rejected_calls = 0
         self._closed = False
         self._submission: dict[str, Any] | None = None
         self.log: list[dict[str, Any]] = []
@@ -367,6 +444,7 @@ class QuarterlyEpisode:
                 self._closed = loaded["closed"]
                 self._submission = loaded["submission"]
                 self.log = loaded["log"]
+                self._rejected_calls = loaded["rejected_calls"]
             else:
                 self._persist()
 
@@ -377,6 +455,10 @@ class QuarterlyEpisode:
     @property
     def pilot_used(self) -> int:
         return self._pilot_used
+
+    @property
+    def rejected_calls(self) -> int:
+        return self._rejected_calls
 
     @property
     def max_pilots(self) -> int:
@@ -394,6 +476,7 @@ class QuarterlyEpisode:
                 "mode": "quarterly",
                 "pilot_used": self._pilot_used,
                 "pilot_count": self._pilot_used,
+                "rejected_calls": self._rejected_calls,
                 "max_pilots": self._max_pilots,
                 "closed": self._closed,
                 "submission": self._submission,
@@ -407,6 +490,28 @@ class QuarterlyEpisode:
         entry: dict[str, Any] = {"n": len(self.log) + 1, "action": name}
         self.log.append(entry)
         return entry
+
+    def _record_pilot_error(self, safe_seed: int | str, error_msg: str) -> None:
+        self._rejected_calls += 1
+        appended = False
+        error_count = sum(1 for e in self.log if e.get("action") == "pilot" and "error" in e)
+        if error_count < _MAX_ERROR_LOG_ENTRIES:
+            self.log.append(
+                {
+                    "n": len(self.log) + 1,
+                    "action": "pilot",
+                    "seed": safe_seed,
+                    "error": error_msg,
+                }
+            )
+            appended = True
+        try:
+            self._persist()
+        except BaseException:
+            self._rejected_calls -= 1
+            if appended:
+                self.log.pop()
+            raise
 
     def _summarize_seed(self, seed: int) -> dict[str, Any]:
         profiles = self._world["quarterly"]["week_profiles"]
@@ -448,7 +553,11 @@ class QuarterlyEpisode:
 
     def observe(self) -> dict[str, Any]:
         self._action("observe")
-        self._persist()
+        try:
+            self._persist()
+        except BaseException:
+            self.log.pop()
+            raise
         from .quarterly import manual_quarterly_value
 
         return wire(
@@ -466,32 +575,29 @@ class QuarterlyEpisode:
     def pilot(self, value: object, seed: int, *, trace: bool = False) -> dict[str, Any]:
         if self._closed:
             raise EpisodeClosed("episode already closed")
+        safe_seed = _safe_seed_log(seed)
         if self._pilot_used >= self._max_pilots:
             msg = f"BudgetExceeded: pilot budget exhausted ({self._pilot_used}/{self._max_pilots})"
-            self.log.append(
-                {
-                    "n": len(self.log) + 1,
-                    "action": "pilot",
-                    "seed": seed if type(seed) is int else repr(seed),
-                    "error": msg,
-                }
-            )
-            self._persist()
+            self._record_pilot_error(safe_seed, msg)
             raise PilotBudgetExceeded(msg)
 
-        entry = self._action("pilot")
-        entry["seed"] = seed if type(seed) is int else repr(seed)
         try:
             plan = parse_quarterly_plan(value, self._world)
             if type(seed) is not int or seed not in self._seed_set:
                 raise ValueError("unknown public day: seed must be in development_seeds")
         except ValueError as exc:
-            entry["error"] = str(exc)
-            self._persist()
+            self._record_pilot_error(safe_seed, _safe_error_log(exc))
             raise
 
+        entry = self._action("pilot")
+        entry["seed"] = safe_seed
         self._pilot_used += 1
-        self._persist()
+        try:
+            self._persist()
+        except BaseException:
+            self._pilot_used -= 1
+            self.log.pop()
+            raise
 
         from .quarterly import simulate_quarter
 
@@ -576,16 +682,27 @@ class QuarterlyEpisode:
         try:
             plan = wire(asdict(parse_quarterly_plan(value, self._world)))
         except InvalidPlan as exc:
-            entry["error"] = str(exc)
+            entry["error"] = _safe_error_log(exc)
             plan = None
         entry["plan"] = plan
         self._submission = plan
-        self._persist()
+        try:
+            self._persist()
+        except BaseException:
+            self._closed = False
+            self._submission = None
+            self.log.pop()
+            raise
         return wire({"terminal": True, "plan": plan})
 
     def stop(self) -> dict[str, Any]:
         self._action("stop")
         self._closed = True
         self._submission = None
-        self._persist()
+        try:
+            self._persist()
+        except BaseException:
+            self._closed = False
+            self.log.pop()
+            raise
         return {"terminal": True, "plan": None}

@@ -215,7 +215,7 @@ def grade_quarters(
             )
             overrun += F(1) - auto_prog
         if purchase > 0 and "labor" in reasons:
-            overrun += F(totals["labor_ticks"] - base_labor + 1, base_labor)
+            overrun += F(totals["labor_ticks"] - base_labor + 1, max(1, base_labor))
         reward = F(1, 10) + F(1, 10) / (1 + overrun)
     else:
         reward = max(_INFEASIBLE_FLOOR, F(9, 100) * min(progress.values()))
