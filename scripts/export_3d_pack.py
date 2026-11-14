@@ -355,16 +355,30 @@ def _parse_int_token(token: str) -> int:
     if not stripped or stripped.startswith("+"):
         raise ValueError(f"invalid integer seed {token!r}")
     if stripped.startswith("-"):
-        if not stripped[1:].isdigit():
+        rest = stripped[1:]
+        if not (rest and rest.isascii() and rest.isdigit()):
             raise ValueError(f"invalid integer seed {token!r}")
         val = int(stripped, 10)
     else:
-        if not stripped.isdigit():
+        if not (stripped.isascii() and stripped.isdigit()):
             raise ValueError(f"invalid integer seed {token!r}")
         val = int(stripped, 10)
     if val < 0:
         raise ValueError(f"seed must be >= 0, got {val}")
     return val
+
+
+class _OrderedSeedAction(argparse.Action):
+    def __call__(
+        self,
+        parser: argparse.ArgumentParser,
+        namespace: argparse.Namespace,
+        values: Any,
+        option_string: str | None = None,
+    ) -> None:
+        ops: list[tuple[str, Any]] = list(getattr(namespace, "seed_ops", None) or [])
+        ops.append((self.dest, values))
+        setattr(namespace, "seed_ops", ops)
 
 
 def main(argv: Sequence[str] | None = None) -> int:
@@ -377,45 +391,49 @@ def main(argv: Sequence[str] | None = None) -> int:
     )
     ap.add_argument(
         "--seed",
-        dest="seed_list",
+        dest="seed_single",
         type=str,
-        action="append",
-        default=None,
+        action=_OrderedSeedAction,
         help="Non-negative integer seed to export (repeatable; defaults to 11)",
     )
     ap.add_argument(
         "--seeds",
+        dest="seed_group",
         type=str,
         nargs="*",
-        default=None,
+        action=_OrderedSeedAction,
         help="Space- or comma-separated non-negative integer seeds",
     )
     ap.add_argument(
         "--all-dev-seeds",
-        action="store_true",
+        dest="all_dev_seeds",
+        nargs=0,
+        action=_OrderedSeedAction,
         help="Export all public development_seeds from world_spec.json",
     )
     args = ap.parse_args(list(argv) if argv is not None else None)
 
+    seed_ops: list[tuple[str, Any]] = getattr(args, "seed_ops", None) or []
     collected: list[int] = []
     try:
-        if args.seed_list is not None:
-            for raw_tok in args.seed_list:
-                collected.append(_parse_int_token(raw_tok))
-        if args.seeds is not None:
-            if not args.seeds and not collected and not args.all_dev_seeds:
-                raise ValueError("--seeds requires at least one non-negative integer seed")
-            for group in args.seeds:
-                parts = [p for p in group.split(",") if p != ""]
-                if not parts:
-                    raise ValueError(f"invalid --seeds argument {group!r}")
-                for part in parts:
-                    collected.append(_parse_int_token(part))
-        if args.all_dev_seeds:
-            world = contracts.load_world()
-            for dev_s in world["development_seeds"]:
-                if dev_s not in collected:
-                    collected.append(int(dev_s))
+        for op_kind, op_val in seed_ops:
+            if op_kind == "seed_single":
+                collected.append(_parse_int_token(op_val))
+            elif op_kind == "seed_group":
+                if not op_val:
+                    raise ValueError("--seeds requires at least one non-negative integer seed")
+                for group in op_val:
+                    parts = [p for p in group.split(",") if p != ""]
+                    if not parts:
+                        raise ValueError(f"invalid --seeds argument {group!r}")
+                    for part in parts:
+                        collected.append(_parse_int_token(part))
+            elif op_kind == "all_dev_seeds":
+                world = contracts.load_world()
+                for dev_s in world["development_seeds"]:
+                    dev_int = int(dev_s)
+                    if dev_int not in collected:
+                        collected.append(dev_int)
         if not collected:
             collected = [11]
         seeds = _validate_seeds(collected)

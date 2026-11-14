@@ -5,6 +5,7 @@ import json
 from pathlib import Path
 import re
 import runpy
+import socket
 import subprocess
 import sys
 import threading
@@ -1174,3 +1175,703 @@ def test_musa_handoff_doc_recovers_368bf27_verbatim_and_documents_bridge():
         "week-11",
     ):
         assert required_snippet in guide_prefix, f"Missing {required_snippet!r} in Russian guide header"
+
+
+def _count_unescaped_gfm_pipes(line: str) -> int:
+    return len(re.findall(r"(?<!\\)(?:\\\\)*\|", line))
+
+
+def test_compare_escapes_backslash_pipes_and_handles_string_reasons():
+    world = load_world()
+    day = generate(world, 11)
+    base_eval = evaluate(world, manual_value(), (day,))
+
+    report = compare(
+        {
+            r"backslash_pipe_plan\|inject": replace(
+                base_eval,
+                reasons=(r"reason_with_backslash\|pipe",),
+            ),
+            "str_reason_case": {
+                "valid": False,
+                "feasible": False,
+                "win": False,
+                "reward_num": 0,
+                "reward_den": 1,
+                "metrics": {},
+                "reasons": "nop",
+            },
+            "empty_str_reason_case": {
+                "valid": False,
+                "feasible": False,
+                "win": False,
+                "reward_num": 0,
+                "reward_den": 1,
+                "metrics": {},
+                "reasons": "",
+            },
+        }
+    )
+
+    sections = report.split("\n\n")
+    table1_lines = sections[0].splitlines()
+    table2_lines = sections[1].splitlines()
+    for row in table1_lines:
+        assert _count_unescaped_gfm_pipes(row) == 10, f"Broken GFM pipe count in Table 1 row: {row!r}"
+    for row in table2_lines:
+        assert _count_unescaped_gfm_pipes(row) == 8, f"Broken GFM pipe count in Table 2 row: {row!r}"
+
+    assert r"backslash_pipe_plan\\\|inject" in report
+    assert r"reason_with_backslash\\\|pipe" in report
+    assert "- str_reason_case: no plan submitted (no-op)." in report
+    assert "n, o, p" not in report
+    assert "- empty_str_reason_case:" not in report
+
+
+def test_validate_shift_bundle_rejects_walk_before_parent_start_or_assist(tmp_path):
+    # m10a: walk swapped before parent assist on same tick (tick=17, line 13 vs line 14)
+    w_jam = load_world()
+    w_jam["clock"].update(shift_ticks=12, overtime_ticks=20, break_at=12, break_length=5)
+    w_jam["prob_bps"]["jam"]["tray"]["regular"] = 10_000
+    w_jam["prob_bps"]["defect_auto"]["tray"]["regular"] = 0
+    p_jam = Plan(1, True, True, "all", ((1, 2, 3, 4),))
+    s_jam = Scenario(1, 42, (Order(0, "regular", 0, 32),))
+    r_jam = simulate(w_jam, p_jam, s_jam, trace=True)
+    b_jam = export_shift_bundle(w_jam, p_jam, s_jam, r_jam, calculate(w_jam, p_jam, r_jam), tmp_path / "m10_assist")
+    evs_jam = [json.loads(x) for x in (b_jam / "events.jsonl").read_text(encoding="utf-8").splitlines()]
+    assist_idx = next(i for i, e in enumerate(evs_jam) if e["kind"] == "assist")
+    assert evs_jam[assist_idx + 1]["kind"] == "walk"
+    evs_jam[assist_idx], evs_jam[assist_idx + 1] = evs_jam[assist_idx + 1], evs_jam[assist_idx]
+    (b_jam / "events.jsonl").write_text(
+        "\n".join(json.dumps(e, separators=(",", ":")) for e in evs_jam) + "\n",
+        encoding="utf-8",
+    )
+    with pytest.raises(ValueError, match=f"line {assist_idx + 1}"):
+        validate_shift_bundle(b_jam)
+
+    # m10b: walk swapped before parent human start on same tick (stage 2 transition 1->2)
+    w_man = load_world()
+    w_man["clock"].update(shift_ticks=40, overtime_ticks=10, break_at=440, break_length=40)
+    w_man["prob_bps"]["defect_manual"]["regular"] = 0
+    p_man = Plan(1, False, False, "manual", ((1, 2, 3, 4),))
+    s_man = Scenario(1, 7, (Order(0, "regular", 0, 28),))
+    r_man = simulate(w_man, p_man, s_man, trace=True)
+    b_man = export_shift_bundle(w_man, p_man, s_man, r_man, calculate(w_man, p_man, r_man), tmp_path / "m10_start")
+    evs_man = [json.loads(x) for x in (b_man / "events.jsonl").read_text(encoding="utf-8").splitlines()]
+    walk_idx = next(i for i, e in enumerate(evs_man) if e["kind"] == "walk")
+    assert evs_man[walk_idx - 1]["kind"] == "start"
+    evs_man[walk_idx - 1], evs_man[walk_idx] = evs_man[walk_idx], evs_man[walk_idx - 1]
+    (b_man / "events.jsonl").write_text(
+        "\n".join(json.dumps(e, separators=(",", ":")) for e in evs_man) + "\n",
+        encoding="utf-8",
+    )
+    with pytest.raises(ValueError, match=f"line {walk_idx}"):
+        validate_shift_bundle(b_man)
+
+
+def test_validate_shift_bundle_enforces_deterministic_end_tick_finish_jam_and_horizon_clipping(tmp_path):
+    # m30: fabricated finish + good at tick == H (27) when start.end_tick == 28 > H
+    w30 = load_world()
+    w30["clock"].update(shift_ticks=20, overtime_ticks=7, break_at=440, break_length=40)
+    w30["prob_bps"]["defect_manual"]["regular"] = 0
+    p30 = Plan(1, False, False, "manual", ((1, 2, 3, 4),))
+    s30 = Scenario(1, 7, (Order(0, "regular", 0, 28),))
+    r30 = simulate(w30, p30, s30, trace=True)
+    b30 = export_shift_bundle(w30, p30, s30, r30, calculate(w30, p30, r30), tmp_path / "m30")
+    fake_r30 = replace(r30, good=1, on_time=1, unfinished=0, events=())
+    m30 = json.loads((b30 / "manifest.json").read_text(encoding="utf-8"))
+    m30["raw"].update(good=1, on_time=1, unfinished=0)
+    m30["economy"] = json.loads(json.dumps(asdict(calculate(w30, p30, fake_r30))))
+    (b30 / "manifest.json").write_text(json.dumps(m30) + "\n", encoding="utf-8")
+    evs30 = [json.loads(x) for x in (b30 / "events.jsonl").read_text(encoding="utf-8").splitlines()]
+    fab_line = len(evs30) + 1
+    evs30.append({"tick": 27, "kind": "finish", "order_id": 0, "resource": "w0", "stage": 4, "attempt": 0, "end_tick": None})
+    evs30.append({"tick": 27, "kind": "good", "order_id": 0, "resource": "w0", "stage": 4, "attempt": 0, "end_tick": None})
+    (b30 / "events.jsonl").write_text(
+        "\n".join(json.dumps(e, separators=(",", ":")) for e in evs30) + "\n", encoding="utf-8"
+    )
+    with pytest.raises(ValueError, match=f"line {fab_line}"):
+        validate_shift_bundle(b30)
+
+    # m31: premature human finish at tick=1 when start=[0,3)
+    w31 = load_world()
+    w31["clock"].update(shift_ticks=40, overtime_ticks=10, break_at=440, break_length=40)
+    w31["prob_bps"]["defect_manual"]["regular"] = 0
+    r31 = simulate(w31, p30, s30, trace=True)
+    b31 = export_shift_bundle(w31, p30, s30, r31, calculate(w31, p30, r31), tmp_path / "m31")
+    evs31 = [json.loads(x) for x in (b31 / "events.jsonl").read_text(encoding="utf-8").splitlines()]
+    evs31[3]["tick"] = 1  # finish(stage=1) moved from tick 3 to tick 1
+    evs31[4]["tick"] = 1  # enqueue(stage=2) moved to tick 1
+    (b31 / "events.jsonl").write_text(
+        "\n".join(json.dumps(e, separators=(",", ":")) for e in evs31) + "\n", encoding="utf-8"
+    )
+    with pytest.raises(ValueError, match="line 4"):
+        validate_shift_bundle(b31)
+
+    # m32: premature robot jam at tick=11 when robot start=[10,13)
+    w32 = load_world()
+    w32["clock"].update(shift_ticks=12, overtime_ticks=20, break_at=12, break_length=5)
+    w32["prob_bps"]["jam"]["tray"]["regular"] = 10_000
+    w32["prob_bps"]["defect_auto"]["tray"]["regular"] = 0
+    p32 = Plan(1, True, True, "all", ((1, 2, 3, 4),))
+    s32 = Scenario(1, 42, (Order(0, "regular", 0, 32),))
+    r32 = simulate(w32, p32, s32, trace=True)
+    b32 = export_shift_bundle(w32, p32, s32, r32, calculate(w32, p32, r32), tmp_path / "m32")
+    evs32 = [json.loads(x) for x in (b32 / "events.jsonl").read_text(encoding="utf-8").splitlines()]
+    jam_idx = next(i for i, e in enumerate(evs32) if e["kind"] == "jam")
+    # Place jam before break (which starts at tick=12) so monotonicity holds while jam.tick=11 != 13
+    jam_ev = dict(evs32.pop(jam_idx), tick=11)
+    brk_idx = next(i for i, e in enumerate(evs32) if e["kind"] == "break")
+    evs32.insert(brk_idx, jam_ev)
+    (b32 / "events.jsonl").write_text(
+        "\n".join(json.dumps(e, separators=(",", ":")) for e in evs32) + "\n", encoding="utf-8"
+    )
+    with pytest.raises(ValueError, match=f"line {brk_idx + 1}"):
+        validate_shift_bundle(b32)
+
+    # m33: bogus robot start.end_tick = tick + 999 while world.time.auto.tray.regular == 3
+    b33 = export_shift_bundle(w32, p32, s32, r32, calculate(w32, p32, r32), tmp_path / "m33")
+    evs33 = [json.loads(x) for x in (b33 / "events.jsonl").read_text(encoding="utf-8").splitlines()]
+    r_start_idx = next(i for i, e in enumerate(evs33) if e["kind"] == "start" and e["resource"] == "robot")
+    evs33[r_start_idx]["end_tick"] = evs33[r_start_idx]["tick"] + 999
+    (b33 / "events.jsonl").write_text(
+        "\n".join(json.dumps(e, separators=(",", ":")) for e in evs33) + "\n", encoding="utf-8"
+    )
+    with pytest.raises(ValueError, match=f"line {r_start_idx + 1}"):
+        validate_shift_bundle(b33)
+
+    # m34: dangling human start [0,3) without finish when horizon == 50
+    b34 = export_shift_bundle(w31, p30, s30, r31, calculate(w31, p30, r31), tmp_path / "m34")
+    evs34 = [json.loads(x) for x in (b34 / "events.jsonl").read_text(encoding="utf-8").splitlines()][:3]
+    fake_r34 = replace(
+        r31, good=0, on_time=0, unfinished=1, pack_started=0, pack_finished=0, labor_ticks=3, overtime_ticks=(0,), events=()
+    )
+    m34 = json.loads((b34 / "manifest.json").read_text(encoding="utf-8"))
+    m34["raw"] = {**json.loads(json.dumps(asdict(fake_r34))), "events": []}
+    m34["economy"] = json.loads(json.dumps(asdict(calculate(w31, p30, fake_r34))))
+    (b34 / "manifest.json").write_text(json.dumps(m34) + "\n", encoding="utf-8")
+    (b34 / "events.jsonl").write_text(
+        "\n".join(json.dumps(e, separators=(",", ":")) for e in evs34) + "\n", encoding="utf-8"
+    )
+    with pytest.raises(ValueError, match="line 3"):
+        validate_shift_bundle(b34)
+
+    # m35: dangling jammed robot after assist.end_tick == H == 27 (trailing robot finish+enqueue deleted)
+    w35 = load_world()
+    w35["clock"].update(shift_ticks=12, overtime_ticks=15, break_at=12, break_length=5)
+    w35["prob_bps"]["jam"]["tray"]["regular"] = 10_000
+    w35["prob_bps"]["defect_auto"]["tray"]["regular"] = 0
+    r35 = simulate(w35, p32, s32, trace=True)
+    b35 = export_shift_bundle(w35, p32, s32, r35, calculate(w35, p32, r35), tmp_path / "m35")
+    evs35 = [json.loads(x) for x in (b35 / "events.jsonl").read_text(encoding="utf-8").splitlines()]
+    assert evs35[-2]["kind"] == "finish" and evs35[-2]["resource"] == "robot"
+    evs35 = evs35[:-2]
+    fake_r35 = replace(r35, pack_finished=0, auto_finished=0, events=())
+    m35 = json.loads((b35 / "manifest.json").read_text(encoding="utf-8"))
+    m35["raw"] = {**json.loads(json.dumps(asdict(fake_r35))), "events": []}
+    m35["economy"] = json.loads(json.dumps(asdict(calculate(w35, p32, fake_r35))))
+    (b35 / "manifest.json").write_text(json.dumps(m35) + "\n", encoding="utf-8")
+    (b35 / "events.jsonl").write_text(
+        "\n".join(json.dumps(e, separators=(",", ":")) for e in evs35) + "\n", encoding="utf-8"
+    )
+    with pytest.raises(ValueError):
+        validate_shift_bundle(b35)
+
+
+def test_validate_shift_bundle_enforces_transition_coupling_and_economy_formula_parity(tmp_path):
+    w = load_world()
+    w["clock"].update(shift_ticks=60, overtime_ticks=10, break_at=440, break_length=40)
+    w["prob_bps"]["defect_auto"]["tray"]["regular"] = 0
+    w["prob_bps"]["jam"]["tray"]["regular"] = 0
+    p = Plan(1, True, True, "all", ((1,), (2,), (3,), (4,)))
+    s = Scenario(1, 7, (Order(0, "regular", 0, 50),))
+    r = simulate(w, p, s, trace=True)
+    econ = calculate(w, p, r)
+
+    # m36: Stage-4 terminal good attributed to wrong worker resource ("w0" instead of "w3")
+    b36 = export_shift_bundle(w, p, s, r, econ, tmp_path / "m36")
+    evs36 = [json.loads(x) for x in (b36 / "events.jsonl").read_text(encoding="utf-8").splitlines()]
+    good_idx = next(i for i, e in enumerate(evs36) if e["kind"] == "good")
+    evs36[good_idx]["resource"] = "w0"
+    (b36 / "events.jsonl").write_text(
+        "\n".join(json.dumps(e, separators=(",", ":")) for e in evs36) + "\n", encoding="utf-8"
+    )
+    with pytest.raises(ValueError, match=f"line {good_idx + 1}"):
+        validate_shift_bundle(b36)
+
+    # m37: Delayed enqueue after finish (phantom multi-tick limbo between finish and enqueue)
+    w37 = load_world()
+    w37["clock"].update(shift_ticks=80, overtime_ticks=10, break_at=440, break_length=40)
+    w37["prob_bps"]["defect_manual"]["regular"] = 0
+    p37 = Plan(1, False, False, "manual", ((1,), (2, 3, 4)))
+    s37 = Scenario(1, 7, (Order(0, "regular", 0, 70), Order(1, "regular", 20, 80)))
+    r37 = simulate(w37, p37, s37, trace=True)
+    b37 = export_shift_bundle(w37, p37, s37, r37, calculate(w37, p37, r37), tmp_path / "m37")
+    evs37 = [json.loads(x) for x in (b37 / "events.jsonl").read_text(encoding="utf-8").splitlines()]
+    # Order 0 finishes stage 1 at tick 3; delay enqueue(stage=2) from tick 3 to tick 4 while start(stage=2) is shifted too?
+    # Simpler: Order 1 arrives at tick=20; delay its stage-1 enqueue from tick=20 to tick=21 before w0 starts it!
+    # Wait: w0 is idle at tick 20 so w0 starts order 1 at tick 20. Let's make w0 busy at tick 4 when order 1 arrives at tick 1!
+    s37b = Scenario(1, 7, (Order(0, "regular", 0, 70), Order(1, "regular", 1, 70)))
+    r37b = simulate(w37, p37, s37b, trace=True)
+    b37b = export_shift_bundle(w37, p37, s37b, r37b, calculate(w37, p37, r37b), tmp_path / "m37b")
+    evs37b = [json.loads(x) for x in (b37b / "events.jsonl").read_text(encoding="utf-8").splitlines()]
+    enq1_idx = next(
+        i for i, e in enumerate(evs37b) if e["kind"] == "enqueue" and e["order_id"] == 1 and e["stage"] == 1
+    )
+    # Order 1 arrives at tick 1 while w0 is busy until tick 3, so tick=2 preserves monotonicity!
+    evs37b[enq1_idx]["tick"] = 2
+    (b37b / "events.jsonl").write_text(
+        "\n".join(json.dumps(e, separators=(",", ":")) for e in evs37b) + "\n", encoding="utf-8"
+    )
+    with pytest.raises(ValueError, match=f"line {enq1_idx + 1}"):
+        validate_shift_bundle(b37b)
+
+    # m38: Zeroed Economy costs and purchase on robot=True, trays=True bundle
+    b38 = export_shift_bundle(w, p, s, r, econ, tmp_path / "m38")
+    m38 = json.loads((b38 / "manifest.json").read_text(encoding="utf-8"))
+    m38["economy"] = {
+        "purchase": 0,
+        "costs": {k: 0 for k in m38["economy"]["costs"]},
+        "total": 0,
+    }
+    (b38 / "manifest.json").write_text(json.dumps(m38) + "\n", encoding="utf-8")
+    with pytest.raises(ValueError, match="economy"):
+        validate_shift_bundle(b38)
+
+
+@dataclass(frozen=True)
+class _StrictProjectWeekPlan:
+    robot: bool
+    trays: bool
+    route: str
+    maintenance: bool
+    workers: tuple[tuple[int, ...], ...]
+
+    def to_shift_plan(self) -> Plan:
+        return Plan(1, self.robot, self.trays, self.route, self.workers)
+
+
+@dataclass(frozen=True)
+class _StrictProjectQuarterlyPlan:
+    schema_version: int
+    weeks: tuple[_StrictProjectWeekPlan, ...]
+
+
+@dataclass(frozen=True)
+class _StrictProjectWeekReport:
+    week: int
+    label: str
+    week_seed: int
+    carryover_in: int
+    carryover_out: int
+    wear_start: int
+    wear_end: int
+    commissioning_active: bool
+    shift_plan: Plan
+    scenario: Scenario
+    raw: object
+    shift_economy: Economy
+    week_economy: Economy
+
+
+@dataclass(frozen=True)
+class _StrictProjectQuarterReport:
+    schema_version: int
+    seed: int
+    purchase: int
+    total_cost: int
+    labor_ticks: int
+    weeks: tuple[_StrictProjectWeekReport, ...]
+
+
+def test_export_quarter_pack_strict_project_md_week_report_without_quarterly_module(tmp_path, monkeypatch):
+    # Verify strict 13-field WeekReport contract (NO .world or .week_world attribute)
+    assert len(_StrictProjectWeekReport.__dataclass_fields__) == 13
+    assert "world" not in _StrictProjectWeekReport.__dataclass_fields__
+    assert "week_world" not in _StrictProjectWeekReport.__dataclass_fields__
+
+    monkeypatch.setitem(sys.modules, "robotization_bench.quarterly", None)
+
+    world = load_world()
+    world["quarterly"] = {
+        "schema_version": 2,
+        "world_id": "cell-quarterly-v2",
+        "weeks": 12,
+        "max_pilots": 24,
+        "carryover_cap": 80,
+        "commissioning": {
+            "weeks": 2,
+            "jam_bonus_bps": {"bare": 1400, "tray": 650},
+            "defect_bonus_bps": {"bare": 200, "tray": 80},
+        },
+        "wear": {
+            "per_week_bypass": 1,
+            "per_week_all": 3,
+            "fragile_oversize_all_bonus": 1,
+            "maintenance_reduction": 5,
+            "maintenance_auto_slowdown_ticks": 1,
+            "jam_bps_per_wear": 350,
+            "defect_bps_per_wear": 120,
+            "max_wear": 12,
+        },
+        "money": {
+            "budget": 1800000,
+            "depreciation_weeks": 52,
+            "robot_service_week": 3500,
+            "maintenance_cost": 4500,
+            "shifts_per_week": 5,
+            "hire_cost": 9000,
+            "layoff_cost": 11000,
+            "retrain_cost": 3500,
+            "cross_skill_shift_premium": 900,
+            "backlog_holding_per_order": 600,
+        },
+        "threshold_bps": {
+            "good_each_week": 9000,
+            "good_pooled": 9500,
+            "on_time_pooled": 8800,
+            "escaped_each_week_max": 120,
+            "auto_pack_pooled_min": 3000,
+        },
+        "week_profiles": [
+            {
+                "week": w,
+                "label": f"profile_{w:02d}",
+                "waves": 10 + (w % 3),
+                "orders_min": 11,
+                "regular_bps": 7600,
+                "fragile_bps": 1600,
+                "due_offset": 160,
+            }
+            for w in range(12)
+        ],
+    }
+
+    q = world["quarterly"]
+    wear = 0
+    plan_weeks = []
+    report_weeks = []
+    total_cost = 0
+    total_labor = 0
+
+    for w in range(12):
+        maint = w in (6, 9)
+        wp = _StrictProjectWeekPlan(
+            robot=True,
+            trays=True,
+            route="bypass",
+            maintenance=maint,
+            workers=((1,), (2,), (3, 4), (2, 3)),
+        )
+        sp = wp.to_shift_plan()
+        commissioning = w < 2
+        wear_start = wear
+        reduced_wear = wear_start - q["wear"]["maintenance_reduction"] if maint else wear_start
+        eff_wear = min(q["wear"]["max_wear"], max(0, reduced_wear))
+
+        eff_w = json.loads(json.dumps(world))
+        eff_w.pop("quarterly", None)
+        for k, v in q["week_profiles"][w].items():
+            if k in eff_w["generator"]:
+                eff_w["generator"][k] = v
+        for rig in ("bare", "tray"):
+            jam_add = (q["commissioning"]["jam_bonus_bps"][rig] if commissioning else 0) + eff_wear * q["wear"]["jam_bps_per_wear"]
+            def_add = (q["commissioning"]["defect_bonus_bps"][rig] if commissioning else 0) + eff_wear * q["wear"]["defect_bps_per_wear"]
+            for kind in eff_w["kinds"]:
+                eff_w["prob_bps"]["jam"][rig][kind] = min(10_000, max(0, eff_w["prob_bps"]["jam"][rig][kind] + jam_add))
+                eff_w["prob_bps"]["defect_auto"][rig][kind] = min(10_000, max(0, eff_w["prob_bps"]["defect_auto"][rig][kind] + def_add))
+        if maint:
+            for rig in ("bare", "tray"):
+                for kind in eff_w["kinds"]:
+                    eff_w["time"]["auto"][rig][kind] += q["wear"]["maintenance_auto_slowdown_ticks"]
+
+        scen = Scenario(
+            1,
+            1100 + w,
+            tuple(Order(idx, "regular", 5 * idx, 180 + 5 * idx) for idx in range(6)),
+        )
+        raw = simulate(eff_w, sp, scen, trace=True)
+        shift_econ = calculate(eff_w, sp, raw)
+        week_costs = {
+            "depreciation": 29_423,
+            "service": 3_500,
+            "maintenance": 4_500 if maint else 0,
+            "shifts": shift_econ.costs["shifts"] * 5,
+            "cross_skill": 9_000,
+            "overtime": shift_econ.costs["overtime"] * 5,
+            "hiring_retraining": 0,
+            "trays": shift_econ.costs["trays"] * 5,
+            "materials": shift_econ.costs["materials"] * 5,
+            "rework": shift_econ.costs["rework"] * 5,
+            "late": shift_econ.costs["late"] * 5,
+            "backlog_holding": 0,
+            "unfulfilled": 0,
+            "escaped": shift_econ.costs["escaped"] * 5,
+        }
+        week_econ = Economy(purchase=1_530_000, costs=week_costs, total=sum(week_costs.values()))
+        wear_end = min(q["wear"]["max_wear"], eff_wear + q["wear"]["per_week_bypass"])
+        wear = wear_end
+
+        total_cost += week_econ.total
+        total_labor += raw.labor_ticks
+        plan_weeks.append(wp)
+        report_weeks.append(
+            _StrictProjectWeekReport(
+                week=w,
+                label=q["week_profiles"][w]["label"],
+                week_seed=scen.seed,
+                carryover_in=0,
+                carryover_out=0,
+                wear_start=wear_start,
+                wear_end=wear_end,
+                commissioning_active=commissioning,
+                shift_plan=sp,
+                scenario=scen,
+                raw=raw,
+                shift_economy=shift_econ,
+                week_economy=week_econ,
+            )
+        )
+
+    strict_plan = _StrictProjectQuarterlyPlan(2, tuple(plan_weeks))
+    strict_quarter = _StrictProjectQuarterReport(
+        2, 11, 1_530_000, total_cost, total_labor, tuple(report_weeks)
+    )
+
+    out_dir = tmp_path / "strict_quarter_pack"
+    export_quarter_pack(world, strict_quarter, strict_plan, out_dir)
+    audit = validate_quarter_pack(out_dir, expected_weeks=12)
+    assert audit["ok"] is True
+
+    for w in range(12):
+        wm = json.loads((out_dir / f"weeks/week-{w:02d}/manifest.json").read_text(encoding="utf-8"))
+        assert "quarterly" not in wm["world"]
+        expected_reg_auto = world["time"]["auto"]["tray"]["regular"] + (1 if w in (6, 9) else 0)
+        assert wm["world"]["time"]["auto"]["tray"]["regular"] == expected_reg_auto
+
+
+def test_validate_quarter_pack_reconciles_totals_plan_monotonicity_and_orphan_entries(tmp_path):
+    base_world = load_world()
+    q_plan, q_report = _build_duck_quarter_fixture(
+        base_world, seed=11, automated=True, attach_explicit_week_world=True
+    )
+    clean_dir = tmp_path / "clean_qpack"
+    export_quarter_pack(base_world, q_report, q_plan, clean_dir)
+    assert validate_quarter_pack(clean_dir, expected_weeks=12)["ok"] is True
+
+    def clone_pack(tag: str) -> Path:
+        dst = tmp_path / f"mut_{tag}"
+        (dst / "weeks").mkdir(parents=True)
+        (dst / "quarter_manifest.json").write_bytes((clean_dir / "quarter_manifest.json").read_bytes())
+        for w in range(12):
+            src_w = clean_dir / "weeks" / f"week-{w:02d}"
+            dst_w = dst / "weeks" / f"week-{w:02d}"
+            dst_w.mkdir()
+            (dst_w / "manifest.json").write_bytes((src_w / "manifest.json").read_bytes())
+            (dst_w / "events.jsonl").write_bytes((src_w / "events.jsonl").read_bytes())
+        return dst
+
+    # qm01: labor_ticks + 1
+    d1 = clone_pack("qm01_labor")
+    qm1 = json.loads((d1 / "quarter_manifest.json").read_text(encoding="utf-8"))
+    qm1["labor_ticks"] += 1
+    (d1 / "quarter_manifest.json").write_text(json.dumps(qm1) + "\n", encoding="utf-8")
+    with pytest.raises(ValueError, match="labor_ticks"):
+        validate_quarter_pack(d1, expected_weeks=12)
+
+    # qm02: total_cost + 1
+    d2 = clone_pack("qm02_cost")
+    qm2 = json.loads((d2 / "quarter_manifest.json").read_text(encoding="utf-8"))
+    qm2["total_cost"] += 1
+    (d2 / "quarter_manifest.json").write_text(json.dumps(qm2) + "\n", encoding="utf-8")
+    with pytest.raises(ValueError, match="total_cost"):
+        validate_quarter_pack(d2, expected_weeks=12)
+
+    # qm_purchase: purchase + 1
+    d_pur = clone_pack("qm_purchase")
+    qm_pur = json.loads((d_pur / "quarter_manifest.json").read_text(encoding="utf-8"))
+    qm_pur["purchase"] += 1
+    (d_pur / "quarter_manifest.json").write_text(json.dumps(qm_pur) + "\n", encoding="utf-8")
+    with pytest.raises(ValueError, match="purchase"):
+        validate_quarter_pack(d_pur, expected_weeks=12)
+
+    # qm03: plan.weeks[5] contradicts shift_plan / breaks irreversible CapEx
+    d3 = clone_pack("qm03_plan_mismatch")
+    qm3 = json.loads((d3 / "quarter_manifest.json").read_text(encoding="utf-8"))
+    qm3["plan"]["weeks"][5] = {
+        "robot": False,
+        "trays": False,
+        "route": "manual",
+        "maintenance": False,
+        "workers": qm3["plan"]["weeks"][5]["workers"],
+    }
+    (d3 / "quarter_manifest.json").write_text(json.dumps(qm3) + "\n", encoding="utf-8")
+    with pytest.raises(ValueError):
+        validate_quarter_pack(d3, expected_weeks=12)
+
+    # qm05a & qm05b: orphan weeks/week-12/ directory and stray file inside weeks/
+    d5a = clone_pack("qm05_orphan_dir")
+    (d5a / "weeks" / "week-12").mkdir()
+    with pytest.raises(ValueError):
+        validate_quarter_pack(d5a, expected_weeks=12)
+
+    d5b = clone_pack("qm05_stray_file")
+    (d5b / "weeks" / "stray.txt").write_text("orphan\n", encoding="utf-8")
+    with pytest.raises(ValueError):
+        validate_quarter_pack(d5b, expected_weeks=12)
+
+
+def test_export_3d_pack_cli_rejects_non_ascii_seeds_and_preserves_flag_order(tmp_path):
+    script_path = ROOT / "scripts" / "export_3d_pack.py"
+
+    # Non-ASCII Unicode digits (Devanagari ११ and Latin-1 superscript ²) MUST fail with exit code 2 and no traceback
+    for bad_seed in ("११", "²", "-१"):
+        res = subprocess.run(
+            [sys.executable, str(script_path), "--out", str(tmp_path / f"bad_{ord(bad_seed[-1])}"), "--seed", bad_seed],
+            capture_output=True,
+            text=True,
+            timeout=15,
+        )
+        assert res.returncode == 2, f"Expected exit code 2 for --seed {bad_seed!r}, got {res.returncode}"
+        assert "Traceback" not in res.stderr
+
+    # Mixed --seeds / --seed / --all-dev-seeds MUST preserve exact CLI appearance order
+    mod_ns = runpy.run_path(str(script_path))
+    main_fn = mod_ns["main"]
+
+    ordered_out = tmp_path / "ordered_pack"
+    rc = main_fn(["--out", str(ordered_out), "--seeds", "29,47", "--seed", "0", "--seed", "11"])
+    assert rc == 0
+    idx = json.loads((ordered_out / "index.json").read_text(encoding="utf-8"))
+    assert idx["seeds"] == [29, 47, 0, 11]
+
+    ordered_dev_out = tmp_path / "ordered_dev_pack"
+    rc_dev = main_fn(["--out", str(ordered_dev_out), "--seed", "99", "--all-dev-seeds", "--seed", "5"])
+    assert rc_dev == 0
+    idx_dev = json.loads((ordered_dev_out / "index.json").read_text(encoding="utf-8"))
+    assert idx_dev["seeds"] == [99, 11, 29, 47, 5]
+
+
+def _raw_tcp_exchange(host: str, port: int, payload: bytes, *, timeout: float = 5.0) -> bytes:
+    with socket.create_connection((host, port), timeout=timeout) as sock:
+        sock.sendall(payload)
+        chunks: list[bytes] = []
+        while True:
+            chunk = sock.recv(65_536)
+            if not chunk:
+                break
+            chunks.append(chunk)
+        return b"".join(chunks)
+
+
+def _parse_raw_http_response(raw_bytes: bytes) -> tuple[str, dict[str, str], bytes]:
+    assert b"\r\n\r\n" in raw_bytes, f"Missing HTTP header terminator in {raw_bytes[:200]!r}"
+    head, body = raw_bytes.split(b"\r\n\r\n", 1)
+    lines = head.decode("iso-8859-1").split("\r\n")
+    status_line = lines[0]
+    headers: dict[str, str] = {}
+    for line in lines[1:]:
+        if ":" in line:
+            k, v = line.split(":", 1)
+            headers[k.strip()] = v.strip()
+    return status_line, headers, body
+
+
+def test_serve_3d_hardens_latin1_range_malformed_ipv6_options_origin_large_post_and_http09(tmp_path, capsys):
+    serve_script = ROOT / "scripts" / "serve_3d.py"
+    pack_dir = tmp_path / "hardened_pack"
+    pack_dir.mkdir()
+    index_bytes = b'{"secret_payload": "DO_NOT_LEAK_HEADERLESS"}\n'
+    (pack_dir / "index.json").write_bytes(index_bytes)
+
+    serve_mod = runpy.run_path(str(serve_script))
+    server = serve_mod["create_server"](pack_dir, host="127.0.0.1", port=0, quiet=True)
+    host, port = server.server_address[:2]
+    thread = threading.Thread(target=server.serve_forever, daemon=True)
+    thread.start()
+    try:
+        # 1. Latin-1 superscripts in Range header -> 416 + Content-Range + CORS + no-store + 0 tracebacks
+        for raw_range in (b"bytes=\xb2-", b"bytes=0-\xb3", b"bytes=-\xb9"):
+            req = (
+                b"GET /index.json HTTP/1.1\r\nHost: 127.0.0.1\r\nRange: "
+                + raw_range
+                + b"\r\nConnection: close\r\n\r\n"
+            )
+            resp = _raw_tcp_exchange(host, port, req)
+            status_line, hdrs, _ = _parse_raw_http_response(resp)
+            assert status_line.startswith("HTTP/1.1 416"), status_line
+            _assert_common_cors_headers(hdrs)
+            assert {k.lower(): v for k, v in hdrs.items()}.get("content-range") == f"bytes */{len(index_bytes)}"
+
+        # 2. Malformed IPv6 urlsplit & invalid origin-form OPTIONS (missing leading '/') -> 400 + CORS + no-store
+        for bad_req in (
+            b"GET http://[::1/index.json HTTP/1.1\r\nHost: 127.0.0.1\r\nConnection: close\r\n\r\n",
+            b"OPTIONS http://[::1/index.json HTTP/1.1\r\nHost: 127.0.0.1\r\nConnection: close\r\n\r\n",
+            b"OPTIONS index.json HTTP/1.1\r\nHost: 127.0.0.1\r\nConnection: close\r\n\r\n",
+        ):
+            resp = _raw_tcp_exchange(host, port, bad_req)
+            status_line, hdrs, _ = _parse_raw_http_response(resp)
+            assert status_line.startswith("HTTP/1.1 400"), f"Got {status_line!r} for {bad_req!r}"
+            _assert_common_cors_headers(hdrs)
+
+        # Valid OPTIONS * still returns 204
+        opt_star = _raw_tcp_exchange(
+            host, port, b"OPTIONS * HTTP/1.1\r\nHost: 127.0.0.1\r\nConnection: close\r\n\r\n"
+        )
+        st_star, hdr_star, _ = _parse_raw_http_response(opt_star)
+        assert st_star.startswith("HTTP/1.1 204")
+        _assert_common_cors_headers(hdr_star)
+
+        # 3. Large POST body (100 KB and 1 MiB raw TCP + 20x 512 KB http.client) -> clean 405 + EOF (no RST)
+        for body_size, conn_hdr in ((102_400, b"Connection: close\r\n"), (102_400, b""), (1_048_576, b"Connection: close\r\n")):
+            post_body = b"x" * body_size
+            post_req = (
+                b"POST /index.json HTTP/1.1\r\nHost: 127.0.0.1\r\n"
+                + f"Content-Length: {body_size}\r\n".encode("ascii")
+                + conn_hdr
+                + b"\r\n"
+                + post_body
+            )
+            post_resp = _raw_tcp_exchange(host, port, post_req)
+            st_post, hdr_post, _ = _parse_raw_http_response(post_resp)
+            assert st_post.startswith("HTTP/1.1 405"), st_post
+            _assert_common_cors_headers(hdr_post)
+            assert {k.lower(): v for k, v in hdr_post.items()}.get("allow") == "GET, HEAD, OPTIONS"
+
+        payload_512k = b"z" * 524_288
+        for _ in range(20):
+            st_hc, hdr_hc, _ = _http_request(
+                host,
+                port,
+                "POST",
+                "/index.json",
+                headers={"Content-Type": "application/octet-stream"},
+                body=payload_512k,
+            )
+            assert st_hc == 405
+            _assert_common_cors_headers(hdr_hc)
+
+        # Raw TCP GET without Connection: close also receives HTTP/1.1 + CORS + clean EOF
+        get_no_close = _raw_tcp_exchange(
+            host, port, b"GET /index.json HTTP/1.1\r\nHost: 127.0.0.1\r\n\r\n"
+        )
+        st_nc, hdr_nc, body_nc = _parse_raw_http_response(get_no_close)
+        assert st_nc.startswith("HTTP/1.1 200")
+        _assert_common_cors_headers(hdr_nc)
+        assert body_nc == index_bytes
+
+        # 4. HTTP/0.9 2-token GET and 1-token garbage -> HTTP/1.1 400 + CORS + no-store + zero payload leak
+        for raw_09 in (b"GET /index.json\r\n\r\n", b"GARBAGE_NOT_HTTP\r\n\r\n"):
+            resp_09 = _raw_tcp_exchange(host, port, raw_09)
+            st_09, hdr_09, body_09 = _parse_raw_http_response(resp_09)
+            assert st_09.startswith("HTTP/1.1 400"), st_09
+            _assert_common_cors_headers(hdr_09)
+            assert b"DO_NOT_LEAK_HEADERLESS" not in body_09
+    finally:
+        server.shutdown()
+        server.server_close()
+        thread.join(timeout=5)
+
+    captured = capsys.readouterr()
+    assert "Traceback" not in captured.err
+    assert "ValueError" not in captured.err

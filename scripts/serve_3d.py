@@ -28,12 +28,19 @@ def _content_type_for(path: Path) -> str:
     return _MIME_TYPES.get(path.suffix.lower(), "application/octet-stream")
 
 
+def _is_ascii_digits(s: str) -> bool:
+    return bool(s) and s.isascii() and s.isdigit()
+
+
 def _validate_url_segments(raw_target: str) -> tuple[int, list[str] | None, str]:
     if "\x00" in raw_target or "\\" in raw_target:
         return 403, None, "Invalid characters in request target"
     if raw_target.startswith("//"):
         return 403, None, "Ambiguous double-slash request target forbidden"
-    split = urllib.parse.urlsplit(raw_target)
+    try:
+        split = urllib.parse.urlsplit(raw_target)
+    except ValueError:
+        return 400, None, "Malformed request URI"
     if split.scheme or split.netloc:
         return 400, None, "Relative request path required"
     decoded = urllib.parse.unquote(split.path)
@@ -90,6 +97,10 @@ def _open_safe_file(root_dir: Path, raw_target: str) -> tuple[int, int | None, P
     return 200, fd, resolved, ""
 
 
+_MAX_DRAIN_BYTES = 2_097_152
+_DRAIN_CHUNK_BYTES = 65_536
+
+
 def _parse_byte_range(range_header: str, total_len: int) -> tuple[str, int, int]:
     spec_full = range_header.strip()
     if not spec_full.lower().startswith("bytes="):
@@ -101,7 +112,7 @@ def _parse_byte_range(range_header: str, total_len: int) -> tuple[str, int, int]
     start_str = start_str.strip()
     end_str = end_str.strip()
     if start_str == "":
-        if not end_str.isdigit():
+        if not _is_ascii_digits(end_str):
             return ("unsatisfiable", 0, 0)
         suffix = int(end_str, 10)
         if suffix <= 0:
@@ -109,14 +120,14 @@ def _parse_byte_range(range_header: str, total_len: int) -> tuple[str, int, int]
         start = max(0, total_len - suffix)
         end = total_len - 1
         return ("partial", start, end)
-    if not start_str.isdigit():
+    if not _is_ascii_digits(start_str):
         return ("unsatisfiable", 0, 0)
     start = int(start_str, 10)
     if start >= total_len:
         return ("unsatisfiable", 0, 0)
     if end_str == "":
         return ("partial", start, total_len - 1)
-    if not end_str.isdigit():
+    if not _is_ascii_digits(end_str):
         return ("unsatisfiable", 0, 0)
     end = int(end_str, 10)
     if start > end:
@@ -140,6 +151,8 @@ class PackHTTPServer(ThreadingHTTPServer):
 
 class PackRequestHandler(BaseHTTPRequestHandler):
     server_version = "FulfillmentCell3DBridge/1.0"
+    protocol_version = "HTTP/1.1"
+    default_request_version = "HTTP/1.1"
 
     def log_message(self, fmt: str, *args: Any) -> None:
         if not getattr(self.server, "quiet", False):
@@ -162,14 +175,28 @@ class PackRequestHandler(BaseHTTPRequestHandler):
         self._send_common_headers()
         super().end_headers()
 
+    def parse_request(self) -> bool:
+        if not super().parse_request():
+            self.close_connection = True
+            return False
+        if self.request_version == "HTTP/0.9" or len(self.requestline.split()) < 3:
+            self.request_version = "HTTP/1.1"
+            self.close_connection = True
+            self._send_json_error(400, "HTTP/0.9 is not supported")
+            return False
+        return True
+
     def _send_json_error(
         self, status: int, message: str, *, extra_headers: dict[str, str] | None = None
     ) -> None:
+        self._drain_request_body()
+        self.close_connection = True
         body = (json.dumps({"error": message}) + "\n").encode("utf-8")
         self.send_response(status)
         if extra_headers:
             for k, v in extra_headers.items():
                 self.send_header(k, v)
+        self.send_header("Connection", "close")
         self.send_header("Content-Type", "application/json; charset=utf-8")
         self.send_header("Content-Length", str(len(body)))
         self.end_headers()
@@ -177,38 +204,61 @@ class PackRequestHandler(BaseHTTPRequestHandler):
             self.wfile.write(body)
 
     def _drain_request_body(self) -> None:
-        raw_len = self.headers.get("Content-Length")
-        if not raw_len:
+        if getattr(self, "_body_drained", False):
             return
-        try:
-            length = int(raw_len)
-        except ValueError:
+        self._body_drained = True
+        headers = getattr(self, "headers", None)
+        if headers is None:
+            return
+        raw_len = headers.get("Content-Length")
+        if not raw_len:
+            if headers.get("Transfer-Encoding"):
+                self.close_connection = True
+            return
+        stripped_len = raw_len.strip()
+        if not _is_ascii_digits(stripped_len):
             self.close_connection = True
             return
+        length = int(stripped_len, 10)
         if length <= 0:
             return
-        to_read = min(length, 65_536)
+        remaining = min(length, _MAX_DRAIN_BYTES)
+        prev_timeout = self.connection.gettimeout()
         try:
-            self.rfile.read(to_read)
-        except OSError:
-            pass
-        if length > 65_536:
+            self.connection.settimeout(0.5)
+            while remaining > 0:
+                chunk = self.rfile.read(min(remaining, _DRAIN_CHUNK_BYTES))
+                if not chunk:
+                    self.close_connection = True
+                    break
+                remaining -= len(chunk)
+        except (TimeoutError, OSError):
+            self.close_connection = True
+        finally:
+            try:
+                self.connection.settimeout(prev_timeout)
+            except OSError:
+                pass
+        if length > _MAX_DRAIN_BYTES or remaining > 0:
             self.close_connection = True
 
     def handle_one_request(self) -> None:
         self._common_headers_sent = False
+        self._body_drained = False
         try:
             self.raw_requestline = self.rfile.readline(65537)
             if len(self.raw_requestline) > 65536:
                 self.requestline = ""
-                self.request_version = ""
+                self.request_version = "HTTP/1.1"
                 self.command = ""
                 self._send_json_error(414, "Request-URI Too Long")
+                self.wfile.flush()
                 return
             if not self.raw_requestline:
                 self.close_connection = True
                 return
             if not self.parse_request():
+                self.wfile.flush()
                 return
             if self.command == "GET":
                 self.do_GET()
@@ -239,15 +289,24 @@ class PackRequestHandler(BaseHTTPRequestHandler):
             if "\x00" in target or "\\" in target or target.startswith("//"):
                 self._send_json_error(403, "Invalid characters in request target")
                 return
-            split = urllib.parse.urlsplit(target)
-            if split.scheme or split.netloc:
+            try:
+                split = urllib.parse.urlsplit(target)
+            except ValueError:
+                self._send_json_error(400, "Malformed request URI")
+                return
+            if split.scheme or split.netloc or not split.path.startswith("/"):
                 self._send_json_error(400, "Relative request path required")
                 return
             decoded = urllib.parse.unquote(split.path)
+            if not decoded.startswith("/"):
+                self._send_json_error(400, "Relative request path required")
+                return
             if "\x00" in decoded or "\\" in decoded or ".." in decoded.split("/"):
                 self._send_json_error(403, "Path traversal forbidden")
                 return
+        self.close_connection = True
         self.send_response(204)
+        self.send_header("Connection", "close")
         self.send_header("Allow", "GET, HEAD, OPTIONS")
         self.send_header("Content-Length", "0")
         self.end_headers()
@@ -273,14 +332,18 @@ class PackRequestHandler(BaseHTTPRequestHandler):
         if range_hdr is not None:
             mode, start, end = _parse_byte_range(range_hdr, total_len)
             if mode == "unsatisfiable":
+                self.close_connection = True
                 self.send_response(416)
+                self.send_header("Connection", "close")
                 self.send_header("Content-Range", f"bytes */{total_len}")
                 self.send_header("Content-Length", "0")
                 self.end_headers()
                 return
             if mode == "partial":
                 chunk = data[start : end + 1]
+                self.close_connection = True
                 self.send_response(206)
+                self.send_header("Connection", "close")
                 self.send_header("Content-Type", content_type)
                 self.send_header("Accept-Ranges", "bytes")
                 self.send_header("Content-Range", f"bytes {start}-{end}/{total_len}")
@@ -290,7 +353,9 @@ class PackRequestHandler(BaseHTTPRequestHandler):
                     self.wfile.write(chunk)
                 return
 
+        self.close_connection = True
         self.send_response(200)
+        self.send_header("Connection", "close")
         self.send_header("Content-Type", content_type)
         self.send_header("Accept-Ranges", "bytes")
         self.send_header("Content-Length", str(total_len))
