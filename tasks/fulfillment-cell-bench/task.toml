@@ -1,0 +1,16 @@
+schema_version = "1.4"
+
+[metadata]
+name = "fulfillment-cell-bench"
+
+[verifier]
+environment_mode = "separate"
+
+[verifier.environment]
+network_mode = "no-network"
+
+[[environment.mcp_servers]]
+name = "cell"
+transport = "stdio"
+command = "python3"
+args = ["-m", "robotization_bench.mcp_proxy", "--socket", "/run/bench/bench.sock"]

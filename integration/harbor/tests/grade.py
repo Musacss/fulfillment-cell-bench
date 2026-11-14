@@ -1,29 +1,54 @@
-"""Run inside the clean verifier. Import exclusively from the trusted image."""
+"""Run inside the clean airgapped verifier. Import exclusively from the trusted image."""
+
 from dataclasses import asdict
-from pathlib import Path
 import hashlib
 import json
+import os
+from pathlib import Path
 import sys
 
 HERE = Path(__file__).resolve().parent
-sys.path.insert(0,str(HERE/"trusted"/"src"))
-from robotization_bench.contracts import load_world
-from robotization_bench.scenarios import generate
-from robotization_bench.verifier import verify_file
+sys.path.insert(0, str(HERE / "trusted" / "src"))
+
+from robotization_bench.contracts import load_world  # noqa: E402
+from robotization_bench.scenarios import generate  # noqa: E402
+from robotization_bench.verifier import verify_file, verify_quarterly_file  # noqa: E402
 
 
-def grade(submission: Path, out: Path):
+def grade(submission: Path, out: Path, *, mode: str | None = None) -> None:
+    raw_mode = os.environ.get("BENCH_MODE", "quarterly") if mode is None else mode
+    resolved_mode = raw_mode.strip().lower()
+    if resolved_mode not in ("quarterly", "v1"):
+        raise ValueError(f"Unsupported BENCH_MODE: {raw_mode!r}")
+
     w = load_world()
-    seed_bytes = (HERE/"seeds.json").read_bytes()
-    days = tuple(generate(w,seed) for seed in json.loads(seed_bytes))
-    result = verify_file(w,submission,days)
-    out.mkdir(parents=True,exist_ok=True)
-    (out/"evaluation.json").write_text(json.dumps({"evaluation":asdict(result),
-        "seeds_sha256":hashlib.sha256(seed_bytes).hexdigest(),"world":w["world_id"],
-        "source":json.loads((HERE/"provenance.json").read_text())},indent=2))
-    # Harbor expects a scalar float; the authoritative fraction is kept beside it.
-    (out/"reward.txt").write_text(str(result.reward_num/result.reward_den)+"\n")
+    seed_bytes = (HERE / "seeds.json").read_bytes()
+    seeds = json.loads(seed_bytes)
+
+    if resolved_mode == "v1":
+        days = tuple(generate(w, int(seed)) for seed in seeds)
+        result = verify_file(w, submission, days)
+        world_id = w["world_id"]
+    else:
+        result = verify_quarterly_file(w, submission, seeds)
+        world_id = w.get("quarterly", {}).get("world_id", w["world_id"])
+
+    out.mkdir(parents=True, exist_ok=True)
+    payload = {
+        "evaluation": asdict(result),
+        "seeds_sha256": hashlib.sha256(seed_bytes).hexdigest(),
+        "world": world_id,
+        "source": json.loads((HERE / "provenance.json").read_text(encoding="utf-8")),
+    }
+    (out / "evaluation.json").write_text(
+        json.dumps(payload, indent=2, ensure_ascii=True, allow_nan=False) + "\n",
+        encoding="utf-8",
+    )
+    # Harbor expects a scalar float; the authoritative fraction is kept beside it in evaluation.json.
+    (out / "reward.txt").write_text(f"{result.reward_num / result.reward_den}\n", encoding="utf-8")
 
 
-if __name__=="__main__":
-    grade(Path("/logs/artifacts/submission.json"), Path("/logs/verifier"))
+if __name__ == "__main__":
+    submission_path = Path(os.environ.get("BENCH_SUBMISSION", "/logs/artifacts/submission.json"))
+    verifier_dir = Path(os.environ.get("BENCH_VERIFIER_DIR", "/logs/verifier"))
+    grade(submission_path, verifier_dir)

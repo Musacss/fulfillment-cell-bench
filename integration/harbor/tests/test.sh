@@ -1,3 +1,3 @@
 #!/bin/sh
 set -eu
-exec python -I /tests/grade.py
+exec python3 -I /tests/grade.py

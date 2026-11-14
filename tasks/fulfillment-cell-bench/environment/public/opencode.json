@@ -1,0 +1,19 @@
+{
+  "$schema": "https://opencode.ai/config.json",
+  "mcp": {
+    "cell": {
+      "type": "local",
+      "command": [
+        "python3",
+        "-m",
+        "robotization_bench.mcp_proxy",
+        "--socket",
+        "/run/bench/bench.sock"
+      ],
+      "enabled": true,
+      "environment": {
+        "PYTHONPATH": "/app/src"
+      }
+    }
+  }
+}

@@ -12,5 +12,5 @@ network_mode = "no-network"
 [[environment.mcp_servers]]
 name = "cell"
 transport = "stdio"
-command = "python"
-args = ["-m", "robotization_bench.mcp_server", "--submission", "/logs/artifacts/submission.json", "--log", "/logs/agent/cell-episode.json"]
+command = "python3"
+args = ["-m", "robotization_bench.mcp_proxy", "--socket", "/run/bench/bench.sock"]
