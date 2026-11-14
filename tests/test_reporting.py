@@ -1,14 +1,18 @@
 from dataclasses import asdict, dataclass, replace
 import hashlib
 import http.client
+import importlib.util
 import json
+import os
 from pathlib import Path
 import re
 import runpy
 import socket
+import struct
 import subprocess
 import sys
 import threading
+import time
 import types
 import urllib.request
 
@@ -635,8 +639,17 @@ def _build_duck_quarter_fixture(
 
 
 def test_export_quarter_pack_duck_typed_12_weeks_and_world_tiers(tmp_path, monkeypatch):
-    # Confirm reporting.py has zero top-level dependency on robotization_bench.quarterly
-    assert "robotization_bench.quarterly" not in sys.modules
+    # Confirm reporting.py has zero top-level dependency on robotization_bench.quarterly in a clean process
+    subprocess.run(
+        [
+            sys.executable,
+            "-c",
+            "import sys, robotization_bench.reporting; assert 'robotization_bench.quarterly' not in sys.modules",
+        ],
+        check=True,
+        env={**os.environ, "PYTHONPATH": str(ROOT / "src"), "PYTHONDONTWRITEBYTECODE": "1"},
+        timeout=15,
+    )
 
     base_world = load_world()
     days = tuple(generate(base_world, s) for s in base_world["development_seeds"])
@@ -705,7 +718,7 @@ def test_export_quarter_pack_duck_typed_12_weeks_and_world_tiers(tmp_path, monke
     assert qm_lazy["world_id"] == "cell-quarterly-v2"
 
     # Tier 3: Fallback to base world when quarterly module is not installed
-    monkeypatch.delitem(sys.modules, "robotization_bench.quarterly", raising=False)
+    monkeypatch.setitem(sys.modules, "robotization_bench.quarterly", None)
     q_plan_manual, q_report_manual = _build_duck_quarter_fixture(
         base_world, seed=47, automated=False, attach_explicit_week_world=False
     )
@@ -757,7 +770,11 @@ def test_export_3d_pack_cli_v1_custom_seed_and_dynamic_quarterly(tmp_path, monke
     assert index["replay_format"] == "robotization-bench.replay.v1"
     assert index["seeds"] == [11, 999]
     assert index["evaluation_seeds"] == [11, 29, 47]
-    assert index["quarterly_available"] is False
+    expected_q = (
+        "quarterly" in load_world()
+        and importlib.util.find_spec("robotization_bench.quarterly") is not None
+    )
+    assert index["quarterly_available"] is expected_q
 
     runs_by_id = {r["id"]: r for r in index["runs"]}
     for seed in (11, 999):
@@ -773,6 +790,13 @@ def test_export_3d_pack_cli_v1_custom_seed_and_dynamic_quarterly(tmp_path, monke
             assert validate_shift_bundle(b_dir)["ok"] is True
             m = json.loads((b_dir / "manifest.json").read_text(encoding="utf-8"))
             assert len(m["plan"]["workers"]) == expected_workers
+
+        if expected_q:
+            for q_strat in ("manual", "reference"):
+                q_rid = f"quarterly-{q_strat}-seed{seed}"
+                assert q_rid in runs_by_id
+                assert validate_quarter_pack(pack_dir / q_rid, expected_weeks=12)["ok"] is True
+            assert runs_by_id[f"quarterly-reference-seed{seed}"]["evaluation"]["win"] is True
 
         # Identical scenario across all 3 v1 bundles on the same seed (368bf27:108, 450)
         s_man = json.loads((pack_dir / f"v1-manual-seed{seed}/manifest.json").read_text())["scenario"]
@@ -856,7 +880,39 @@ def test_export_3d_pack_cli_v1_custom_seed_and_dynamic_quarterly(tmp_path, monke
         _, q_rep = _build_duck_quarter_fixture(
             w, seed=seed, automated=automated, attach_explicit_week_world=False, trace=trace
         )
-        return q_rep
+        fixed_weeks = []
+        tot_c = 0
+        tot_l = 0
+        for idx, (wp, wr) in enumerate(zip(q_plan.weeks, q_rep.weeks)):
+            sp = wp.to_shift_plan()
+            eff_w = _make_week_world(
+                w, idx, commissioning=(wp.robot and idx < 2), wear=wr.wear_start, maintenance=wp.maintenance
+            )
+            raw_w = simulate(eff_w, sp, wr.scenario, trace=trace)
+            se = calculate(eff_w, sp, raw_w)
+            we_costs = dict(wr.week_economy.costs)
+            we_costs.update(
+                depreciation=se.costs["depreciation"] * 5,
+                service=3500 if wp.robot else 0,
+                maintenance=4500 if wp.maintenance else 0,
+                shifts=se.costs["shifts"] * 5,
+                overtime=se.costs["overtime"],
+                trays=se.costs["trays"],
+                materials=se.costs["materials"],
+                rework=se.costs["rework"],
+                late=se.costs["late"],
+                escaped=se.costs["escaped"],
+            )
+            we = Economy(purchase=se.purchase, costs=we_costs, total=sum(we_costs.values()))
+            tot_c += we.total
+            tot_l += raw_w.labor_ticks
+            fixed_weeks.append(
+                replace(wr, shift_plan=sp, raw=raw_w, shift_economy=se, week_economy=we)
+            )
+        has_r = any(wp.robot for wp in q_plan.weeks)
+        has_t = any(wp.trays for wp in q_plan.weeks)
+        pur = (w["money"]["robot_purchase"] if has_r else 0) + (w["money"]["tray_purchase"] if has_t else 0)
+        return _DuckQuarterReport(2, seed, pur, tot_c, tot_l, tuple(fixed_weeks))
 
     def fake_evaluate_quarterly(_w, val, _seeds):
         is_auto = any(wk.get("robot") for wk in val["weeks"])
@@ -882,13 +938,15 @@ def test_export_3d_pack_cli_v1_custom_seed_and_dynamic_quarterly(tmp_path, monke
     monkeypatch.setattr(grading_mod, "evaluate_quarterly", fake_evaluate_quarterly, raising=False)
 
     # 3a. Pre-M3 path (QuarterlyEpisode absent -> graceful phased template fallback)
-    pack_pre_m3 = tmp_path / "pack_q_pre_m3"
-    rc_pre = main_fn(["--out", str(pack_pre_m3), "--seed", "11"])
-    assert rc_pre == 0
-    idx_pre = json.loads((pack_pre_m3 / "index.json").read_text(encoding="utf-8"))
-    assert idx_pre["quarterly_available"] is True
-    assert validate_quarter_pack(pack_pre_m3 / "quarterly-manual-seed11", expected_weeks=12)["ok"] is True
-    assert validate_quarter_pack(pack_pre_m3 / "quarterly-reference-seed11", expected_weeks=12)["ok"] is True
+    with monkeypatch.context() as mp:
+        mp.delattr(episode_mod, "QuarterlyEpisode", raising=False)
+        pack_pre_m3 = tmp_path / "pack_q_pre_m3"
+        rc_pre = main_fn(["--out", str(pack_pre_m3), "--seed", "11"])
+        assert rc_pre == 0
+        idx_pre = json.loads((pack_pre_m3 / "index.json").read_text(encoding="utf-8"))
+        assert idx_pre["quarterly_available"] is True
+        assert validate_quarter_pack(pack_pre_m3 / "quarterly-manual-seed11", expected_weeks=12)["ok"] is True
+        assert validate_quarter_pack(pack_pre_m3 / "quarterly-reference-seed11", expected_weeks=12)["ok"] is True
 
     # 3b. Post-M3 path (QuarterlyEpisode + polymorphic reference.solve returning schema_version == 2)
     class FakeQuarterlyEpisode:
@@ -1141,29 +1199,42 @@ def test_musa_handoff_doc_recovers_368bf27_verbatim_and_documents_bridge():
     handoff_path = ROOT / "docs" / "ru" / "3D_HANDOFF_MUSA.md"
     assert handoff_path.is_file(), f"Missing {handoff_path}"
 
-    git_proc = subprocess.run(
-        ["git", "-C", str(ROOT), "show", "368bf27:docs/PROMPT_3D_INTEGRATION_RU.md"],
-        capture_output=True,
-        check=True,
-        timeout=10,
-    )
-    raw_bytes = git_proc.stdout
-    assert len(raw_bytes) == 64_169
+    handoff_bytes = handoff_path.read_bytes()
+    assert len(handoff_bytes) > 64_169
+    suffix_bytes = handoff_bytes[-64_169:]
+    assert len(suffix_bytes) == 64_169
     assert (
-        hashlib.sha256(raw_bytes).hexdigest()
+        hashlib.sha256(suffix_bytes).hexdigest()
         == "3ea0716cfb4218f1e06d3ba8f1bed655dda420aa9735725132c9ae82013bbf49"
     )
-    original_text = raw_bytes.decode("utf-8")
+    original_text = suffix_bytes.decode("utf-8")
     assert len(original_text.splitlines()) == 466
 
-    handoff_text = handoff_path.read_text(encoding="utf-8")
-    assert original_text in handoff_text
-    assert "\n---\n" in handoff_text
+    if (ROOT / ".git").exists():
+        has_commit = subprocess.run(
+            ["git", "-C", str(ROOT), "cat-file", "-e", "368bf27^{commit}"],
+            capture_output=True,
+            timeout=10,
+        )
+        if has_commit.returncode == 0:
+            git_proc = subprocess.run(
+                ["git", "-C", str(ROOT), "show", "368bf27:docs/PROMPT_3D_INTEGRATION_RU.md"],
+                capture_output=True,
+                check=True,
+                timeout=10,
+            )
+            assert git_proc.stdout == suffix_bytes
 
-    guide_prefix = handoff_text.split(original_text, 1)[0]
+    handoff_text = handoff_bytes.decode("utf-8")
+    assert handoff_text.endswith(original_text)
+    guide_prefix = handoff_bytes[:-64_169].decode("utf-8")
+    assert "\n---\n" in guide_prefix
     for required_snippet in (
         "scripts/export_3d_pack.py",
         "scripts/serve_3d.py",
+        "--extra-plan",
+        "frontier-gemini-4-carbon",
+        "post-rl-qwen2.5-7b",
         "http://127.0.0.1:8765/index.json",
         "v1-manual-seed11",
         "v1-candidate-seed11",
@@ -1171,6 +1242,8 @@ def test_musa_handoff_doc_recovers_368bf27_verbatim_and_documents_bridge():
         "quarterly-manual-seed11",
         "quarterly-reference-seed11",
         "quarter_manifest.json",
+        "diagnostics",
+        "diagnostics.md",
         "weeks/week-00",
         "week-11",
     ):
@@ -1663,6 +1736,8 @@ def test_validate_quarter_pack_reconciles_totals_plan_monotonicity_and_orphan_en
         dst = tmp_path / f"mut_{tag}"
         (dst / "weeks").mkdir(parents=True)
         (dst / "quarter_manifest.json").write_bytes((clean_dir / "quarter_manifest.json").read_bytes())
+        if (clean_dir / "diagnostics.md").is_file():
+            (dst / "diagnostics.md").write_bytes((clean_dir / "diagnostics.md").read_bytes())
         for w in range(12):
             src_w = clean_dir / "weeks" / f"week-{w:02d}"
             dst_w = dst / "weeks" / f"week-{w:02d}"
@@ -1875,3 +1950,681 @@ def test_serve_3d_hardens_latin1_range_malformed_ipv6_options_origin_large_post_
     captured = capsys.readouterr()
     assert "Traceback" not in captured.err
     assert "ValueError" not in captured.err
+
+
+def test_serve_3d_bounded_digits_single_crlf_http09_blank_line_disconnect_and_monotonic_drain(tmp_path):
+    serve_script = ROOT / "scripts" / "serve_3d.py"
+    pack_dir = tmp_path / "iter3_pack"
+    pack_dir.mkdir()
+    index_bytes = b'{"ok":true,"secret":"NO_LEAK_09"}\n'
+    (pack_dir / "index.json").write_bytes(index_bytes)
+
+    serve_mod = runpy.run_path(str(serve_script))
+    handler_cls = serve_mod["PackRequestHandler"]
+    assert getattr(handler_cls, "timeout", None) == 5.0
+
+    with subprocess.Popen(
+        [
+            sys.executable,
+            str(serve_script),
+            "--dir",
+            str(pack_dir),
+            "--host",
+            "127.0.0.1",
+            "--port",
+            "0",
+        ],
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+    ) as proc:
+        try:
+            assert proc.stdout is not None
+            banner = proc.stdout.readline().decode("utf-8").strip()
+            host, port_s = banner.split("http://", 1)[1].rstrip("/").split(":")
+            port = int(port_s)
+
+            # 1. >4300-digit ASCII integers in Range & Content-Length -> zero ValueError, valid HTTP + CORS
+            huge_nines = b"9" * 5000
+            huge_zeros = b"0" * 5000
+            for raw_range, expected_status in (
+                (b"bytes=" + huge_nines + b"-", "HTTP/1.1 416"),
+                (b"bytes=0-" + huge_nines, "HTTP/1.1 206"),
+                (b"bytes=-" + huge_nines, "HTTP/1.1 206"),
+                (b"bytes=-" + huge_zeros, "HTTP/1.1 416"),
+                (b"bytes=" + huge_zeros + b"-", "HTTP/1.1 206"),
+            ):
+                resp = _raw_tcp_exchange(
+                    host,
+                    port,
+                    b"GET /index.json HTTP/1.1\r\nHost: 127.0.0.1\r\nRange: " + raw_range + b"\r\n\r\n",
+                )
+                st_line, hdrs, _ = _parse_raw_http_response(resp)
+                assert st_line.startswith(expected_status), f"{raw_range[:24]!r} -> {st_line!r}"
+                _assert_common_cors_headers(hdrs)
+
+            resp_cl = _raw_tcp_exchange(
+                host,
+                port,
+                b"POST /index.json HTTP/1.1\r\nHost: 127.0.0.1\r\nContent-Length: " + huge_nines + b"\r\n\r\n",
+            )
+            st_cl, hdr_cl, _ = _parse_raw_http_response(resp_cl)
+            assert st_cl.startswith("HTTP/1.1 405")
+            _assert_common_cors_headers(hdr_cl)
+
+            # 2. Single-CRLF HTTP/0.9 (without 2nd CRLF or half-close!) & blank request lines -> < 0.25s 400 + CORS
+            for fast_bad in (
+                b"GET /index.json\r\n",
+                b"GARBAGE\r\n",
+                b"\r\n\r\n",
+                b"   \r\n\r\n",
+            ):
+                t0 = time.monotonic()
+                resp_bad = _raw_tcp_exchange(host, port, fast_bad, timeout=1.0)
+                dt = time.monotonic() - t0
+                assert dt < 0.25, f"{fast_bad!r} took {dt:.3f}s"
+                st_bad, hdr_bad, body_bad = _parse_raw_http_response(resp_bad)
+                assert st_bad.startswith("HTTP/1.1 400"), f"{fast_bad!r} -> {st_bad!r}"
+                _assert_common_cors_headers(hdr_bad)
+                assert {k.lower(): v for k, v in hdr_bad.items()}.get("connection") == "close"
+                assert b"NO_LEAK_09" not in body_bad
+
+            # 3. 200 KB oversized URI -> clean 414 + CORS + no-store + clean EOF (zero ConnectionResetError)
+            uri_200k = b"GET /" + (b"a" * 200_000) + b" HTTP/1.1\r\nHost: 127.0.0.1\r\n\r\n"
+            resp_414 = _raw_tcp_exchange(host, port, uri_200k, timeout=3.0)
+            st_414, hdr_414, _ = _parse_raw_http_response(resp_414)
+            assert st_414.startswith("HTTP/1.1 414"), st_414
+            _assert_common_cors_headers(hdr_414)
+
+            # 4. Abrupt client FIN and SO_LINGER(1, 0) RST mid-POST -> zero tracebacks on stderr
+            with socket.create_connection((host, port), timeout=2.0) as s_fin:
+                s_fin.sendall(
+                    b"POST /index.json HTTP/1.1\r\nHost: 127.0.0.1\r\nContent-Length: 100000\r\n\r\n"
+                    + b"x" * 1024
+                )
+            with socket.create_connection((host, port), timeout=2.0) as s_rst:
+                s_rst.setsockopt(socket.SOL_SOCKET, socket.SO_LINGER, struct.pack("ii", 1, 0))
+                s_rst.sendall(
+                    b"POST /index.json HTTP/1.1\r\nHost: 127.0.0.1\r\nContent-Length: 100000\r\n\r\n"
+                    + b"y" * 1024
+                )
+
+            # 5. Monotonic wall-clock cap on trickle POST (1 byte every 0.2s) & instant skip on >2MiB lie
+            t_lie = time.monotonic()
+            resp_lie = _raw_tcp_exchange(
+                host,
+                port,
+                b"POST /index.json HTTP/1.1\r\nHost: 127.0.0.1\r\nContent-Length: 10737418240\r\n\r\n",
+                timeout=2.0,
+            )
+            dt_lie = time.monotonic() - t_lie
+            assert dt_lie < 0.25, f"10 GiB Content-Length lie took {dt_lie:.3f}s"
+            st_lie, hdr_lie, _ = _parse_raw_http_response(resp_lie)
+            assert st_lie.startswith("HTTP/1.1 405")
+            _assert_common_cors_headers(hdr_lie)
+
+            t_trickle = time.monotonic()
+            with socket.create_connection((host, port), timeout=2.0) as s_tr:
+                s_tr.sendall(
+                    b"POST /index.json HTTP/1.1\r\nHost: 127.0.0.1\r\nContent-Length: 100000\r\n\r\n"
+                )
+                for _ in range(4):
+                    time.sleep(0.2)
+                    try:
+                        s_tr.sendall(b"z")
+                    except OSError:
+                        break
+                chunks = []
+                while True:
+                    try:
+                        ch = s_tr.recv(4096)
+                    except OSError:
+                        break
+                    if not ch:
+                        break
+                    chunks.append(ch)
+            dt_trickle = time.monotonic() - t_trickle
+            assert dt_trickle < 0.95, f"Trickle POST exceeded monotonic 0.5s deadline ({dt_trickle:.3f}s)"
+            st_tr, hdr_tr, _ = _parse_raw_http_response(b"".join(chunks))
+            assert st_tr.startswith("HTTP/1.1 405")
+            _assert_common_cors_headers(hdr_tr)
+
+            time.sleep(0.15)
+            proc.terminate()
+            proc.wait(timeout=5)
+            assert proc.stderr is not None
+            stderr_text = proc.stderr.read().decode("utf-8", errors="replace")
+            assert "Traceback (most recent call last):" not in stderr_text, stderr_text
+            assert "ValueError" not in stderr_text, stderr_text
+        finally:
+            if proc.poll() is None:
+                proc.kill()
+                proc.wait(timeout=5)
+
+
+def test_compare_coerces_dict_string_metrics_blocking_pipe_injection():
+    valid_numeric_strings = {
+        "valid": True,
+        "feasible": True,
+        "win": True,
+        "reward_num": 2,
+        "reward_den": 5,
+        "metrics": {
+            "purchase": "1530000",
+            "total_cost": "80000",
+            "base_cost": "100000",
+            "labor_ticks": "3000",
+            "base_labor_ticks": "4000",
+            "auto_finished": "120",
+            "pack_finished": "200",
+            "orders": "200",
+            "good": "200",
+            "on_time": "198",
+            "escaped": "0",
+            "scrap": "0",
+            "unfinished": "0",
+        },
+        "reasons": (),
+    }
+    rendered = compare({"str_digits_ok": valid_numeric_strings})
+    t1, t2 = rendered.split("\n\n")[:2]
+    for line in t1.splitlines():
+        assert _count_unescaped_gfm_pipes(line) == 10
+    for line in t2.splitlines():
+        assert _count_unescaped_gfm_pipes(line) == 8
+
+    for bad_field in ("labor_ticks", "auto_finished", "orders", "unfinished"):
+        injected = json.loads(json.dumps(valid_numeric_strings))
+        injected["metrics"][bad_field] = "250 | INJECTED_COL"
+        with pytest.raises(ValueError):
+            compare({"injected": injected})
+
+
+def test_quarter_diagnostics_all_five_categories_markdown_and_validator(tmp_path):
+    import robotization_bench.reporting as reporting_mod
+
+    assert hasattr(reporting_mod, "build_quarter_diagnostics")
+    assert hasattr(reporting_mod, "render_quarter_diagnostics_md")
+    build_diag = reporting_mod.build_quarter_diagnostics
+    render_diag_md = reporting_mod.render_quarter_diagnostics_md
+
+    expected_categories = {
+        "commissioning_jam_unassisted",
+        "route_all_unmaintained_wear",
+        "hiring_retraining_friction",
+        "sla_overtime_breach",
+        "backlog_carryover_surge",
+    }
+
+    world = load_world()
+    world["quarterly"] = {
+        "schema_version": 2,
+        "world_id": "cell-quarterly-v2",
+        "weeks": 12,
+        "carryover_cap": 80,
+        "threshold_bps": {
+            "good_each_week": 9000,
+            "good_pooled": 9500,
+            "on_time_pooled": 8800,
+            "escaped_each_week_max": 120,
+            "auto_pack_pooled_min": 3000,
+        },
+    }
+
+    # Build a 12-week rollout exhibiting all 5 genuine operational failure categories:
+    # - Week 0: robot=True, route="all", commissioning_active=True, NO Zone-3 worker -> jam deadlock + unfulfilled
+    # - Week 1: crew changed + hiring_retraining > 0, carryover_in > 0
+    # - Weeks 2..4: route="all", maintenance=False, rising wear (6 -> 9 on week 4)
+    # - Week 5: carryover_out == 80 (carryover_cap) + overtime_ticks + escaped defect
+    plan_weeks = []
+    report_weeks = []
+    total_cost = 0
+    total_labor = 0
+
+    for w in range(12):
+        if w == 0:
+            workers = ((1,), (2,), (4,))  # 0 Zone-3 workers!
+            route = "all"
+            maint = False
+        elif w == 1:
+            workers = ((1, 2), (2, 3), (3, 4), (4,))  # crew churn vs week 0
+            route = "bypass"
+            maint = False
+        elif w in (2, 3, 4):
+            workers = ((1, 2), (2, 3), (3, 4), (4,))
+            route = "all"
+            maint = False
+        else:
+            workers = ((1, 2), (2, 3), (3, 4), (4,))
+            route = "bypass"
+            maint = w == 7
+
+        wp = _DuckWeekPlan(robot=True, trays=False, route=route, maintenance=maint, workers=workers)
+        sp = wp.to_shift_plan()
+        commissioning = w < 2
+        wear_start = 6 if w == 4 else (3 if w == 3 else (0 if w < 3 else 4))
+        wear_end = 9 if w == 4 else (6 if w == 3 else (3 if w == 2 else 2))
+
+        eff_w = _make_week_world(world, w, commissioning=commissioning, wear=wear_start, maintenance=maint)
+        if w == 0:
+            eff_w["prob_bps"]["jam"]["bare"]["regular"] = 10_000  # guaranteed commissioning jam without Zone 3
+        elif w == 5:
+            eff_w["prob_bps"]["defect_auto"]["bare"]["regular"] = 10_000
+            eff_w["prob_bps"]["detect"] = 0  # guaranteed escaped defect
+
+        carry_in = 3 if w == 1 else (10 if w == 5 else 0)
+        orders = [Order(cid, "regular", 0, 0) for cid in range(carry_in)]
+        if w == 5:
+            # Overload shift to force overtime and carryover_out == 80 (carryover_cap)
+            orders.extend(Order(100 + idx, "oversize", 900 + (idx % 50), 955) for idx in range(95))
+        else:
+            orders.extend(Order(100 + idx, "regular", 5 * idx, 220 + 5 * idx) for idx in range(6))
+
+        scen = Scenario(1, 5000 + w, tuple(sorted(orders, key=lambda o: (o.arrival, o.id))))
+        raw = simulate(eff_w, sp, scen, trace=True)
+        shift_econ = calculate(eff_w, sp, raw)
+        carry_out = min(80, raw.unfinished) if w < 11 else 0
+        hiring_cost = 29_000 if w == 1 else 0
+        v2_costs = {
+            "depreciation": shift_econ.costs["depreciation"] * 5,
+            "service": 3_500,
+            "maintenance": 4_500 if maint else 0,
+            "shifts": shift_econ.costs["shifts"] * 5,
+            "cross_skill": 1_800,
+            "overtime": shift_econ.costs["overtime"] * 5,
+            "hiring_retraining": hiring_cost,
+            "trays": 0,
+            "materials": shift_econ.costs["materials"] * 5,
+            "rework": shift_econ.costs["rework"] * 5,
+            "late": shift_econ.costs["late"] * 5,
+            "backlog_holding": carry_out * 600,
+            "unfulfilled": shift_econ.costs["unfulfilled"] * 5 if w == 11 else 0,
+            "escaped": shift_econ.costs["escaped"] * 5,
+        }
+        week_econ = Economy(purchase=1_350_000, costs=v2_costs, total=sum(v2_costs.values()))
+        total_cost += week_econ.total
+        total_labor += raw.labor_ticks
+        plan_weeks.append(wp)
+        report_weeks.append(
+            _DuckWeekReport(
+                week=w,
+                label=f"wk_{w:02d}",
+                week_seed=scen.seed,
+                carryover_in=carry_in,
+                carryover_out=carry_out,
+                wear_start=wear_start,
+                wear_end=wear_end,
+                commissioning_active=commissioning,
+                shift_plan=sp,
+                scenario=scen,
+                raw=raw,
+                shift_economy=shift_econ,
+                week_economy=week_econ,
+                week_world=eff_w,
+            )
+        )
+
+    q_plan = _DuckQuarterlyPlan(2, tuple(plan_weeks))
+    q_report = _DuckQuarterReport(2, 11, 1_350_000, total_cost, total_labor, tuple(report_weeks))
+    eval_stub = Evaluation(False, False, False, 0, 1, {}, ("good_each_week", "escaped_each_week_max"))
+
+    diag = build_diag(world, q_report, q_plan, evaluation=eval_stub)
+    assert diag["diagnostics_version"] == 1
+    assert diag["seed"] == 11
+    assert diag["total_weeks"] == 12
+    assert set(diag["counts_by_category"].keys()) == expected_categories
+    for cat in expected_categories:
+        assert diag["counts_by_category"][cat] >= 1, f"Expected category {cat} > 0, got {diag['counts_by_category']}"
+    assert diag["total_issues"] == sum(diag["counts_by_category"].values())
+    assert diag["total_issues"] == diag["critical_issues"] + diag["warning_issues"]
+    assert diag["critical_issues"] >= 3
+    assert 0 in diag["critical_weeks"] and 4 in diag["critical_weeks"]
+    assert not _CYRILLIC_RE.search(json.dumps(diag, ensure_ascii=False))
+
+    md = render_diag_md(diag)
+    assert md.strip() != ""
+    assert not _CYRILLIC_RE.search(md)
+    assert "commissioning_jam_unassisted" in md or "Commissioning" in md
+
+    pack_dir = tmp_path / "diag_qpack"
+    export_quarter_pack(world, q_report, q_plan, pack_dir, evaluation=eval_stub)
+    assert (pack_dir / "diagnostics.md").is_file()
+    qm = json.loads((pack_dir / "quarter_manifest.json").read_text(encoding="utf-8"))
+    assert qm["diagnostics_file"] == "diagnostics.md"
+    assert qm["diagnostics"] == diag
+    assert validate_quarter_pack(pack_dir, expected_weeks=12)["ok"] is True
+
+    # Sacred v1 check: per-week manifest.json still has exact 7 keys!
+    for w in range(12):
+        wm = json.loads((pack_dir / f"weeks/week-{w:02d}/manifest.json").read_text(encoding="utf-8"))
+        assert set(wm.keys()) == {"replay_format", "world", "plan", "scenario", "raw", "economy", "events_file"}
+
+    # Validator rejects missing diagnostics.md, Cyrillic diagnostics.md, stray root file, tampered counts
+    def clone_diag_pack(name: str) -> Path:
+        dst = tmp_path / f"diag_mut_{name}"
+        (dst / "weeks").mkdir(parents=True)
+        (dst / "quarter_manifest.json").write_bytes((pack_dir / "quarter_manifest.json").read_bytes())
+        (dst / "diagnostics.md").write_bytes((pack_dir / "diagnostics.md").read_bytes())
+        for w in range(12):
+            src_w = pack_dir / "weeks" / f"week-{w:02d}"
+            dst_w = dst / "weeks" / f"week-{w:02d}"
+            dst_w.mkdir()
+            (dst_w / "manifest.json").write_bytes((src_w / "manifest.json").read_bytes())
+            (dst_w / "events.jsonl").write_bytes((src_w / "events.jsonl").read_bytes())
+        return dst
+
+    p_missing = clone_diag_pack("missing_md")
+    (p_missing / "diagnostics.md").unlink()
+    with pytest.raises(ValueError):
+        validate_quarter_pack(p_missing, expected_weeks=12)
+
+    p_empty = clone_diag_pack("empty_md")
+    (p_empty / "diagnostics.md").write_text("   \n", encoding="utf-8")
+    with pytest.raises(ValueError):
+        validate_quarter_pack(p_empty, expected_weeks=12)
+
+    p_cyr = clone_diag_pack("cyrillic_md")
+    (p_cyr / "diagnostics.md").write_text("# Ошибка\n", encoding="utf-8")
+    with pytest.raises(ValueError):
+        validate_quarter_pack(p_cyr, expected_weeks=12)
+
+    p_stray = clone_diag_pack("stray_root")
+    (p_stray / "unexpected.txt").write_text("stray\n", encoding="utf-8")
+    with pytest.raises(ValueError):
+        validate_quarter_pack(p_stray, expected_weeks=12)
+
+    p_tampered = clone_diag_pack("tampered_counts")
+    qm_bad = json.loads((p_tampered / "quarter_manifest.json").read_text(encoding="utf-8"))
+    qm_bad["diagnostics"]["total_issues"] += 1
+    (p_tampered / "quarter_manifest.json").write_text(json.dumps(qm_bad) + "\n", encoding="utf-8")
+    with pytest.raises(ValueError):
+        validate_quarter_pack(p_tampered, expected_weeks=12)
+
+
+def test_export_3d_pack_extra_plan_v1_and_v2_and_strict_validation(tmp_path, monkeypatch):
+    script_path = ROOT / "scripts" / "export_3d_pack.py"
+
+    # 1. Valid v1 --extra-plan via subprocess CLI
+    v1_plan_file = tmp_path / "extra_v1.json"
+    v1_plan_file.write_text((ROOT / "data/plans/candidate.json").read_text(encoding="utf-8"), encoding="utf-8")
+    out_v1 = tmp_path / "pack_extra_v1"
+    proc_v1 = subprocess.run(
+        [
+            sys.executable,
+            str(script_path),
+            "--out",
+            str(out_v1),
+            "--seed",
+            "11",
+            "--extra-plan",
+            f"custom-v1-model={v1_plan_file}",
+        ],
+        capture_output=True,
+        text=True,
+        timeout=30,
+    )
+    assert proc_v1.returncode == 0, proc_v1.stderr
+    idx_v1 = json.loads((out_v1 / "index.json").read_text(encoding="utf-8"))
+    extra_v1_run = next(r for r in idx_v1["runs"] if r["id"] == "custom-v1-model-seed11")
+    assert extra_v1_run["mode"] == "v1"
+    assert extra_v1_run["plan_name"] == "custom-v1-model"
+    assert extra_v1_run["extra_plan"] is True
+    assert extra_v1_run["feasible"] is True
+    assert extra_v1_run["win"] is True
+    assert extra_v1_run["reward_den"] > 0
+    assert extra_v1_run["total_cost"] > 0
+    assert validate_shift_bundle(out_v1 / "custom-v1-model-seed11")["ok"] is True
+    assert any("custom-v1-model-seed11" in (c["left"], c["right"]) for c in idx_v1["comparisons"])
+
+    # 2. Strict CLI validation errors -> exit code 2 & zero tracebacks
+    sym_plan = tmp_path / "sym_plan.json"
+    sym_plan.symlink_to(v1_plan_file)
+    big_plan = tmp_path / "oversized_plan.json"
+    big_plan.write_text('{"schema_version": 1, "pad": "' + ("x" * 70_000) + '"}\n', encoding="utf-8")
+    dup_key_plan = tmp_path / "dup_key.json"
+    dup_key_plan.write_text(
+        '{"schema_version": 1, "schema_version": 1, "robot": false, "trays": false, "route": "manual", "workers": [[1,2,3,4]]}\n',
+        encoding="utf-8",
+    )
+    nan_plan = tmp_path / "nan_plan.json"
+    nan_plan.write_text('{"schema_version": NaN}\n', encoding="utf-8")
+    bad_ver_plan = tmp_path / "bad_ver.json"
+    bad_ver_plan.write_text('{"schema_version": 99}\n', encoding="utf-8")
+    invalid_v1_plan = tmp_path / "invalid_v1.json"
+    invalid_v1_plan.write_text(
+        '{"schema_version": 1, "robot": false, "trays": false, "route": "all", "workers": [[1,2,3,4]]}\n',
+        encoding="utf-8",
+    )
+
+    bad_invocations = [
+        ["--extra-plan", "missing_equals"],
+        ["--extra-plan", f"={v1_plan_file}"],
+        ["--extra-plan", "empty_path="],
+        ["--extra-plan", f"../traversal={v1_plan_file}"],
+        ["--extra-plan", f"bad..dots={v1_plan_file}"],
+        ["--extra-plan", f"slash/slug={v1_plan_file}"],
+        ["--extra-plan", f"-leading-dash={v1_plan_file}"],
+        ["--extra-plan", f"v1-manual={v1_plan_file}"],
+        ["--extra-plan", f"Quarterly-Reference={v1_plan_file}"],
+        ["--extra-plan", f"Post-RL-7B={v1_plan_file}", "--extra-plan", f"post-rl-7b={v1_plan_file}"],
+        ["--extra-plan", f"sym={sym_plan}"],
+        ["--extra-plan", f"dir={tmp_path}"],
+        ["--extra-plan", f"big={big_plan}"],
+        ["--extra-plan", f"dup={dup_key_plan}"],
+        ["--extra-plan", f"nan={nan_plan}"],
+        ["--extra-plan", f"ver={bad_ver_plan}"],
+        ["--extra-plan", f"inv={invalid_v1_plan}"],
+    ]
+    for extra_flags in bad_invocations:
+        res_bad = subprocess.run(
+            [sys.executable, str(script_path), "--out", str(tmp_path / "never_ok"), "--seed", "11", *extra_flags],
+            capture_output=True,
+            text=True,
+            timeout=15,
+        )
+        assert res_bad.returncode == 2, f"Expected rc=2 for {extra_flags}, got {res_bad.returncode}"
+        assert "Traceback" not in res_bad.stderr, f"Unexpected traceback for {extra_flags}: {res_bad.stderr}"
+
+    # 3. Repeatable v2 --extra-plan (Frontier + Post-RL) & quarterly-unavailable guard
+    mod_ns = runpy.run_path(str(script_path))
+    main_fn = mod_ns["main"]
+
+    v2_frontier_file = tmp_path / "frontier_gemini.json"
+    v2_post_rl_file = tmp_path / "post_rl_qwen.json"
+    v2_frontier_payload = {
+        "schema_version": 2,
+        "weeks": [
+            {
+                "robot": True,
+                "trays": False,
+                "route": "all",
+                "maintenance": False,
+                "workers": [[1], [2], [3], [4]],
+            }
+            for _ in range(12)
+        ],
+    }
+    v2_post_rl_payload = {
+        "schema_version": 2,
+        "weeks": [
+            {
+                "robot": True,
+                "trays": True,
+                "route": "bypass",
+                "maintenance": (w in (4, 8)),
+                "workers": [[1, 2], [1, 2], [2, 3], [3, 4], [4]],
+            }
+            for w in range(12)
+        ],
+    }
+    v2_frontier_file.write_text(json.dumps(v2_frontier_payload) + "\n", encoding="utf-8")
+    v2_post_rl_file.write_text(json.dumps(v2_post_rl_payload) + "\n", encoding="utf-8")
+
+    # 3a. When quarterly is NOT available, schema_version=2 extra plan exits 2 cleanly
+    import robotization_bench.contracts as contracts_mod
+
+    base_world = load_world()
+    world_no_q = json.loads(json.dumps(base_world))
+    world_no_q.pop("quarterly", None)
+    with monkeypatch.context() as mp:
+        mp.setattr(contracts_mod, "load_world", lambda: json.loads(json.dumps(world_no_q)))
+        mp.setitem(sys.modules, "robotization_bench.quarterly", None)
+        with pytest.raises(SystemExit) as exc_no_q:
+            main_fn(
+                [
+                    "--out",
+                    str(tmp_path / "no_q_out"),
+                    "--seed",
+                    "11",
+                    "--extra-plan",
+                    f"frontier-gemini-4-carbon={v2_frontier_file}",
+                ]
+            )
+        assert exc_no_q.value.code == 2
+
+    # 3b. When quarterly IS available, both Frontier and Post-RL v2 extra plans export + validate + index!
+    world_q = json.loads(json.dumps(base_world))
+    world_q["quarterly"] = {"schema_version": 2, "world_id": "cell-quarterly-v2", "weeks": 12}
+    import robotization_bench.episode as episode_mod
+    import robotization_bench.grading as grading_mod
+    import robotization_bench.validation as validation_mod
+
+    def fake_parse_q(val, _w):
+        if type(val) is not dict or val.get("schema_version") != 2 or len(val.get("weeks", ())) != 12:
+            raise InvalidPlan("bad quarterly plan")
+        return _DuckQuarterlyPlan(
+            2,
+            tuple(
+                _DuckWeekPlan(
+                    bool(wk["robot"]),
+                    bool(wk["trays"]),
+                    wk["route"],
+                    bool(wk["maintenance"]),
+                    tuple(tuple(z) for z in wk["workers"]),
+                )
+                for wk in val["weeks"]
+            ),
+        )
+
+    def fake_manual_q(_w=None):
+        return {
+            "schema_version": 2,
+            "weeks": [
+                {"robot": False, "trays": False, "route": "manual", "maintenance": False, "workers": [[1], [2], [3], [3], [4], [2, 3]]}
+                for _ in range(12)
+            ],
+        }
+
+    def fake_sim_q(w, q_plan, seed, *, trace=False):
+        automated = any(wp.robot for wp in q_plan.weeks)
+        _, q_rep = _build_duck_quarter_fixture(
+            w, seed=seed, automated=automated, attach_explicit_week_world=False, trace=trace
+        )
+        # Ensure week_report shift_plan & maintenance match q_plan.weeks exactly!
+        fixed_weeks = []
+        tot_c = 0
+        tot_l = 0
+        for idx, (wp, wr) in enumerate(zip(q_plan.weeks, q_rep.weeks)):
+            sp = wp.to_shift_plan()
+            eff_w = _make_week_world(w, idx, commissioning=(wp.robot and idx < 2), wear=wr.wear_start, maintenance=wp.maintenance)
+            raw_w = simulate(eff_w, sp, wr.scenario, trace=trace)
+            se = calculate(eff_w, sp, raw_w)
+            we_costs = dict(wr.week_economy.costs)
+            we_costs.update(
+                depreciation=se.costs["depreciation"] * 5,
+                service=3500 if wp.robot else 0,
+                maintenance=4500 if wp.maintenance else 0,
+                shifts=se.costs["shifts"] * 5,
+                overtime=se.costs["overtime"],
+                trays=se.costs["trays"],
+                materials=se.costs["materials"],
+                rework=se.costs["rework"],
+                late=se.costs["late"],
+                escaped=se.costs["escaped"],
+            )
+            we = Economy(purchase=se.purchase, costs=we_costs, total=sum(we_costs.values()))
+            tot_c += we.total
+            tot_l += raw_w.labor_ticks
+            fixed_weeks.append(
+                replace(wr, shift_plan=sp, raw=raw_w, shift_economy=se, week_economy=we)
+            )
+        has_r = any(wp.robot for wp in q_plan.weeks)
+        has_t = any(wp.trays for wp in q_plan.weeks)
+        pur = (w["money"]["robot_purchase"] if has_r else 0) + (w["money"]["tray_purchase"] if has_t else 0)
+        return _DuckQuarterReport(2, seed, pur, tot_c, tot_l, tuple(fixed_weeks))
+
+    def fake_eval_q(_w, val, _seeds):
+        # Require >= 2 Zone-1 pickers + trays + bypass to win (verifies upgraded pre-M3 fallback_crews too!)
+        wks = val["weeks"]
+        dual_picker = all(sum(1 in z for z in wk["workers"]) >= 2 for wk in wks)
+        bypass_trays = all(wk["robot"] and wk["trays"] and wk["route"] == "bypass" for wk in wks)
+        is_win = dual_picker and bypass_trays
+        is_auto = any(wk["robot"] for wk in wks)
+        return Evaluation(
+            valid=True,
+            feasible=dual_picker or not is_auto,
+            win=is_win,
+            reward_num=2 if is_win else (1 if not is_auto else 1),
+            reward_den=5 if (is_win or not is_auto) else 20,
+            metrics={
+                "orders": 200,
+                "good": 200 if (dual_picker or not is_auto) else 150,
+                "on_time": 198,
+                "escaped": 0,
+                "scrap": 0,
+                "unfinished": 0,
+                "purchase": 1_530_000 if is_win else (1_350_000 if is_auto else 0),
+                "total_cost": 75_000 if is_win else 100_000,
+                "base_cost": 100_000,
+                "labor_ticks": 2800 if is_win else 4000,
+                "base_labor_ticks": 4000,
+                "auto_finished": 140 if is_auto else 0,
+                "pack_finished": 200,
+            },
+            reasons=() if is_win else (("good_each_week",) if is_auto else ("cost",)),
+        )
+
+    fake_q_mod = types.ModuleType("robotization_bench.quarterly")
+    fake_q_mod.manual_quarterly_value = fake_manual_q
+    fake_q_mod.build_week_world = _make_week_world
+    fake_q_mod.simulate_quarter = fake_sim_q
+
+    monkeypatch.setattr(contracts_mod, "load_world", lambda: json.loads(json.dumps(world_q)))
+    monkeypatch.setitem(sys.modules, "robotization_bench.quarterly", fake_q_mod)
+    monkeypatch.setattr(validation_mod, "parse_quarterly_plan", fake_parse_q, raising=False)
+    monkeypatch.setattr(grading_mod, "evaluate_quarterly", fake_eval_q, raising=False)
+    monkeypatch.delattr(episode_mod, "QuarterlyEpisode", raising=False)
+
+    out_v2 = tmp_path / "pack_extra_v2"
+    rc_v2 = main_fn(
+        [
+            "--out",
+            str(out_v2),
+            "--seed",
+            "11",
+            "--extra-plan",
+            f"frontier-gemini-4-carbon={v2_frontier_file}",
+            "--extra-plan",
+            f"post-rl-Qwen2.5-7B={v2_post_rl_file}",
+        ]
+    )
+    assert rc_v2 == 0
+    idx_v2 = json.loads((out_v2 / "index.json").read_text(encoding="utf-8"))
+    runs_v2 = {r["id"]: r for r in idx_v2["runs"]}
+
+    # Pre-M3 fallback reference achieved win=True with dual-picker crew!
+    assert runs_v2["quarterly-reference-seed11"]["evaluation"]["win"] is True
+    assert runs_v2["quarterly-manual-seed11"]["diagnostics_md"] == "quarterly-manual-seed11/diagnostics.md"
+    assert runs_v2["quarterly-reference-seed11"]["diagnostics_md"] == "quarterly-reference-seed11/diagnostics.md"
+
+    for slug, exp_win in (("frontier-gemini-4-carbon", False), ("post-rl-Qwen2.5-7B", True)):
+        rid = f"{slug}-seed11"
+        assert rid in runs_v2
+        r_entry = runs_v2[rid]
+        assert r_entry["mode"] == "quarterly"
+        assert r_entry["plan_name"] == slug
+        assert r_entry["extra_plan"] is True
+        assert r_entry["diagnostics_md"] == f"{rid}/diagnostics.md"
+        assert r_entry["win"] is exp_win
+        assert (out_v2 / rid / "diagnostics.md").is_file()
+        assert validate_quarter_pack(out_v2 / rid, expected_weeks=12)["ok"] is True
+        assert any(rid in (c["left"], c["right"]) for c in idx_v2["comparisons"])
