@@ -881,12 +881,18 @@ def eval_qwen_group(group_slug: str, lora_dir: Path | None) -> None:
     llm = LLM(
         model=vllm_model,
         tensor_parallel_size=1,
-        gpu_memory_utilization=float(os.environ.get("VLLM_GPU_MEM_UTIL", "0.32")),
-        max_model_len=4096,
+        gpu_memory_utilization=float(os.environ.get("VLLM_GPU_MEM_UTIL", "0.50")),
+        max_model_len=int(os.environ.get("VLLM_EVAL_MAX_MODEL_LEN", "16384")),
         dtype="bfloat16",
         trust_remote_code=True,
     )
-    sp = SamplingParams(n=1, temperature=0.2, top_p=0.95, max_tokens=2048, seed=4242)
+    sp = SamplingParams(
+        n=1,
+        temperature=0.2,
+        top_p=0.95,
+        max_tokens=int(os.environ.get("VLLM_EVAL_MAX_TOKENS", "8192")),
+        seed=4242,
+    )
     outputs = llm.generate(prompts, sp)
     del llm
     gc.collect()

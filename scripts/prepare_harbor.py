@@ -7,6 +7,7 @@ from pathlib import Path
 import shutil
 import subprocess
 import sys
+import tempfile
 
 ROOT = Path(__file__).resolve().parents[1]
 if str(ROOT / "src") not in sys.path:
@@ -162,14 +163,53 @@ def prepare(
     write_json(out / "tests/provenance.json", provenance)
 
 
+def check_materialized(out: Path, seeds_file: Path) -> None:
+    if not out.is_dir():
+        raise FileNotFoundError(f"Materialized Harbor task directory not found: {out}")
+    with tempfile.TemporaryDirectory(prefix="harbor_check_") as tmp:
+        fresh = Path(tmp) / "task"
+        prepare(fresh, seeds_file, overwrite=True, min_seeds=3)
+        actual_files = {
+            p.relative_to(out).as_posix()
+            for p in out.rglob("*")
+            if p.is_file() and "__pycache__" not in p.parts and not p.name.endswith((".pyc", ".pyo"))
+        }
+        expected_files = {p.relative_to(fresh).as_posix() for p in fresh.rglob("*") if p.is_file()}
+        if actual_files != expected_files:
+            missing = sorted(expected_files - actual_files)
+            extra = sorted(actual_files - expected_files)
+            raise ValueError(f"Harbor task file-set drift in {out}: missing={missing}, extra={extra}")
+        for rel in sorted(expected_files):
+            a_path = out / rel
+            e_path = fresh / rel
+            if rel == "tests/provenance.json":
+                a_doc = json.loads(a_path.read_text(encoding="utf-8"))
+                e_doc = json.loads(e_path.read_text(encoding="utf-8"))
+                for key in ("world_sha256", "schema_version", "harbor_checked_version"):
+                    if a_doc.get(key) != e_doc.get(key):
+                        raise ValueError(f"Harbor provenance drift on {key}: {a_doc.get(key)!r} != {e_doc.get(key)!r}")
+                continue
+            if a_path.read_bytes() != e_path.read_bytes():
+                raise ValueError(f"Harbor task content drift in {rel}")
+
+
 def main() -> None:
     ap = argparse.ArgumentParser(description=__doc__)
-    ap.add_argument("--out", type=Path, required=True, help="Target Harbor task directory")
-    ap.add_argument("--seeds-file", "--seeds", dest="seeds_file", type=Path, required=True)
+    ap.add_argument("--out", type=Path, default=None, help="Target Harbor task directory")
+    ap.add_argument("--seeds-file", "--seeds", dest="seeds_file", type=Path, default=None)
     ap.add_argument("--overwrite", action="store_true", help="Replace existing output directory if present")
     ap.add_argument("--min-seeds", type=int, default=None, help="Minimum distinct evaluation seeds required")
     ap.add_argument("--allow-short-seeds", action="store_true", help="Allow <3 seeds even on canonical task dir")
+    ap.add_argument("--check", action="store_true", help="Verify materialized Harbor task matches fresh build")
     args = ap.parse_args()
+    if args.check:
+        target_out = args.out if args.out is not None else (ROOT / "tasks" / "fulfillment-cell-bench")
+        target_seeds = args.seeds_file if args.seeds_file is not None else (ROOT / "evidence" / "replay_seeds.json")
+        check_materialized(target_out, target_seeds)
+        print(f"OK: {target_out} matches fresh Harbor bundle")
+        return
+    if args.out is None or args.seeds_file is None:
+        ap.error("the following arguments are required: --out, --seeds-file")
     prepare(
         args.out,
         args.seeds_file,
