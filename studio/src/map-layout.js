@@ -82,7 +82,7 @@ export function applyMapLayoutExpansion(environment){
   if(applied.has(environment))return applied.get(environment);
   environment.updateMatrixWorld(true);
   const floor=environment.getObjectByName('ENV_FLOOR_AND_GRID'),walls=environment.getObjectByName('ENV_WALLS_AND_DOCKS');
-  if(!floor||!walls)throw new Error('Не найдены архитектурные слои карты');
+  if(!floor||!walls)throw new Error('Missing architectural map layers');
   const nativeExpanded=isNativeExpandedMap(environment);
   const changes=[],geometry=[],ownedGeometry=[],ownedMaterials=[];
   const remember=o=>{changes.push({o,visible:o.visible,position:o.position.clone(),scale:o.scale.clone()});return o;};
@@ -127,7 +127,7 @@ export function applyMapLayoutExpansion(environment){
     for(let x=-17;x<=17;x++)line('MAP_CAD_GRID_X',x%5===0?.014:.006,17.70,x,0,x%5===0);
     for(let z=-8;z<=8;z++)line('MAP_CAD_GRID_Z',35.70,z%5===0?.014:.006,0,z,z%5===0);
   };
-  const material=name=>{const found=findMaterial(name);if(!found)throw new Error('Нет материала '+name);return found;};
+  const material=name=>{const found=findMaterial(name);if(!found)throw new Error('Missing material '+name);return found;};
   const addBox=(name,w,h,d,x,y,z,mat)=>{
     const g=new THREE.BoxGeometry(w,h,d),o=new THREE.Mesh(g,mat);ownedGeometry.push(g);
     o.name=name;o.position.set(x,y,z);o.castShadow=true;o.receiveShadow=true;patch.add(o);return o;
@@ -135,10 +135,10 @@ export function applyMapLayoutExpansion(environment){
   const removedAxis=[];
   if(!nativeExpanded){
     const wallMat=material('FlexSim / Cutaway wall'),darkMat=material('FlexSim / Graphite steel');
-    const slab=findFloorSlab(environment);if(!slab)throw new Error('Нет плиты Raised_concrete_slab');
+    const slab=findFloorSlab(environment);if(!slab)throw new Error('Missing Raised_concrete_slab');
     remember(slab);slab.scale.x*=36/28;
     const reveal=environment.getObjectByName('Lower_reveal')||environment.getObjectByName('Lower reveal');
-    if(!reveal)throw new Error('Нет плиты Lower_reveal');
+    if(!reveal)throw new Error('Missing Lower_reveal');
     remember(reveal);reveal.scale.x*=35.92/27.92;
     const rearNames=['Plinth_edge','Porcelain_wall_panels','Safety_ochre','Satin_zinc_steel'];
     for(const suffix of rearNames){
@@ -163,7 +163,7 @@ export function applyMapLayoutExpansion(environment){
     }
     for(const side of [-1,1]){
       const dock=environment.getObjectByName('DOCK_0'+(side<0?'1':'2'));
-      if(!dock)throw new Error('Нет дока');remember(dock);dock.position.x=side*MAP_LAYOUT.dockX;dock.position.z=MAP_LAYOUT.dockZ;
+      if(!dock)throw new Error('Missing dock');remember(dock);dock.position.x=side*MAP_LAYOUT.dockX;dock.position.z=MAP_LAYOUT.dockZ;
       // Continuous side walls close the former low-parapet gaps. Only the
       // sectional dock opening remains; the front facade is the open cutaway.
       for(const [lo,hi,height] of [[-8.85,3.35,MAP_LAYOUT.wallHeight],[6.95,8.85,MAP_LAYOUT.wallHeight]]){

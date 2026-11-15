@@ -1,169 +1,269 @@
-const ORDER_STATUS_LABELS = Object.freeze({
-  not_arrived: 'Ещё не поступил',
-  arrived: 'Поступил',
-  queue: 'В очереди',
-  processing: 'В работе',
-  finished_stage: 'Этап завершён',
-  good: 'Годен',
-  escaped: 'Выдан брак',
-  scrap: 'Списан',
-  unfinished: 'Не завершён',
+import {duration, number} from './format.js';
+
+export const strategyLabels = Object.freeze({
+  manual: 'Manual Baseline',
+  candidate: 'Candidate',
+  reference: 'Reference',
+  local: 'Local Run',
 });
 
-export function makeView(entry, state) {
-  const { replay } = entry;
-  const manifest = replay.manifest;
-  const tickSeconds = manifest.world.clock.tick_seconds;
-  const c = state.counters;
-  const totalOrders = manifest.raw.total;
+export const workerStates = Object.freeze({
+  idle: 'Idle',
+  walk: 'Walking',
+  carry_idle: 'Holding Order',
+  carry_walk: 'Carrying Order',
+  pickup: 'Picking Up',
+  place_down: 'Placing Down',
+  reach: 'Reaching',
+  prepare: 'Preparing',
+  pick: 'Picking',
+  pack: 'Packing',
+  inspect: 'Inspecting',
+  assist: 'Assisting Robot',
+  break: 'Break',
+  not_purchased: 'Not Purchased',
+  disabled: 'Disabled',
+  jammed: 'Jammed',
+  helper_walking: 'Helper En Route',
+  service: 'Servicing',
+  finished: 'Finished',
+});
 
+export const importantLabels = Object.freeze({
+  jam: 'Jam',
+  assist: 'Assist',
+  rework: 'Rework',
+  break: 'Break',
+  escaped: 'Escaped Defect',
+  scrap: 'Scrap',
+});
+
+export const costLabels = Object.freeze({
+  depreciation: 'Depreciation',
+  service: 'Robot Service',
+  shifts: 'Shift Wages',
+  overtime: 'Overtime',
+  trays: 'Trays',
+  materials: 'Materials',
+  rework: 'Rework',
+  late: 'Late Penalty',
+  unfulfilled: 'Scrap & Unfinished',
+  escaped: 'Escaped Defects',
+});
+
+export const queueLabels = Object.freeze({
+  Q1: 'Inbound',
+  Q2: 'To Pick',
+  Q3: 'To Pack',
+  Q4: 'To QC',
+  R: 'Rework',
+});
+
+export const stageLabels = Object.freeze({
+  1: 'Prep',
+  2: 'Pick',
+  3: 'Pack',
+  4: 'QC',
+});
+
+const routeLabels = {
+  manual: 'Manual Pack',
+  all: 'All via Robot',
+  bypass: 'Regular via Robot',
+};
+
+const orderStatuses = {
+  not_arrived: 'Not Arrived',
+  arrived: 'Arrived',
+  queue: 'Queued',
+  processing: 'In Progress',
+  finished_stage: 'Stage Done',
+  good: 'Good',
+  escaped: 'Escaped Defect',
+  scrap: 'Scrapped',
+  unfinished: 'Unfinished',
+};
+
+const orderKinds = {
+  regular: 'Regular',
+  fragile: 'Fragile',
+  oversize: 'Oversize',
+};
+
+const share = (numerator, denominator) => denominator > 0 ? numerator / denominator * 100 : null;
+const hours = (ticks, tickSeconds) => Number.isFinite(ticks) ? ticks * tickSeconds / 3600 : null;
+
+/** A read-only view of one replay prefix, with final results in a distinct scope. */
+export function makeView(entry, state) {
+  if (!entry?.replay || !state) return null;
+  const {replay} = entry, {manifest} = replay, {plan, raw, economy} = manifest;
+  const counters = state.counters;
   return {
+    run: {
+      id: entry.run?.id ?? replay.runId,
+      label: strategyLabels[entry.run?.strategy] ?? entry.run?.label ?? replay.runId,
+      strategy: entry.run?.strategy,
+      seed: manifest.scenario.seed,
+      mode: entry.quarter ? 'quarterly' : 'v1',
+      week: entry.week ?? 0,
+    },
     clock: {
-      tick: state.tick,
-      tickFloat: state.tickFloat ?? state.tick,
-      seconds: state.timeSeconds ?? (state.tickFloat ?? state.tick) * tickSeconds,
-      tickSeconds,
+      seconds: state.timeSeconds,
+      tick: state.tickFloat ?? state.tick,
+      tickSeconds: replay.tickSeconds,
       horizonTicks: replay.horizonTicks,
-      ended: Boolean(state.ended),
+      ended: state.ended,
     },
     current: {
-      good: c.good,
-      onTime: c.on_time,
-      escaped: c.escaped,
-      scrap: c.scrap,
-      unfinished: c.unfinished,
+      counters,
       arrived: state.arrivedCount,
       inSystem: state.inSystem,
       notArrived: state.notArrived,
-      packStarted: c.pack_started,
-      packFinished: c.pack_finished,
-      autoFinished: c.auto_finished,
-      traysUsed: c.trays_used,
-      reworkStarted: c.rework_started,
-      laborTicks: c.labor_ticks,
-      laborHours: (c.labor_ticks * tickSeconds) / 3600,
-      overtimeTicks: [...c.overtime_ticks],
-      onTimeShare: totalOrders > 0 ? (c.on_time / totalOrders) * 100 : null,
-      autoShare: c.pack_finished > 0 ? (c.auto_finished / c.pack_finished) * 100 : null,
+      good: counters.good,
+      onTime: counters.on_time,
+      escaped: counters.escaped,
+      scrap: counters.scrap,
+      packsFinished: counters.pack_finished,
+      autoFinished: counters.auto_finished,
+      laborHours: hours(counters.labor_ticks, replay.tickSeconds),
+      autoShare: share(counters.auto_finished, counters.pack_finished),
+      onTimeShare: share(counters.on_time, counters.total),
+      goodShare: share(counters.good, counters.total),
+      queues: state.queues,
+      resources: [...Object.values(state.workers), state.robot],
     },
     final: {
       scope: entry.quarter ? 'week' : 'shift',
-      raw: structuredClone(manifest.raw),
-      economy: structuredClone(manifest.economy),
+      raw,
+      economy,
+      laborHours: hours(raw.labor_ticks, replay.tickSeconds),
+      autoShare: share(raw.auto_finished, raw.pack_finished),
+      onTimeShare: share(raw.on_time, raw.total),
+      goodShare: share(raw.good, raw.total),
     },
-    quarter: entry.quarter
-      ? {
-          week: entry.week ?? 0,
-          weekCount: Array.isArray(entry.quarter.weeks) ? entry.quarter.weeks.length : 0,
-          totalCostCents: entry.quarter.total_cost,
-          purchaseCents: entry.quarter.purchase,
-          weekSummary: entry.weekSummary ? structuredClone(entry.weekSummary) : {},
-        }
-      : null,
+    plan: {
+      workers: plan.workers.length,
+      robot: plan.robot,
+      trays: plan.trays,
+      route: plan.route,
+      routeLabel: routeLabels[plan.route] ?? plan.route,
+      zones: plan.workers,
+      summary: [
+        `${plan.workers.length} workers`,
+        plan.robot ? 'Robot' : 'No Robot',
+        plan.trays ? 'Trays' : 'No Trays',
+        routeLabels[plan.route] ?? plan.route,
+      ],
+    },
+    evaluation: entry.evaluation ?? null,
+    evaluationSeeds: entry.evaluationSeeds ?? [],
+    quarter: entry.quarter ? {
+      totalCostCents: entry.quarter.total_cost,
+      purchaseCents: entry.quarter.purchase,
+      weekSummary: entry.weekSummary,
+      weeksCount: entry.quarter.weeks.length,
+    } : null,
   };
 }
 
-export function inspectEntity(entry, state, target) {
-  if (!target || !entry || !state) return null;
-  const normalized =
-    typeof target === 'string'
-      ? target === 'robot'
-        ? { type: 'robot', id: 'robot' }
-        : null
-      : { type: target.type, id: target.id };
-  if (!normalized) return null;
+function normalizeEntity(entity) {
+  if (entity && typeof entity === 'object') return {type: entity.type ?? entity.kind, id: entity.id ?? entity.orderId};
+  if (typeof entity === 'number') return {type: 'order', id: entity};
+  if (entity === 'robot') return {type: 'robot', id: 'robot'};
+  if (/^w\d+$/.test(entity)) return {type: 'worker', id: entity};
+  if (Object.hasOwn(queueLabels, entity)) return {type: 'queue', id: entity};
+  return null;
+}
 
-  const manifest = entry.replay.manifest;
-
-  if (normalized.type === 'order') {
-    const orderId = Number(normalized.id);
-    const order = state.orders?.[orderId] ?? state.orders?.[normalized.id];
-    if (!order) return null;
-    const status = ORDER_STATUS_LABELS[order.status] || String(order.status);
-    if (order.status === 'not_arrived') {
-      return {
-        type: 'order',
-        id: order.id,
-        title: `Заказ #${order.id}`,
-        status,
-        fields: [{ label: 'Сведения', value: 'Доступны после поступления' }],
-      };
+/** Inspector fields contain only state known at this prefix, never future outcomes. */
+export function inspectEntity(entry, state, entity) {
+  if (!entry?.replay || !state) return null;
+  const selection = normalizeEntity(entity);
+  if (!selection) return null;
+  const {type, id} = selection, tickSeconds = entry.replay.tickSeconds;
+  const at = `At ${duration(state.timeSeconds)}`;
+  if (type === 'worker') {
+    const worker = state.workers[id];
+    if (!worker) return null;
+    const fields = [
+      {label: 'Current Zone', value: stageLabels[worker.zone] ?? '—'},
+      {label: 'Assigned Zones', value: worker.zones.map(zone => `${zone} · ${stageLabels[zone]}`).join(', ')},
+      {label: 'Order', value: worker.orderId != null ? `#${worker.orderId}` : '—'},
+    ];
+    if (worker.activity) {
+      fields.push({
+        label: 'Window',
+        value: `${duration(worker.activity.startTick * tickSeconds)} → ${duration(worker.activity.endTick * tickSeconds)}`,
+      });
     }
     return {
-      type: 'order',
-      id: order.id,
-      title: `Заказ #${order.id}`,
-      status,
-      fields: [
-        { label: 'Тип', value: String(order.kind) },
-        { label: 'Этап', value: String(order.stage) },
-        { label: 'Попытка', value: String(order.attempt) },
-        { label: 'Очередь', value: order.queue || '—' },
-        { label: 'Ресурс', value: order.resource || '—' },
-        { label: 'Дедлайн', value: `тик ${order.due}` },
-      ],
+      title: `Worker ${id.toUpperCase()}`,
+      eyebrow: at,
+      status: workerStates[worker.state] ?? worker.state,
+      fields,
+      orders: worker.orderId != null ? [worker.orderId] : [],
     };
   }
-
-  if (normalized.type === 'queue') {
-    const queueId = String(normalized.id);
-    if (!Object.hasOwn(state.queues || {}, queueId)) return null;
-    const orders = [...state.queues[queueId]];
-    const capByQueue = {
-      Q2: manifest.world.capacity.pick,
-      Q3: manifest.world.capacity.pack,
-      Q4: manifest.world.capacity.qc,
-    };
-    const cap = state.capacity?.[queueId] ?? capByQueue[queueId] ?? null;
-    const reserved = state.reserved?.[queueId] ?? null;
-    return {
-      type: 'queue',
-      id: queueId,
-      title: `Очередь ${queueId}`,
-      status: orders.length > 0 ? `${orders.length} в очереди` : 'Пусто',
-      orders,
-      fields: [
-        { label: 'Ожидают', value: String(orders.length) },
-        { label: 'Бронь', value: reserved !== null ? String(reserved) : '—' },
-        { label: 'Вместимость', value: cap !== null ? `${cap} мест` : '∞' },
-      ],
-    };
-  }
-
-  if (normalized.type === 'worker') {
-    const workerId = String(normalized.id);
-    const worker = state.workers?.[workerId];
-    if (!worker) return null;
-    return {
-      type: 'worker',
-      id: workerId,
-      title: `Оператор ${workerId.toUpperCase()}`,
-      status: String(worker.state),
-      fields: [
-        { label: 'Состояние', value: String(worker.state) },
-        { label: 'Текущая зона', value: `Зона ${worker.zone}` },
-        { label: 'Разрешённые зоны', value: worker.zones.join(', ') },
-        { label: 'Заказ', value: worker.orderId != null ? `#${worker.orderId}` : '—' },
-      ],
-    };
-  }
-
-  if (normalized.type === 'robot') {
+  if (type === 'robot') {
     const robot = state.robot;
-    if (!robot) return null;
+    const fields = [
+      {label: 'Route', value: routeLabels[entry.replay.manifest.plan.route] ?? '—'},
+      {label: 'Order', value: robot.orderId != null ? `#${robot.orderId}` : '—'},
+      {label: 'Helper', value: robot.helperId?.toUpperCase() ?? '—'},
+    ];
+    if (robot.jamTick != null) fields.push({label: 'Jam Time', value: duration(robot.jamTick * tickSeconds)});
+    if (robot.assistEndTick != null) fields.push({label: 'Assist Until', value: duration(robot.assistEndTick * tickSeconds)});
     return {
-      type: 'robot',
-      id: 'robot',
-      title: 'Упаковочный робот',
-      status: String(robot.state),
-      fields: [
-        { label: 'Состояние', value: String(robot.state) },
-        { label: 'Маршрут', value: String(manifest.plan.route) },
-        { label: 'Лотки', value: manifest.plan.trays ? 'Да' : 'Нет' },
-        { label: 'Заказ', value: robot.orderId != null ? `#${robot.orderId}` : '—' },
-      ],
+      title: 'Packing Robot',
+      eyebrow: at,
+      status: workerStates[robot.state] ?? robot.state,
+      fields,
+      orders: robot.orderId != null ? [robot.orderId] : [],
     };
   }
-
+  if (type === 'queue') {
+    const orders = state.queues[id];
+    if (!orders) return null;
+    const capacity = state.capacity[id];
+    return {
+      title: `${id} · ${queueLabels[id] ?? id}`,
+      eyebrow: at,
+      status: `${orders.length} queued`,
+      fields: [
+        {label: 'Waiting', value: number(orders.length)},
+        {label: 'Reserved', value: state.reserved[id] != null ? number(state.reserved[id]) : 'N/A'},
+        {label: 'Capacity', value: capacity != null ? `${capacity} slots` : 'Unbounded'},
+      ],
+      orders: [...orders],
+    };
+  }
+  if (type === 'order') {
+    const order = state.orders[id];
+    if (!order) return null;
+    if (order.status === 'not_arrived') {
+      return {
+        title: `Order #${order.id}`,
+        eyebrow: at,
+        status: orderStatuses.not_arrived,
+        fields: [{label: 'Details', value: 'Available after arrival'}],
+      };
+    }
+    const fields = [
+      {label: 'Type', value: orderKinds[order.kind] ?? order.kind},
+      {label: 'Arrival', value: duration(order.arrival * tickSeconds)},
+      {label: 'Due', value: duration(order.due * tickSeconds)},
+      {label: 'Stage', value: stageLabels[order.stage] ?? '—'},
+      {label: 'Queue', value: order.queue ? `${order.queue} · ${queueLabels[order.queue]}` : '—'},
+      {label: 'Resource', value: order.resource === 'robot' ? 'Robot' : order.resource?.toUpperCase() ?? '—'},
+      {label: 'Attempt', value: order.attempt === 1 ? 'Rework' : 'First'},
+    ];
+    if (order.outcomeTick != null) fields.push({label: 'Completed', value: duration(order.outcomeTick * tickSeconds)});
+    return {
+      title: `Order #${order.id}`,
+      eyebrow: at,
+      status: orderStatuses[order.status] ?? order.status,
+      fields,
+    };
+  }
   return null;
 }

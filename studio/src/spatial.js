@@ -83,7 +83,7 @@ function rect(name,minX,maxX,minZ,maxZ){return {name,minX,maxX,minZ,maxZ};}
 export function stageSlotTransform(bindings=DEFAULT_VISUAL_BINDINGS,stage,index=0) {
   const s=Number(stage),table=STAGE_SLOTS[s];
   const entry=(bindings?.stages||DEFAULT_VISUAL_BINDINGS.stages).find(x=>x.stage===s);
-  if(!table||!entry)throw new Error('Нет пространственной привязки этапа '+stage);
+  if(!table||!entry)throw new Error('Missing spatial binding for stage '+stage);
   if(!Number.isInteger(index)||index<0||index>=table.length)throw new RangeError('Invalid parallel slot '+index);
   const spec=table[index],tableY=entry.table_height_m??.86;
   let bx=spec.bx,bz=spec.bz;
@@ -304,7 +304,7 @@ export function gridPath(from,to,obstacles=DEFAULT_OBSTACLES) {
       }
       if(best)return best;
     }
-    throw new Error('Нет свободного подхода к точке '+p.map(v=>v.toFixed(2)).join(', '));
+    throw new Error('No unobstructed approach to point '+p.map(v=>v.toFixed(2)).join(', '));
   }
   const start=nodeFor(from),goal=nodeFor(to),key=(x,z)=>z*nx+x;
   const startKey=key(start.x,start.z),goalKey=key(goal.x,goal.z);
@@ -320,7 +320,7 @@ export function gridPath(from,to,obstacles=DEFAULT_OBSTACLES) {
       costs[id]=g;parents[id]=p.id;heap.push({id,x,z,f:g+Math.hypot(goal.x-x,goal.z-z)});
     }
   }
-  if(!found)throw new Error('Не найден безопасный обход оборудования');
+  if(!found)throw new Error('No safe obstacle detour found');
   const points=[];for(let id=goalKey;id!==-1;id=parents[id])points.push(point(id%nx,Math.floor(id/nx)));
   points.reverse();points.unshift([...from]);points.push([...to]);
   const simple=[points[0]];let i=0;
@@ -518,19 +518,10 @@ const OPERATION_BY_STAGE=Object.freeze({1:'prepare',2:'pick',3:'pack',4:'inspect
 const QUEUE_VISIBLE_MAX=Object.freeze({Q1:18,Q2:12,Q3:10,Q4:8,R:18});
 
 function compilePolyline(rawPoints,fallbackYaw=0,startYaw=null,endYaw=null){
-  const raw=[];
+  const pts=[];
   for(const p of rawPoints){
     const c=cleanVec3(p);
-    if(!raw.length||dist3(raw.at(-1),c)>1e-6)raw.push(c);
-  }
-  const pts=[];
-  if(raw.length){
-    pts.push(raw[0]);
-    const endPt=raw.at(-1);
-    for(let i=1;i<raw.length-1;i++){
-      if(dist3(pts.at(-1),raw[i])>=.60&&dist3(raw[i],endPt)>=.60)pts.push(raw[i]);
-    }
-    if(raw.length>1)pts.push(endPt);
+    if(!pts.length||dist3(pts.at(-1),c)>1e-6)pts.push(c);
   }
   if(!pts.length)pts.push([0,0,0],[0,0,0]);
   else if(pts.length===1)pts.push([...pts[0]]);
@@ -563,13 +554,13 @@ function sampleCompiledPolyline(poly,u){
   const pos=[cleanNum(a[0]+(b[0]-a[0])*f),cleanNum(a[1]+(b[1]-a[1])*f),cleanNum(a[2]+(b[2]-a[2])*f)];
   let yaw=poly.segYaw[idx]??poly.fallbackYaw;
   for(let k=1;k<pts.length-1;k++){
-    const sk=poly.cum[k],rk=Math.min(.55,.49*poly.seg[k-1],.49*poly.seg[k]);
+    const sk=poly.cum[k],rk=Math.min(.25,.45*poly.seg[k-1],.45*poly.seg[k]);
     if(rk>1e-5&&Math.abs(target-sk)<rk){
       yaw=lerpAngle(poly.segYaw[k-1],poly.segYaw[k],smooth01((target-(sk-rk))/(2*rk)));
       break;
     }
   }
-  const endBlend=Math.min(1.20,.5*poly.totalLength);
+  const endBlend=Math.min(.28,.42*poly.totalLength);
   if(poly.startYaw!==null&&endBlend>1e-5&&target<endBlend){
     yaw=lerpAngle(poly.startYaw,yaw,smooth01(target/endBlend));
   }

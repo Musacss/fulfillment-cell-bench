@@ -108,7 +108,7 @@ function topCaptionGeometry(source,parent){
     if(!world.every(p=>p.y>=minCapY))continue;
     for(const point of world){point.applyMatrix4(inverseParent);points.push(point.x,point.y,point.z);normalValues.push(0,1,0);}
   }
-  if(!points.length)throw new Error('Не удалось выделить надпись ESCAPED / HOLD из пола v02');
+  if(!points.length)throw new Error('Failed to extract ESCAPED / HOLD floor caption');
   const result=new THREE.BufferGeometry();
   result.setAttribute('position',new THREE.Float32BufferAttribute(points,3));
   result.setAttribute('normal',new THREE.Float32BufferAttribute(normalValues,3));
@@ -134,7 +134,7 @@ function zoneCaptionGeometry(source,parent,zone){
     if(!ids.every(id=>new THREE.Vector3().fromBufferAttribute(n,id).applyMatrix3(normalMatrix).normalize().y>.98))continue;
     for(const point of points){point.applyMatrix4(inverse);values.push(point.x,point.y,point.z);normals.push(0,1,0);}
   }
-  if(!values.length)throw new Error('Не найдена подпись зоны '+zone.id);
+  if(!values.length)throw new Error('Missing zone caption '+zone.id);
   const result=new THREE.BufferGeometry();result.setAttribute('position',new THREE.Float32BufferAttribute(values,3));
   result.setAttribute('normal',new THREE.Float32BufferAttribute(normals,3));result.computeBoundingBox();
   const bounds=result.boundingBox,pos=result.getAttribute('position');
@@ -230,7 +230,7 @@ export function applyMapFloorFixes(environment,layout){
   if(applied.has(environment))return applied.get(environment);
   environment.updateMatrixWorld(true);
   const floor=environment.getObjectByName('ENV_FLOOR_AND_GRID');
-  if(!floor)throw new Error('Отсутствует слой ENV_FLOOR_AND_GRID');
+  if(!floor)throw new Error('Missing ENV_FLOOR_AND_GRID layer');
   if(isNativeExpandedMap(environment)){
     const changed=[],ownedMaterials=new Set(),ownedGeometry=new Set();
     const patch=new THREE.Group();patch.name='MAP_FLOOR_FIXES';
@@ -392,7 +392,7 @@ export function applyMapFloorFixes(environment,layout){
   const byMaterial=name=>original.find(o=>oneMaterial(o)?.name===name);
   const lane=original.find(o=>o.name==='WALKWAY_GREEN_5S');
   const oldWhite=byMaterial('Paper labels'),oldArrows=byMaterial('Warm white laminate'),oldAmber=byMaterial('Status amber'),oldBlue=byMaterial('Petrol powder coat');
-  if(!lane||!oldWhite||!oldArrows||!oldAmber||!oldBlue)throw new Error('В исходной карте v02 не найдены дорожка или её разметка');
+  if(!lane||!oldWhite||!oldArrows||!oldAmber||!oldBlue)throw new Error('Missing walkway or floor markings in map');
 
   const changed=[],ownedMaterials=new Set(),ownedGeometry=new Set();
   const patch=new THREE.Group();patch.name='MAP_FLOOR_FIXES';patch.userData.map_revision=REVISION;

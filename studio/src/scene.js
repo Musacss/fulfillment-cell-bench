@@ -4,10 +4,10 @@ import {OrbitControls} from 'three/addons/controls/OrbitControls.js';
 import {RoomEnvironment} from 'three/addons/environments/RoomEnvironment.js';
 import {
   createActorVisual,createOrderVisualPool,templateClone,hideEnvironmentReplayOrders,sampleWalkPath,
-} from '../../4_Horses_Environment_v02/visual/visual-integration.js';
+} from './visual/visual-integration.js';
 import {
   applyEnvironmentDefaults,setEnvironmentLayer,setRobotAndonState,suppressOverheadStructures,
-} from '../../4_Horses_Environment_v02/visual/environment-layers.js';
+} from './visual/environment-layers.js';
 import {
   actorPosition,benchPosition,stageSlotTransform,robotAssistYaw,queueStackPositions,outcomeStackPositions,scrapStationPositions,buildWorkerPresentationPlan,
 } from './spatial.js';
@@ -92,7 +92,7 @@ export async function createScenePlayer(canvas,{assetBase='/scene/',onStats=()=>
   const [environmentGLTF,layoutGLTF,templatesGLTF,workerGLTF,robotGLTF]=bundle.models;
   const bindings=bundle.bindings;
   let renderer;
-  try{renderer=new THREE.WebGLRenderer({canvas,antialias:true,alpha:false,powerPreference:'high-performance'});}
+  try{renderer=new THREE.WebGLRenderer({canvas,antialias:true,alpha:false,preserveDrawingBuffer:true,powerPreference:'high-performance'});}
   catch(error){bundle.refs--;throw new Error('WebGL unavailable: '+error.message);}
   renderer.setPixelRatio(Math.min(window.devicePixelRatio||1,1.8));
   renderer.outputColorSpace=THREE.SRGBColorSpace;renderer.toneMapping=THREE.AgXToneMapping;renderer.toneMappingExposure=1.05;
@@ -112,6 +112,7 @@ export async function createScenePlayer(canvas,{assetBase='/scene/',onStats=()=>
   const fill=new THREE.DirectionalLight('#dce8ff',1.05);fill.position.set(10,10,-8);scene.add(fill);
   const environment=environmentGLTF.scene.clone(true),layout=layoutGLTF.scene.clone(true);
   scene.add(environment,layout);hideEnvironmentReplayOrders(environment);applyEnvironmentDefaults(environment);
+  environment.traverse(o=>{if(/^Warehouse[_ ]?(wordmark|descriptor)$/i.test(o.name)||/wordmark|descriptor/i.test(o.geometry?.name||''))o.visible=false;});
   // The authored layout contains preview slot outlines. Runtime occupancy
   // replaces those marks, so their coincident faces must not remain visible.
   layout.traverse(o=>{if(/^VIS_QUEUE_Q[234]_OUTLINE_/.test(o.name))o.visible=false;});
@@ -141,7 +142,7 @@ export async function createScenePlayer(canvas,{assetBase='/scene/',onStats=()=>
   suppressOverheadStructures(layout);
   layout.updateMatrixWorld(true);
   for(const name of [...bindings.stages.flatMap(s=>[s.actor_anchor,s.order_anchor]),bindings.robot.actor_anchor,bindings.robot.order_anchor,bindings.robot.helper_anchor]){
-    if(!layout.getObjectByName(name))throw new Error('Missing anchor in visual_layout: '+name);
+    if(!layout.getObjectByName(name))throw new Error('Missing visual_layout anchor '+name);
   }
   const robotCellOwnedMaterials=[],robotCellColorEntries=[],standbyTint=new THREE.Color('#5a6d80');
   for(const rootNode of [environment.getObjectByName('ENV_ROBOT_CELL'),layout.getObjectByName('VIS_ROBOT_PACK_TABLE')].filter(Boolean)){
@@ -187,12 +188,12 @@ export async function createScenePlayer(canvas,{assetBase='/scene/',onStats=()=>
     const badge=createBadge('', '#333333');const p=bindings.queues[queue].origin_gltf_m;
     badge.sprite.position.set(p[0]+.56,p[1]+1.35,p[2]-.21);badge.sprite.visible=false;dynamic.add(badge.sprite);badges.push(badge);overflowBadges[queue]=badge;
   }
-  const autoSlotBadge=createBadge('AUTO-SLOT: OFF (AI)','#3b4a59');
-  autoSlotBadge.sprite.position.set(3.5,2.08,-2.55);autoSlotBadge.sprite.scale.set(2.15,.44,1);autoSlotBadge.sprite.visible=false;
+  const autoSlotBadge=createBadge('ROBOT OFF','#3b4a59');
+  autoSlotBadge.sprite.position.set(3.5,2.08,-2.55);autoSlotBadge.sprite.scale.set(1.75,.38,1);autoSlotBadge.sprite.visible=false;
   dynamic.add(autoSlotBadge.sprite);badges.push(autoSlotBadge);
   const persistentBadgeCount=badges.length;
 
-  function applyRobotCellStandby(standby,label='AUTO-SLOT: OFF (AI)'){
+  function applyRobotCellStandby(standby,label='ROBOT OFF'){
     const key=standby?`dim:${label}`:'active';
     if(key===robotDimKey)return;
     robotDimKey=key;
@@ -220,7 +221,7 @@ export async function createScenePlayer(canvas,{assetBase='/scene/',onStats=()=>
     fitFactor=nextFit;camera.updateProjectionMatrix();draw();
   }
   function setCameraPreset(name){
-    activePreset=name==='q1/pick'?'q1':name;
+    activePreset=name==='q1/pick'?'q1':name==='top'?'blueprint':name;
     const preset=PRESETS[activePreset];if(!preset)throw new Error('Unknown camera preset '+name);
     suppressOverheadStructures(environment);
     suppressOverheadStructures(layout);
@@ -396,7 +397,7 @@ export async function createScenePlayer(canvas,{assetBase='/scene/',onStats=()=>
     presentation.reworkBadge.sprite.visible=reworkActive;
     const robot=state.robot,robotOrder=state.orders[robot.orderId],robotActivity=robot.activity;
     const robotStandby=!replay.manifest.plan.robot||robot.state==='not_purchased'||robot.state==='disabled';
-    applyRobotCellStandby(robotStandby,!replay.manifest.plan.robot||robot.state==='not_purchased'?'AUTO-SLOT: OFF (AI)':'AUTO-SLOT: STANDBY');
+    applyRobotCellStandby(robotStandby,!replay.manifest.plan.robot||robot.state==='not_purchased'?'ROBOT OFF':'STANDBY');
     const fr=state.flow?.robot;
     const robotOrderKind=robotOrder?.kind||'regular';
     let robotVisualState=robotStandby?robot.state:(fr?fr.state:robot.state);
@@ -542,5 +543,5 @@ export async function createScenePlayer(canvas,{assetBase='/scene/',onStats=()=>
   const observer=new ResizeObserver(resize);observer.observe(canvas);
   const originalDispose=dispose;
   setCameraPreset('overview');resize();
-  return {setReplay,render,resize,setLayer,setCameraPreset,selectEntity,clearSelection(){selectEntity(null);},selectOrder(id){selectEntity(id==null?null:{type:'order',id});},get selectedEntity(){return selectedEntity?{...selectedEntity}:null;},dispose(){observer.disconnect();originalDispose();},get metrics(){return metrics;},getmetrics(){return metrics;},get camera(){return camera;},get scene(){return scene;}};
+  return {setReplay,render,resize,setLayer,setCameraPreset,selectEntity,clearSelection(){selectEntity(null);},selectOrder(id){selectEntity(id==null?null:{type:'order',id});},get selectedEntity(){return selectedEntity?{...selectedEntity}:null;},queuePreviewCount:{Q1:bindings.queues.Q1?.preview_count??6,R:bindings.queues.R?.preview_count??6},dispose(){observer.disconnect();originalDispose();},get metrics(){return metrics;},getmetrics(){return metrics;},get camera(){return camera;},get scene(){return scene;}};
 }
