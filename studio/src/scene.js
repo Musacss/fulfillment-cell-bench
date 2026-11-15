@@ -35,10 +35,10 @@ async function loadAssets(assetBase,onProgress){
       const files=['warehouse_environment.glb','modules/visual_layout.glb','modules/visual_support.glb','modules/warehouse_worker.glb','modules/humanoid_robot.glb'];
       const models=await Promise.all(files.map(async(file,index)=>{
         try{const gltf=await loader.loadAsync(base+file);onProgress?.({loading:file,loadedAsset:index+1});return gltf;}
-        catch(error){throw new Error('Не удалось загрузить 3D-ассет '+file+': '+error.message);}
+        catch(error){throw new Error('Failed to load 3D asset '+file+': '+error.message);}
       }));
       const response=await fetch(base+'visual_bindings.json');
-      if(!response.ok)throw new Error('Не найдены привязки visual_bindings.json ('+response.status+')');
+      if(!response.ok)throw new Error('Missing visual_bindings.json ('+response.status+')');
       const bindings=await response.json();
       return {base,models,bindings,refs:0};
     })();
@@ -91,7 +91,7 @@ export async function createScenePlayer(canvas,{assetBase='/scene/',onStats=()=>
   const bindings=bundle.bindings;
   let renderer;
   try{renderer=new THREE.WebGLRenderer({canvas,antialias:true,alpha:false,powerPreference:'high-performance'});}
-  catch(error){bundle.refs--;throw new Error('WebGL недоступен: '+error.message);}
+  catch(error){bundle.refs--;throw new Error('WebGL unavailable: '+error.message);}
   renderer.setPixelRatio(Math.min(window.devicePixelRatio||1,1.8));
   renderer.outputColorSpace=THREE.SRGBColorSpace;renderer.toneMapping=THREE.AgXToneMapping;renderer.toneMappingExposure=1.05;
   renderer.shadowMap.enabled=true;renderer.shadowMap.type=THREE.PCFSoftShadowMap;
@@ -123,7 +123,7 @@ export async function createScenePlayer(canvas,{assetBase='/scene/',onStats=()=>
   const mapFloor=applyMapFloorFixes(environment,layout);
   layout.updateMatrixWorld(true);
   for(const name of [...bindings.stages.flatMap(s=>[s.actor_anchor,s.order_anchor]),bindings.robot.actor_anchor,bindings.robot.order_anchor,bindings.robot.helper_anchor]){
-    if(!layout.getObjectByName(name))throw new Error('В visual_layout отсутствует привязка '+name);
+    if(!layout.getObjectByName(name))throw new Error('Missing anchor in visual_layout: '+name);
   }
   const dynamic=new THREE.Group();dynamic.name='REPLAY_DYNAMIC';scene.add(dynamic);
   const rollers=[];environment.traverse(o=>{if(/^ROLLER_\d\d_\d\d$/.test(o.name))rollers.push({node:o,base:o.quaternion.clone()});});
@@ -251,7 +251,7 @@ export async function createScenePlayer(canvas,{assetBase='/scene/',onStats=()=>
       const stacked=queueStackPositions(bindings,queue,orders);
       stacked.visibleOrders.forEach((order,i)=>placeOrder(order,stacked.positions[i]));
       if(queue==='Q1'||queue==='R'){
-        overflow[queue]=stacked.overflow;const badge=overflowBadges[queue];badge.sprite.visible=stacked.overflow>0;badge.update('+'+stacked.overflow+' в '+queue);
+        overflow[queue]=stacked.overflow;const badge=overflowBadges[queue];badge.sprite.visible=stacked.overflow>0;badge.update('+'+stacked.overflow+' in '+queue);
       }else{
         const slots=markers[queue]||[],reservations=state.reserved[queue]||0,q=bindings.queues[queue];
         slots.forEach(({empty,reserved},i)=>{

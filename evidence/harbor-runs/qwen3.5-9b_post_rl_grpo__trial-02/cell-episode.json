@@ -1,0 +1,2725 @@
+[
+  {
+    "n": 1,
+    "action": "observe"
+  },
+  {
+    "n": 2,
+    "action": "pilot",
+    "seed": 29,
+    "plan": {
+      "schema_version": 2,
+      "weeks": [
+        {
+          "robot": false,
+          "trays": false,
+          "route": "manual",
+          "maintenance": false,
+          "workers": [
+            [
+              1
+            ],
+            [
+              2
+            ],
+            [
+              3
+            ],
+            [
+              3
+            ],
+            [
+              4
+            ],
+            [
+              2,
+              3
+            ]
+          ]
+        },
+        {
+          "robot": false,
+          "trays": false,
+          "route": "manual",
+          "maintenance": false,
+          "workers": [
+            [
+              1
+            ],
+            [
+              2
+            ],
+            [
+              3
+            ],
+            [
+              3
+            ],
+            [
+              4
+            ],
+            [
+              2,
+              3
+            ]
+          ]
+        },
+        {
+          "robot": false,
+          "trays": false,
+          "route": "manual",
+          "maintenance": false,
+          "workers": [
+            [
+              1
+            ],
+            [
+              2
+            ],
+            [
+              3
+            ],
+            [
+              3
+            ],
+            [
+              4
+            ],
+            [
+              2,
+              3
+            ]
+          ]
+        },
+        {
+          "robot": false,
+          "trays": false,
+          "route": "manual",
+          "maintenance": false,
+          "workers": [
+            [
+              1
+            ],
+            [
+              2
+            ],
+            [
+              3
+            ],
+            [
+              3
+            ],
+            [
+              4
+            ],
+            [
+              2,
+              3
+            ]
+          ]
+        },
+        {
+          "robot": false,
+          "trays": false,
+          "route": "manual",
+          "maintenance": false,
+          "workers": [
+            [
+              1
+            ],
+            [
+              2
+            ],
+            [
+              3
+            ],
+            [
+              3
+            ],
+            [
+              4
+            ],
+            [
+              2,
+              3
+            ]
+          ]
+        },
+        {
+          "robot": false,
+          "trays": false,
+          "route": "manual",
+          "maintenance": false,
+          "workers": [
+            [
+              1
+            ],
+            [
+              2
+            ],
+            [
+              3
+            ],
+            [
+              3
+            ],
+            [
+              4
+            ],
+            [
+              2,
+              3
+            ]
+          ]
+        },
+        {
+          "robot": false,
+          "trays": false,
+          "route": "manual",
+          "maintenance": false,
+          "workers": [
+            [
+              1
+            ],
+            [
+              2
+            ],
+            [
+              3
+            ],
+            [
+              3
+            ],
+            [
+              4
+            ],
+            [
+              2,
+              3
+            ]
+          ]
+        },
+        {
+          "robot": false,
+          "trays": false,
+          "route": "manual",
+          "maintenance": false,
+          "workers": [
+            [
+              1
+            ],
+            [
+              2
+            ],
+            [
+              3
+            ],
+            [
+              3
+            ],
+            [
+              4
+            ],
+            [
+              2,
+              3
+            ]
+          ]
+        },
+        {
+          "robot": false,
+          "trays": false,
+          "route": "manual",
+          "maintenance": false,
+          "workers": [
+            [
+              1
+            ],
+            [
+              2
+            ],
+            [
+              3
+            ],
+            [
+              3
+            ],
+            [
+              4
+            ],
+            [
+              2,
+              3
+            ]
+          ]
+        },
+        {
+          "robot": false,
+          "trays": false,
+          "route": "manual",
+          "maintenance": false,
+          "workers": [
+            [
+              1
+            ],
+            [
+              2
+            ],
+            [
+              3
+            ],
+            [
+              3
+            ],
+            [
+              4
+            ],
+            [
+              2,
+              3
+            ]
+          ]
+        },
+        {
+          "robot": false,
+          "trays": false,
+          "route": "manual",
+          "maintenance": false,
+          "workers": [
+            [
+              1
+            ],
+            [
+              2
+            ],
+            [
+              3
+            ],
+            [
+              3
+            ],
+            [
+              4
+            ],
+            [
+              2,
+              3
+            ]
+          ]
+        },
+        {
+          "robot": false,
+          "trays": false,
+          "route": "manual",
+          "maintenance": false,
+          "workers": [
+            [
+              1
+            ],
+            [
+              2
+            ],
+            [
+              3
+            ],
+            [
+              3
+            ],
+            [
+              4
+            ],
+            [
+              2,
+              3
+            ]
+          ]
+        }
+      ]
+    },
+    "pilot_budget": {
+      "used": 1,
+      "max": 24
+    },
+    "purchase": 0,
+    "total_cost": 6005360,
+    "labor_ticks": 45623,
+    "totals": {
+      "orders": 1793,
+      "good": 1793,
+      "on_time": 1626,
+      "escaped": 0,
+      "scrap": 0,
+      "unfinished_terminal": 0,
+      "carryover_peak": 0,
+      "auto_finished": 0,
+      "pack_finished": 1806,
+      "pack_started": 1806,
+      "rework_started": 13,
+      "trays_used": 0,
+      "jams": 0,
+      "assists": 0
+    },
+    "weeks": [
+      {
+        "week": 0,
+        "label": "baseline_open",
+        "week_seed": 803263223,
+        "exogenous_orders": 134,
+        "carryover_in": 0,
+        "carryover_out": 0,
+        "wear_start": 0,
+        "wear_end": 0,
+        "commissioning_active": false,
+        "jams": 0,
+        "assists": 0,
+        "shift_economy": {
+          "purchase": 0,
+          "costs": {
+            "depreciation": 0,
+            "service": 0,
+            "shifts": 91200,
+            "overtime": 0,
+            "trays": 0,
+            "materials": 1632,
+            "rework": 140,
+            "late": 0,
+            "unfulfilled": 0,
+            "escaped": 0
+          },
+          "total": 92972
+        },
+        "week_economy": {
+          "purchase": 0,
+          "costs": {
+            "depreciation": 0,
+            "service": 0,
+            "maintenance": 0,
+            "shifts": 456000,
+            "cross_skill": 4500,
+            "overtime": 0,
+            "hiring_retraining": 0,
+            "trays": 0,
+            "materials": 8160,
+            "rework": 700,
+            "late": 0,
+            "backlog_holding": 0,
+            "unfulfilled": 0,
+            "escaped": 0
+          },
+          "total": 469360
+        },
+        "raw": {
+          "schema_version": 1,
+          "seed": 803263223,
+          "total": 134,
+          "good": 134,
+          "on_time": 134,
+          "escaped": 0,
+          "scrap": 0,
+          "unfinished": 0,
+          "pack_started": 136,
+          "pack_finished": 136,
+          "auto_finished": 0,
+          "trays_used": 0,
+          "rework_started": 2,
+          "labor_ticks": 3281,
+          "overtime_ticks": [
+            0,
+            0,
+            0,
+            0,
+            0,
+            0
+          ],
+          "events": []
+        }
+      },
+      {
+        "week": 1,
+        "label": "baseline_steady",
+        "week_seed": 1183127694,
+        "exogenous_orders": 132,
+        "carryover_in": 0,
+        "carryover_out": 0,
+        "wear_start": 0,
+        "wear_end": 0,
+        "commissioning_active": false,
+        "jams": 0,
+        "assists": 0,
+        "shift_economy": {
+          "purchase": 0,
+          "costs": {
+            "depreciation": 0,
+            "service": 0,
+            "shifts": 91200,
+            "overtime": 0,
+            "trays": 0,
+            "materials": 1584,
+            "rework": 0,
+            "late": 0,
+            "unfulfilled": 0,
+            "escaped": 0
+          },
+          "total": 92784
+        },
+        "week_economy": {
+          "purchase": 0,
+          "costs": {
+            "depreciation": 0,
+            "service": 0,
+            "maintenance": 0,
+            "shifts": 456000,
+            "cross_skill": 4500,
+            "overtime": 0,
+            "hiring_retraining": 0,
+            "trays": 0,
+            "materials": 7920,
+            "rework": 0,
+            "late": 0,
+            "backlog_holding": 0,
+            "unfulfilled": 0,
+            "escaped": 0
+          },
+          "total": 468420
+        },
+        "raw": {
+          "schema_version": 1,
+          "seed": 1183127694,
+          "total": 132,
+          "good": 132,
+          "on_time": 132,
+          "escaped": 0,
+          "scrap": 0,
+          "unfinished": 0,
+          "pack_started": 132,
+          "pack_finished": 132,
+          "auto_finished": 0,
+          "trays_used": 0,
+          "rework_started": 0,
+          "labor_ticks": 3221,
+          "overtime_ticks": [
+            0,
+            0,
+            0,
+            0,
+            0,
+            0
+          ],
+          "events": []
+        }
+      },
+      {
+        "week": 2,
+        "label": "autumn_ramp",
+        "week_seed": 313573580,
+        "exogenous_orders": 139,
+        "carryover_in": 0,
+        "carryover_out": 0,
+        "wear_start": 0,
+        "wear_end": 0,
+        "commissioning_active": false,
+        "jams": 0,
+        "assists": 0,
+        "shift_economy": {
+          "purchase": 0,
+          "costs": {
+            "depreciation": 0,
+            "service": 0,
+            "shifts": 91200,
+            "overtime": 0,
+            "trays": 0,
+            "materials": 1668,
+            "rework": 0,
+            "late": 0,
+            "unfulfilled": 0,
+            "escaped": 0
+          },
+          "total": 92868
+        },
+        "week_economy": {
+          "purchase": 0,
+          "costs": {
+            "depreciation": 0,
+            "service": 0,
+            "maintenance": 0,
+            "shifts": 456000,
+            "cross_skill": 4500,
+            "overtime": 0,
+            "hiring_retraining": 0,
+            "trays": 0,
+            "materials": 8340,
+            "rework": 0,
+            "late": 0,
+            "backlog_holding": 0,
+            "unfulfilled": 0,
+            "escaped": 0
+          },
+          "total": 468840
+        },
+        "raw": {
+          "schema_version": 1,
+          "seed": 313573580,
+          "total": 139,
+          "good": 139,
+          "on_time": 139,
+          "escaped": 0,
+          "scrap": 0,
+          "unfinished": 0,
+          "pack_started": 139,
+          "pack_finished": 139,
+          "auto_finished": 0,
+          "trays_used": 0,
+          "rework_started": 0,
+          "labor_ticks": 3438,
+          "overtime_ticks": [
+            0,
+            0,
+            0,
+            0,
+            0,
+            0
+          ],
+          "events": []
+        }
+      },
+      {
+        "week": 3,
+        "label": "fragile_promo",
+        "week_seed": 1948563681,
+        "exogenous_orders": 167,
+        "carryover_in": 0,
+        "carryover_out": 0,
+        "wear_start": 0,
+        "wear_end": 0,
+        "commissioning_active": false,
+        "jams": 0,
+        "assists": 0,
+        "shift_economy": {
+          "purchase": 0,
+          "costs": {
+            "depreciation": 0,
+            "service": 0,
+            "shifts": 91200,
+            "overtime": 0,
+            "trays": 0,
+            "materials": 2016,
+            "rework": 70,
+            "late": 320,
+            "unfulfilled": 0,
+            "escaped": 0
+          },
+          "total": 93606
+        },
+        "week_economy": {
+          "purchase": 0,
+          "costs": {
+            "depreciation": 0,
+            "service": 0,
+            "maintenance": 0,
+            "shifts": 456000,
+            "cross_skill": 4500,
+            "overtime": 0,
+            "hiring_retraining": 0,
+            "trays": 0,
+            "materials": 10080,
+            "rework": 350,
+            "late": 1600,
+            "backlog_holding": 0,
+            "unfulfilled": 0,
+            "escaped": 0
+          },
+          "total": 472530
+        },
+        "raw": {
+          "schema_version": 1,
+          "seed": 1948563681,
+          "total": 167,
+          "good": 167,
+          "on_time": 166,
+          "escaped": 0,
+          "scrap": 0,
+          "unfinished": 0,
+          "pack_started": 168,
+          "pack_finished": 168,
+          "auto_finished": 0,
+          "trays_used": 0,
+          "rework_started": 1,
+          "labor_ticks": 4375,
+          "overtime_ticks": [
+            0,
+            0,
+            0,
+            0,
+            0,
+            0
+          ],
+          "events": []
+        }
+      },
+      {
+        "week": 4,
+        "label": "mid_quarter",
+        "week_seed": 1796229529,
+        "exogenous_orders": 130,
+        "carryover_in": 0,
+        "carryover_out": 0,
+        "wear_start": 0,
+        "wear_end": 0,
+        "commissioning_active": false,
+        "jams": 0,
+        "assists": 0,
+        "shift_economy": {
+          "purchase": 0,
+          "costs": {
+            "depreciation": 0,
+            "service": 0,
+            "shifts": 91200,
+            "overtime": 0,
+            "trays": 0,
+            "materials": 1572,
+            "rework": 70,
+            "late": 0,
+            "unfulfilled": 0,
+            "escaped": 0
+          },
+          "total": 92842
+        },
+        "week_economy": {
+          "purchase": 0,
+          "costs": {
+            "depreciation": 0,
+            "service": 0,
+            "maintenance": 0,
+            "shifts": 456000,
+            "cross_skill": 4500,
+            "overtime": 0,
+            "hiring_retraining": 0,
+            "trays": 0,
+            "materials": 7860,
+            "rework": 350,
+            "late": 0,
+            "backlog_holding": 0,
+            "unfulfilled": 0,
+            "escaped": 0
+          },
+          "total": 468710
+        },
+        "raw": {
+          "schema_version": 1,
+          "seed": 1796229529,
+          "total": 130,
+          "good": 130,
+          "on_time": 130,
+          "escaped": 0,
+          "scrap": 0,
+          "unfinished": 0,
+          "pack_started": 131,
+          "pack_finished": 131,
+          "auto_finished": 0,
+          "trays_used": 0,
+          "rework_started": 1,
+          "labor_ticks": 3239,
+          "overtime_ticks": [
+            0,
+            0,
+            0,
+            0,
+            0,
+            0
+          ],
+          "events": []
+        }
+      },
+      {
+        "week": 5,
+        "label": "pre_peak_prep",
+        "week_seed": 2131332157,
+        "exogenous_orders": 114,
+        "carryover_in": 0,
+        "carryover_out": 0,
+        "wear_start": 0,
+        "wear_end": 0,
+        "commissioning_active": false,
+        "jams": 0,
+        "assists": 0,
+        "shift_economy": {
+          "purchase": 0,
+          "costs": {
+            "depreciation": 0,
+            "service": 0,
+            "shifts": 91200,
+            "overtime": 0,
+            "trays": 0,
+            "materials": 1368,
+            "rework": 0,
+            "late": 0,
+            "unfulfilled": 0,
+            "escaped": 0
+          },
+          "total": 92568
+        },
+        "week_economy": {
+          "purchase": 0,
+          "costs": {
+            "depreciation": 0,
+            "service": 0,
+            "maintenance": 0,
+            "shifts": 456000,
+            "cross_skill": 4500,
+            "overtime": 0,
+            "hiring_retraining": 0,
+            "trays": 0,
+            "materials": 6840,
+            "rework": 0,
+            "late": 0,
+            "backlog_holding": 0,
+            "unfulfilled": 0,
+            "escaped": 0
+          },
+          "total": 467340
+        },
+        "raw": {
+          "schema_version": 1,
+          "seed": 2131332157,
+          "total": 114,
+          "good": 114,
+          "on_time": 114,
+          "escaped": 0,
+          "scrap": 0,
+          "unfinished": 0,
+          "pack_started": 114,
+          "pack_finished": 114,
+          "auto_finished": 0,
+          "trays_used": 0,
+          "rework_started": 0,
+          "labor_ticks": 2753,
+          "overtime_ticks": [
+            0,
+            0,
+            0,
+            0,
+            0,
+            0
+          ],
+          "events": []
+        }
+      },
+      {
+        "week": 6,
+        "label": "early_holiday",
+        "week_seed": 1642557441,
+        "exogenous_orders": 141,
+        "carryover_in": 0,
+        "carryover_out": 0,
+        "wear_start": 0,
+        "wear_end": 0,
+        "commissioning_active": false,
+        "jams": 0,
+        "assists": 0,
+        "shift_economy": {
+          "purchase": 0,
+          "costs": {
+            "depreciation": 0,
+            "service": 0,
+            "shifts": 91200,
+            "overtime": 0,
+            "trays": 0,
+            "materials": 1752,
+            "rework": 350,
+            "late": 0,
+            "unfulfilled": 0,
+            "escaped": 0
+          },
+          "total": 93302
+        },
+        "week_economy": {
+          "purchase": 0,
+          "costs": {
+            "depreciation": 0,
+            "service": 0,
+            "maintenance": 0,
+            "shifts": 456000,
+            "cross_skill": 4500,
+            "overtime": 0,
+            "hiring_retraining": 0,
+            "trays": 0,
+            "materials": 8760,
+            "rework": 1750,
+            "late": 0,
+            "backlog_holding": 0,
+            "unfulfilled": 0,
+            "escaped": 0
+          },
+          "total": 471010
+        },
+        "raw": {
+          "schema_version": 1,
+          "seed": 1642557441,
+          "total": 141,
+          "good": 141,
+          "on_time": 141,
+          "escaped": 0,
+          "scrap": 0,
+          "unfinished": 0,
+          "pack_started": 146,
+          "pack_finished": 146,
+          "auto_finished": 0,
+          "trays_used": 0,
+          "rework_started": 5,
+          "labor_ticks": 3639,
+          "overtime_ticks": [
+            0,
+            0,
+            0,
+            0,
+            0,
+            0
+          ],
+          "events": []
+        }
+      },
+      {
+        "week": 7,
+        "label": "singles_day_wave",
+        "week_seed": 387259226,
+        "exogenous_orders": 191,
+        "carryover_in": 0,
+        "carryover_out": 0,
+        "wear_start": 0,
+        "wear_end": 0,
+        "commissioning_active": false,
+        "jams": 0,
+        "assists": 0,
+        "shift_economy": {
+          "purchase": 0,
+          "costs": {
+            "depreciation": 0,
+            "service": 0,
+            "shifts": 91200,
+            "overtime": 6550,
+            "trays": 0,
+            "materials": 2292,
+            "rework": 0,
+            "late": 20800,
+            "unfulfilled": 0,
+            "escaped": 0
+          },
+          "total": 120842
+        },
+        "week_economy": {
+          "purchase": 0,
+          "costs": {
+            "depreciation": 0,
+            "service": 0,
+            "maintenance": 0,
+            "shifts": 456000,
+            "cross_skill": 4500,
+            "overtime": 32750,
+            "hiring_retraining": 0,
+            "trays": 0,
+            "materials": 11460,
+            "rework": 0,
+            "late": 104000,
+            "backlog_holding": 0,
+            "unfulfilled": 0,
+            "escaped": 0
+          },
+          "total": 608710
+        },
+        "raw": {
+          "schema_version": 1,
+          "seed": 387259226,
+          "total": 191,
+          "good": 191,
+          "on_time": 126,
+          "escaped": 0,
+          "scrap": 0,
+          "unfinished": 0,
+          "pack_started": 191,
+          "pack_finished": 191,
+          "auto_finished": 0,
+          "trays_used": 0,
+          "rework_started": 0,
+          "labor_ticks": 5041,
+          "overtime_ticks": [
+            0,
+            42,
+            57,
+            49,
+            61,
+            53
+          ],
+          "events": []
+        }
+      },
+      {
+        "week": 8,
+        "label": "black_friday_peak",
+        "week_seed": 1619459271,
+        "exogenous_orders": 192,
+        "carryover_in": 0,
+        "carryover_out": 0,
+        "wear_start": 0,
+        "wear_end": 0,
+        "commissioning_active": false,
+        "jams": 0,
+        "assists": 0,
+        "shift_economy": {
+          "purchase": 0,
+          "costs": {
+            "depreciation": 0,
+            "service": 0,
+            "shifts": 91200,
+            "overtime": 7250,
+            "trays": 0,
+            "materials": 2304,
+            "rework": 0,
+            "late": 21440,
+            "unfulfilled": 0,
+            "escaped": 0
+          },
+          "total": 122194
+        },
+        "week_economy": {
+          "purchase": 0,
+          "costs": {
+            "depreciation": 0,
+            "service": 0,
+            "maintenance": 0,
+            "shifts": 456000,
+            "cross_skill": 4500,
+            "overtime": 36250,
+            "hiring_retraining": 0,
+            "trays": 0,
+            "materials": 11520,
+            "rework": 0,
+            "late": 107200,
+            "backlog_holding": 0,
+            "unfulfilled": 0,
+            "escaped": 0
+          },
+          "total": 615470
+        },
+        "raw": {
+          "schema_version": 1,
+          "seed": 1619459271,
+          "total": 192,
+          "good": 192,
+          "on_time": 125,
+          "escaped": 0,
+          "scrap": 0,
+          "unfinished": 0,
+          "pack_started": 192,
+          "pack_finished": 192,
+          "auto_finished": 0,
+          "trays_used": 0,
+          "rework_started": 0,
+          "labor_ticks": 5145,
+          "overtime_ticks": [
+            0,
+            44,
+            51,
+            61,
+            71,
+            63
+          ],
+          "events": []
+        }
+      },
+      {
+        "week": 9,
+        "label": "cyber_week_peak",
+        "week_seed": 555426095,
+        "exogenous_orders": 189,
+        "carryover_in": 0,
+        "carryover_out": 0,
+        "wear_start": 0,
+        "wear_end": 0,
+        "commissioning_active": false,
+        "jams": 0,
+        "assists": 0,
+        "shift_economy": {
+          "purchase": 0,
+          "costs": {
+            "depreciation": 0,
+            "service": 0,
+            "shifts": 91200,
+            "overtime": 6050,
+            "trays": 0,
+            "materials": 2280,
+            "rework": 70,
+            "late": 10880,
+            "unfulfilled": 0,
+            "escaped": 0
+          },
+          "total": 110480
+        },
+        "week_economy": {
+          "purchase": 0,
+          "costs": {
+            "depreciation": 0,
+            "service": 0,
+            "maintenance": 0,
+            "shifts": 456000,
+            "cross_skill": 4500,
+            "overtime": 30250,
+            "hiring_retraining": 0,
+            "trays": 0,
+            "materials": 11400,
+            "rework": 350,
+            "late": 54400,
+            "backlog_holding": 0,
+            "unfulfilled": 0,
+            "escaped": 0
+          },
+          "total": 556900
+        },
+        "raw": {
+          "schema_version": 1,
+          "seed": 555426095,
+          "total": 189,
+          "good": 189,
+          "on_time": 155,
+          "escaped": 0,
+          "scrap": 0,
+          "unfinished": 0,
+          "pack_started": 190,
+          "pack_finished": 190,
+          "auto_finished": 0,
+          "trays_used": 0,
+          "rework_started": 1,
+          "labor_ticks": 5060,
+          "overtime_ticks": [
+            0,
+            41,
+            55,
+            39,
+            59,
+            48
+          ],
+          "events": []
+        }
+      },
+      {
+        "week": 10,
+        "label": "post_peak_steady",
+        "week_seed": 883797195,
+        "exogenous_orders": 126,
+        "carryover_in": 0,
+        "carryover_out": 0,
+        "wear_start": 0,
+        "wear_end": 0,
+        "commissioning_active": false,
+        "jams": 0,
+        "assists": 0,
+        "shift_economy": {
+          "purchase": 0,
+          "costs": {
+            "depreciation": 0,
+            "service": 0,
+            "shifts": 91200,
+            "overtime": 0,
+            "trays": 0,
+            "materials": 1536,
+            "rework": 140,
+            "late": 0,
+            "unfulfilled": 0,
+            "escaped": 0
+          },
+          "total": 92876
+        },
+        "week_economy": {
+          "purchase": 0,
+          "costs": {
+            "depreciation": 0,
+            "service": 0,
+            "maintenance": 0,
+            "shifts": 456000,
+            "cross_skill": 4500,
+            "overtime": 0,
+            "hiring_retraining": 0,
+            "trays": 0,
+            "materials": 7680,
+            "rework": 700,
+            "late": 0,
+            "backlog_holding": 0,
+            "unfulfilled": 0,
+            "escaped": 0
+          },
+          "total": 468880
+        },
+        "raw": {
+          "schema_version": 1,
+          "seed": 883797195,
+          "total": 126,
+          "good": 126,
+          "on_time": 126,
+          "escaped": 0,
+          "scrap": 0,
+          "unfinished": 0,
+          "pack_started": 128,
+          "pack_finished": 128,
+          "auto_finished": 0,
+          "trays_used": 0,
+          "rework_started": 2,
+          "labor_ticks": 3060,
+          "overtime_ticks": [
+            0,
+            0,
+            0,
+            0,
+            0,
+            0
+          ],
+          "events": []
+        }
+      },
+      {
+        "week": 11,
+        "label": "quarter_close",
+        "week_seed": 1188840532,
+        "exogenous_orders": 138,
+        "carryover_in": 0,
+        "carryover_out": 0,
+        "wear_start": 0,
+        "wear_end": 0,
+        "commissioning_active": false,
+        "jams": 0,
+        "assists": 0,
+        "shift_economy": {
+          "purchase": 0,
+          "costs": {
+            "depreciation": 0,
+            "service": 0,
+            "shifts": 91200,
+            "overtime": 0,
+            "trays": 0,
+            "materials": 1668,
+            "rework": 70,
+            "late": 0,
+            "unfulfilled": 0,
+            "escaped": 0
+          },
+          "total": 92938
+        },
+        "week_economy": {
+          "purchase": 0,
+          "costs": {
+            "depreciation": 0,
+            "service": 0,
+            "maintenance": 0,
+            "shifts": 456000,
+            "cross_skill": 4500,
+            "overtime": 0,
+            "hiring_retraining": 0,
+            "trays": 0,
+            "materials": 8340,
+            "rework": 350,
+            "late": 0,
+            "backlog_holding": 0,
+            "unfulfilled": 0,
+            "escaped": 0
+          },
+          "total": 469190
+        },
+        "raw": {
+          "schema_version": 1,
+          "seed": 1188840532,
+          "total": 138,
+          "good": 138,
+          "on_time": 138,
+          "escaped": 0,
+          "scrap": 0,
+          "unfinished": 0,
+          "pack_started": 139,
+          "pack_finished": 139,
+          "auto_finished": 0,
+          "trays_used": 0,
+          "rework_started": 1,
+          "labor_ticks": 3371,
+          "overtime_ticks": [
+            0,
+            0,
+            0,
+            0,
+            0,
+            0
+          ],
+          "events": []
+        }
+      }
+    ]
+  },
+  {
+    "n": 3,
+    "action": "pilot",
+    "seed": 29,
+    "plan": {
+      "schema_version": 2,
+      "weeks": [
+        {
+          "robot": true,
+          "trays": true,
+          "route": "bypass",
+          "maintenance": false,
+          "workers": [
+            [
+              1
+            ],
+            [
+              2
+            ],
+            [
+              3
+            ],
+            [
+              4
+            ],
+            [
+              2,
+              3
+            ]
+          ]
+        },
+        {
+          "robot": true,
+          "trays": true,
+          "route": "bypass",
+          "maintenance": false,
+          "workers": [
+            [
+              1
+            ],
+            [
+              2
+            ],
+            [
+              3
+            ],
+            [
+              4
+            ],
+            [
+              2,
+              3
+            ]
+          ]
+        },
+        {
+          "robot": true,
+          "trays": true,
+          "route": "bypass",
+          "maintenance": false,
+          "workers": [
+            [
+              1
+            ],
+            [
+              2
+            ],
+            [
+              3
+            ],
+            [
+              4
+            ],
+            [
+              2,
+              3
+            ]
+          ]
+        },
+        {
+          "robot": true,
+          "trays": true,
+          "route": "bypass",
+          "maintenance": false,
+          "workers": [
+            [
+              1
+            ],
+            [
+              2
+            ],
+            [
+              3
+            ],
+            [
+              4
+            ],
+            [
+              2,
+              3
+            ]
+          ]
+        },
+        {
+          "robot": true,
+          "trays": true,
+          "route": "bypass",
+          "maintenance": false,
+          "workers": [
+            [
+              1
+            ],
+            [
+              2
+            ],
+            [
+              3
+            ],
+            [
+              4
+            ],
+            [
+              2,
+              3
+            ]
+          ]
+        },
+        {
+          "robot": true,
+          "trays": true,
+          "route": "bypass",
+          "maintenance": false,
+          "workers": [
+            [
+              1
+            ],
+            [
+              2
+            ],
+            [
+              3
+            ],
+            [
+              4
+            ],
+            [
+              2,
+              3
+            ]
+          ]
+        },
+        {
+          "robot": true,
+          "trays": true,
+          "route": "bypass",
+          "maintenance": false,
+          "workers": [
+            [
+              1
+            ],
+            [
+              2
+            ],
+            [
+              3
+            ],
+            [
+              4
+            ],
+            [
+              2,
+              3
+            ]
+          ]
+        },
+        {
+          "robot": true,
+          "trays": true,
+          "route": "bypass",
+          "maintenance": false,
+          "workers": [
+            [
+              1
+            ],
+            [
+              2
+            ],
+            [
+              3
+            ],
+            [
+              4
+            ],
+            [
+              2,
+              3
+            ]
+          ]
+        },
+        {
+          "robot": true,
+          "trays": true,
+          "route": "bypass",
+          "maintenance": false,
+          "workers": [
+            [
+              1
+            ],
+            [
+              2
+            ],
+            [
+              3
+            ],
+            [
+              4
+            ],
+            [
+              2,
+              3
+            ]
+          ]
+        },
+        {
+          "robot": true,
+          "trays": true,
+          "route": "bypass",
+          "maintenance": false,
+          "workers": [
+            [
+              1
+            ],
+            [
+              2
+            ],
+            [
+              3
+            ],
+            [
+              4
+            ],
+            [
+              2,
+              3
+            ]
+          ]
+        },
+        {
+          "robot": true,
+          "trays": true,
+          "route": "bypass",
+          "maintenance": false,
+          "workers": [
+            [
+              1
+            ],
+            [
+              2
+            ],
+            [
+              3
+            ],
+            [
+              4
+            ],
+            [
+              2,
+              3
+            ]
+          ]
+        },
+        {
+          "robot": true,
+          "trays": true,
+          "route": "bypass",
+          "maintenance": false,
+          "workers": [
+            [
+              1
+            ],
+            [
+              2
+            ],
+            [
+              3
+            ],
+            [
+              4
+            ],
+            [
+              2,
+              3
+            ]
+          ]
+        }
+      ]
+    },
+    "pilot_budget": {
+      "used": 2,
+      "max": 24
+    },
+    "purchase": 1530000,
+    "total_cost": 5912826,
+    "labor_ticks": 34861,
+    "totals": {
+      "orders": 1793,
+      "good": 1789,
+      "on_time": 1514,
+      "escaped": 4,
+      "scrap": 0,
+      "unfinished_terminal": 0,
+      "carryover_peak": 1,
+      "auto_finished": 1283,
+      "pack_finished": 1903,
+      "pack_started": 1903,
+      "rework_started": 109,
+      "trays_used": 1794,
+      "jams": 285,
+      "assists": 285
+    },
+    "weeks": [
+      {
+        "week": 0,
+        "label": "baseline_open",
+        "week_seed": 803263223,
+        "exogenous_orders": 134,
+        "carryover_in": 0,
+        "carryover_out": 0,
+        "wear_start": 0,
+        "wear_end": 1,
+        "commissioning_active": true,
+        "jams": 12,
+        "assists": 12,
+        "shift_economy": {
+          "purchase": 1530000,
+          "costs": {
+            "depreciation": 3060,
+            "service": 700,
+            "shifts": 76000,
+            "overtime": 0,
+            "trays": 804,
+            "materials": 1644,
+            "rework": 210,
+            "late": 0,
+            "unfulfilled": 0,
+            "escaped": 0
+          },
+          "total": 82418
+        },
+        "week_economy": {
+          "purchase": 1530000,
+          "costs": {
+            "depreciation": 29423,
+            "service": 3500,
+            "maintenance": 0,
+            "shifts": 380000,
+            "cross_skill": 4500,
+            "overtime": 0,
+            "hiring_retraining": 11000,
+            "trays": 4020,
+            "materials": 8220,
+            "rework": 1050,
+            "late": 0,
+            "backlog_holding": 0,
+            "unfulfilled": 0,
+            "escaped": 0
+          },
+          "total": 441713
+        },
+        "raw": {
+          "schema_version": 1,
+          "seed": 803263223,
+          "total": 134,
+          "good": 134,
+          "on_time": 134,
+          "escaped": 0,
+          "scrap": 0,
+          "unfinished": 0,
+          "pack_started": 137,
+          "pack_finished": 137,
+          "auto_finished": 108,
+          "trays_used": 134,
+          "rework_started": 3,
+          "labor_ticks": 2191,
+          "overtime_ticks": [
+            0,
+            0,
+            0,
+            0,
+            0
+          ],
+          "events": []
+        }
+      },
+      {
+        "week": 1,
+        "label": "baseline_steady",
+        "week_seed": 1183127694,
+        "exogenous_orders": 132,
+        "carryover_in": 0,
+        "carryover_out": 0,
+        "wear_start": 1,
+        "wear_end": 2,
+        "commissioning_active": true,
+        "jams": 9,
+        "assists": 9,
+        "shift_economy": {
+          "purchase": 1530000,
+          "costs": {
+            "depreciation": 3060,
+            "service": 700,
+            "shifts": 76000,
+            "overtime": 0,
+            "trays": 792,
+            "materials": 1596,
+            "rework": 70,
+            "late": 0,
+            "unfulfilled": 0,
+            "escaped": 0
+          },
+          "total": 82218
+        },
+        "week_economy": {
+          "purchase": 1530000,
+          "costs": {
+            "depreciation": 29423,
+            "service": 3500,
+            "maintenance": 0,
+            "shifts": 380000,
+            "cross_skill": 4500,
+            "overtime": 0,
+            "hiring_retraining": 0,
+            "trays": 3960,
+            "materials": 7980,
+            "rework": 350,
+            "late": 0,
+            "backlog_holding": 0,
+            "unfulfilled": 0,
+            "escaped": 0
+          },
+          "total": 429713
+        },
+        "raw": {
+          "schema_version": 1,
+          "seed": 1183127694,
+          "total": 132,
+          "good": 132,
+          "on_time": 132,
+          "escaped": 0,
+          "scrap": 0,
+          "unfinished": 0,
+          "pack_started": 133,
+          "pack_finished": 133,
+          "auto_finished": 107,
+          "trays_used": 132,
+          "rework_started": 1,
+          "labor_ticks": 2086,
+          "overtime_ticks": [
+            0,
+            0,
+            0,
+            0,
+            0
+          ],
+          "events": []
+        }
+      },
+      {
+        "week": 2,
+        "label": "autumn_ramp",
+        "week_seed": 313573580,
+        "exogenous_orders": 139,
+        "carryover_in": 0,
+        "carryover_out": 0,
+        "wear_start": 2,
+        "wear_end": 3,
+        "commissioning_active": false,
+        "jams": 9,
+        "assists": 9,
+        "shift_economy": {
+          "purchase": 1530000,
+          "costs": {
+            "depreciation": 3060,
+            "service": 700,
+            "shifts": 76000,
+            "overtime": 0,
+            "trays": 834,
+            "materials": 1704,
+            "rework": 210,
+            "late": 0,
+            "unfulfilled": 0,
+            "escaped": 0
+          },
+          "total": 82508
+        },
+        "week_economy": {
+          "purchase": 1530000,
+          "costs": {
+            "depreciation": 29423,
+            "service": 3500,
+            "maintenance": 0,
+            "shifts": 380000,
+            "cross_skill": 4500,
+            "overtime": 0,
+            "hiring_retraining": 0,
+            "trays": 4170,
+            "materials": 8520,
+            "rework": 1050,
+            "late": 0,
+            "backlog_holding": 0,
+            "unfulfilled": 0,
+            "escaped": 0
+          },
+          "total": 431163
+        },
+        "raw": {
+          "schema_version": 1,
+          "seed": 313573580,
+          "total": 139,
+          "good": 139,
+          "on_time": 139,
+          "escaped": 0,
+          "scrap": 0,
+          "unfinished": 0,
+          "pack_started": 142,
+          "pack_finished": 142,
+          "auto_finished": 106,
+          "trays_used": 139,
+          "rework_started": 3,
+          "labor_ticks": 2348,
+          "overtime_ticks": [
+            0,
+            0,
+            0,
+            0,
+            0
+          ],
+          "events": []
+        }
+      },
+      {
+        "week": 3,
+        "label": "fragile_promo",
+        "week_seed": 1948563681,
+        "exogenous_orders": 167,
+        "carryover_in": 0,
+        "carryover_out": 0,
+        "wear_start": 3,
+        "wear_end": 4,
+        "commissioning_active": false,
+        "jams": 13,
+        "assists": 13,
+        "shift_economy": {
+          "purchase": 1530000,
+          "costs": {
+            "depreciation": 3060,
+            "service": 700,
+            "shifts": 76000,
+            "overtime": 0,
+            "trays": 1002,
+            "materials": 2088,
+            "rework": 490,
+            "late": 0,
+            "unfulfilled": 0,
+            "escaped": 0
+          },
+          "total": 83340
+        },
+        "week_economy": {
+          "purchase": 1530000,
+          "costs": {
+            "depreciation": 29423,
+            "service": 3500,
+            "maintenance": 0,
+            "shifts": 380000,
+            "cross_skill": 4500,
+            "overtime": 0,
+            "hiring_retraining": 0,
+            "trays": 5010,
+            "materials": 10440,
+            "rework": 2450,
+            "late": 0,
+            "backlog_holding": 0,
+            "unfulfilled": 0,
+            "escaped": 0
+          },
+          "total": 435323
+        },
+        "raw": {
+          "schema_version": 1,
+          "seed": 1948563681,
+          "total": 167,
+          "good": 167,
+          "on_time": 167,
+          "escaped": 0,
+          "scrap": 0,
+          "unfinished": 0,
+          "pack_started": 174,
+          "pack_finished": 174,
+          "auto_finished": 106,
+          "trays_used": 167,
+          "rework_started": 7,
+          "labor_ticks": 3377,
+          "overtime_ticks": [
+            0,
+            0,
+            0,
+            0,
+            0
+          ],
+          "events": []
+        }
+      },
+      {
+        "week": 4,
+        "label": "mid_quarter",
+        "week_seed": 1796229529,
+        "exogenous_orders": 130,
+        "carryover_in": 0,
+        "carryover_out": 0,
+        "wear_start": 4,
+        "wear_end": 5,
+        "commissioning_active": false,
+        "jams": 10,
+        "assists": 10,
+        "shift_economy": {
+          "purchase": 1530000,
+          "costs": {
+            "depreciation": 3060,
+            "service": 700,
+            "shifts": 76000,
+            "overtime": 0,
+            "trays": 780,
+            "materials": 1668,
+            "rework": 630,
+            "late": 0,
+            "unfulfilled": 0,
+            "escaped": 0
+          },
+          "total": 82838
+        },
+        "week_economy": {
+          "purchase": 1530000,
+          "costs": {
+            "depreciation": 29423,
+            "service": 3500,
+            "maintenance": 0,
+            "shifts": 380000,
+            "cross_skill": 4500,
+            "overtime": 0,
+            "hiring_retraining": 0,
+            "trays": 3900,
+            "materials": 8340,
+            "rework": 3150,
+            "late": 0,
+            "backlog_holding": 0,
+            "unfulfilled": 0,
+            "escaped": 0
+          },
+          "total": 432813
+        },
+        "raw": {
+          "schema_version": 1,
+          "seed": 1796229529,
+          "total": 130,
+          "good": 130,
+          "on_time": 130,
+          "escaped": 0,
+          "scrap": 0,
+          "unfinished": 0,
+          "pack_started": 139,
+          "pack_finished": 139,
+          "auto_finished": 102,
+          "trays_used": 130,
+          "rework_started": 9,
+          "labor_ticks": 2291,
+          "overtime_ticks": [
+            0,
+            0,
+            0,
+            0,
+            0
+          ],
+          "events": []
+        }
+      },
+      {
+        "week": 5,
+        "label": "pre_peak_prep",
+        "week_seed": 2131332157,
+        "exogenous_orders": 114,
+        "carryover_in": 0,
+        "carryover_out": 0,
+        "wear_start": 5,
+        "wear_end": 6,
+        "commissioning_active": false,
+        "jams": 16,
+        "assists": 16,
+        "shift_economy": {
+          "purchase": 1530000,
+          "costs": {
+            "depreciation": 3060,
+            "service": 700,
+            "shifts": 76000,
+            "overtime": 0,
+            "trays": 684,
+            "materials": 1416,
+            "rework": 280,
+            "late": 0,
+            "unfulfilled": 0,
+            "escaped": 0
+          },
+          "total": 82140
+        },
+        "week_economy": {
+          "purchase": 1530000,
+          "costs": {
+            "depreciation": 29423,
+            "service": 3500,
+            "maintenance": 0,
+            "shifts": 380000,
+            "cross_skill": 4500,
+            "overtime": 0,
+            "hiring_retraining": 0,
+            "trays": 3420,
+            "materials": 7080,
+            "rework": 1400,
+            "late": 0,
+            "backlog_holding": 0,
+            "unfulfilled": 0,
+            "escaped": 0
+          },
+          "total": 429323
+        },
+        "raw": {
+          "schema_version": 1,
+          "seed": 2131332157,
+          "total": 114,
+          "good": 114,
+          "on_time": 114,
+          "escaped": 0,
+          "scrap": 0,
+          "unfinished": 0,
+          "pack_started": 118,
+          "pack_finished": 118,
+          "auto_finished": 96,
+          "trays_used": 114,
+          "rework_started": 4,
+          "labor_ticks": 1855,
+          "overtime_ticks": [
+            0,
+            0,
+            0,
+            0,
+            0
+          ],
+          "events": []
+        }
+      },
+      {
+        "week": 6,
+        "label": "early_holiday",
+        "week_seed": 1642557441,
+        "exogenous_orders": 141,
+        "carryover_in": 0,
+        "carryover_out": 0,
+        "wear_start": 6,
+        "wear_end": 7,
+        "commissioning_active": false,
+        "jams": 20,
+        "assists": 20,
+        "shift_economy": {
+          "purchase": 1530000,
+          "costs": {
+            "depreciation": 3060,
+            "service": 700,
+            "shifts": 76000,
+            "overtime": 0,
+            "trays": 846,
+            "materials": 1884,
+            "rework": 1120,
+            "late": 0,
+            "unfulfilled": 0,
+            "escaped": 0
+          },
+          "total": 83610
+        },
+        "week_economy": {
+          "purchase": 1530000,
+          "costs": {
+            "depreciation": 29423,
+            "service": 3500,
+            "maintenance": 0,
+            "shifts": 380000,
+            "cross_skill": 4500,
+            "overtime": 0,
+            "hiring_retraining": 0,
+            "trays": 4230,
+            "materials": 9420,
+            "rework": 5600,
+            "late": 0,
+            "backlog_holding": 0,
+            "unfulfilled": 0,
+            "escaped": 0
+          },
+          "total": 436673
+        },
+        "raw": {
+          "schema_version": 1,
+          "seed": 1642557441,
+          "total": 141,
+          "good": 141,
+          "on_time": 141,
+          "escaped": 0,
+          "scrap": 0,
+          "unfinished": 0,
+          "pack_started": 157,
+          "pack_finished": 157,
+          "auto_finished": 103,
+          "trays_used": 141,
+          "rework_started": 16,
+          "labor_ticks": 2810,
+          "overtime_ticks": [
+            0,
+            0,
+            0,
+            0,
+            0
+          ],
+          "events": []
+        }
+      },
+      {
+        "week": 7,
+        "label": "singles_day_wave",
+        "week_seed": 387259226,
+        "exogenous_orders": 191,
+        "carryover_in": 0,
+        "carryover_out": 0,
+        "wear_start": 7,
+        "wear_end": 8,
+        "commissioning_active": false,
+        "jams": 34,
+        "assists": 34,
+        "shift_economy": {
+          "purchase": 1530000,
+          "costs": {
+            "depreciation": 3060,
+            "service": 700,
+            "shifts": 76000,
+            "overtime": 4325,
+            "trays": 1146,
+            "materials": 2364,
+            "rework": 420,
+            "late": 25280,
+            "unfulfilled": 0,
+            "escaped": 6500
+          },
+          "total": 119795
+        },
+        "week_economy": {
+          "purchase": 1530000,
+          "costs": {
+            "depreciation": 29423,
+            "service": 3500,
+            "maintenance": 0,
+            "shifts": 380000,
+            "cross_skill": 4500,
+            "overtime": 21625,
+            "hiring_retraining": 0,
+            "trays": 5730,
+            "materials": 11820,
+            "rework": 2100,
+            "late": 126400,
+            "backlog_holding": 0,
+            "unfulfilled": 0,
+            "escaped": 32500
+          },
+          "total": 617598
+        },
+        "raw": {
+          "schema_version": 1,
+          "seed": 387259226,
+          "total": 191,
+          "good": 190,
+          "on_time": 111,
+          "escaped": 1,
+          "scrap": 0,
+          "unfinished": 0,
+          "pack_started": 197,
+          "pack_finished": 197,
+          "auto_finished": 118,
+          "trays_used": 191,
+          "rework_started": 6,
+          "labor_ticks": 4067,
+          "overtime_ticks": [
+            0,
+            28,
+            39,
+            55,
+            51
+          ],
+          "events": []
+        }
+      },
+      {
+        "week": 8,
+        "label": "black_friday_peak",
+        "week_seed": 1619459271,
+        "exogenous_orders": 192,
+        "carryover_in": 0,
+        "carryover_out": 0,
+        "wear_start": 8,
+        "wear_end": 9,
+        "commissioning_active": false,
+        "jams": 32,
+        "assists": 32,
+        "shift_economy": {
+          "purchase": 1530000,
+          "costs": {
+            "depreciation": 3060,
+            "service": 700,
+            "shifts": 76000,
+            "overtime": 6900,
+            "trays": 1152,
+            "materials": 2412,
+            "rework": 630,
+            "late": 22400,
+            "unfulfilled": 0,
+            "escaped": 0
+          },
+          "total": 113254
+        },
+        "week_economy": {
+          "purchase": 1530000,
+          "costs": {
+            "depreciation": 29423,
+            "service": 3500,
+            "maintenance": 0,
+            "shifts": 380000,
+            "cross_skill": 4500,
+            "overtime": 34500,
+            "hiring_retraining": 0,
+            "trays": 5760,
+            "materials": 12060,
+            "rework": 3150,
+            "late": 112000,
+            "backlog_holding": 0,
+            "unfulfilled": 0,
+            "escaped": 0
+          },
+          "total": 584893
+        },
+        "raw": {
+          "schema_version": 1,
+          "seed": 1619459271,
+          "total": 192,
+          "good": 192,
+          "on_time": 122,
+          "escaped": 0,
+          "scrap": 0,
+          "unfinished": 0,
+          "pack_started": 201,
+          "pack_finished": 201,
+          "auto_finished": 113,
+          "trays_used": 192,
+          "rework_started": 9,
+          "labor_ticks": 4236,
+          "overtime_ticks": [
+            1,
+            57,
+            65,
+            79,
+            74
+          ],
+          "events": []
+        }
+      },
+      {
+        "week": 9,
+        "label": "cyber_week_peak",
+        "week_seed": 555426095,
+        "exogenous_orders": 189,
+        "carryover_in": 0,
+        "carryover_out": 1,
+        "wear_start": 9,
+        "wear_end": 10,
+        "commissioning_active": false,
+        "jams": 35,
+        "assists": 35,
+        "shift_economy": {
+          "purchase": 1530000,
+          "costs": {
+            "depreciation": 3060,
+            "service": 700,
+            "shifts": 76000,
+            "overtime": 11975,
+            "trays": 1134,
+            "materials": 2448,
+            "rework": 1050,
+            "late": 20480,
+            "unfulfilled": 3500,
+            "escaped": 6500
+          },
+          "total": 126847
+        },
+        "week_economy": {
+          "purchase": 1530000,
+          "costs": {
+            "depreciation": 29423,
+            "service": 3500,
+            "maintenance": 0,
+            "shifts": 380000,
+            "cross_skill": 4500,
+            "overtime": 59875,
+            "hiring_retraining": 0,
+            "trays": 5670,
+            "materials": 12240,
+            "rework": 5250,
+            "late": 102400,
+            "backlog_holding": 600,
+            "unfulfilled": 0,
+            "escaped": 32500
+          },
+          "total": 635958
+        },
+        "raw": {
+          "schema_version": 1,
+          "seed": 555426095,
+          "total": 189,
+          "good": 187,
+          "on_time": 123,
+          "escaped": 1,
+          "scrap": 0,
+          "unfinished": 1,
+          "pack_started": 204,
+          "pack_finished": 204,
+          "auto_finished": 106,
+          "trays_used": 189,
+          "rework_started": 15,
+          "labor_ticks": 4336,
+          "overtime_ticks": [
+            28,
+            103,
+            110,
+            120,
+            118
+          ],
+          "events": []
+        }
+      },
+      {
+        "week": 10,
+        "label": "post_peak_steady",
+        "week_seed": 883797195,
+        "exogenous_orders": 126,
+        "carryover_in": 1,
+        "carryover_out": 0,
+        "wear_start": 10,
+        "wear_end": 11,
+        "commissioning_active": false,
+        "jams": 40,
+        "assists": 40,
+        "shift_economy": {
+          "purchase": 1530000,
+          "costs": {
+            "depreciation": 3060,
+            "service": 700,
+            "shifts": 76000,
+            "overtime": 0,
+            "trays": 762,
+            "materials": 1752,
+            "rework": 1330,
+            "late": 5120,
+            "unfulfilled": 0,
+            "escaped": 0
+          },
+          "total": 88724
+        },
+        "week_economy": {
+          "purchase": 1530000,
+          "costs": {
+            "depreciation": 29423,
+            "service": 3500,
+            "maintenance": 0,
+            "shifts": 380000,
+            "cross_skill": 4500,
+            "overtime": 0,
+            "hiring_retraining": 0,
+            "trays": 3810,
+            "materials": 8760,
+            "rework": 6650,
+            "late": 25600,
+            "backlog_holding": 0,
+            "unfulfilled": 0,
+            "escaped": 0
+          },
+          "total": 462243
+        },
+        "raw": {
+          "schema_version": 1,
+          "seed": 883797195,
+          "total": 127,
+          "good": 127,
+          "on_time": 111,
+          "escaped": 0,
+          "scrap": 0,
+          "unfinished": 0,
+          "pack_started": 146,
+          "pack_finished": 146,
+          "auto_finished": 105,
+          "trays_used": 127,
+          "rework_started": 19,
+          "labor_ticks": 2488,
+          "overtime_ticks": [
+            0,
+            0,
+            0,
+            0,
+            0
+          ],
+          "events": []
+        }
+      },
+      {
+        "week": 11,
+        "label": "quarter_close",
+        "week_seed": 1188840532,
+        "exogenous_orders": 138,
+        "carryover_in": 0,
+        "carryover_out": 0,
+        "wear_start": 11,
+        "wear_end": 12,
+        "commissioning_active": false,
+        "jams": 55,
+        "assists": 55,
+        "shift_economy": {
+          "purchase": 1530000,
+          "costs": {
+            "depreciation": 3060,
+            "service": 700,
+            "shifts": 76000,
+            "overtime": 0,
+            "trays": 828,
+            "materials": 1860,
+            "rework": 1190,
+            "late": 14720,
+            "unfulfilled": 0,
+            "escaped": 13000
+          },
+          "total": 111358
+        },
+        "week_economy": {
+          "purchase": 1530000,
+          "costs": {
+            "depreciation": 29423,
+            "service": 3500,
+            "maintenance": 0,
+            "shifts": 380000,
+            "cross_skill": 4500,
+            "overtime": 0,
+            "hiring_retraining": 0,
+            "trays": 4140,
+            "materials": 9300,
+            "rework": 5950,
+            "late": 73600,
+            "backlog_holding": 0,
+            "unfulfilled": 0,
+            "escaped": 65000
+          },
+          "total": 575413
+        },
+        "raw": {
+          "schema_version": 1,
+          "seed": 1188840532,
+          "total": 138,
+          "good": 136,
+          "on_time": 90,
+          "escaped": 2,
+          "scrap": 0,
+          "unfinished": 0,
+          "pack_started": 155,
+          "pack_finished": 155,
+          "auto_finished": 113,
+          "trays_used": 138,
+          "rework_started": 17,
+          "labor_ticks": 2776,
+          "overtime_ticks": [
+            0,
+            0,
+            0,
+            0,
+            0
+          ],
+          "events": []
+        }
+      }
+    ]
+  },
+  {
+    "n": 4,
+    "action": "submit",
+    "plan": {
+      "schema_version": 2,
+      "weeks": [
+        {
+          "robot": true,
+          "trays": true,
+          "route": "bypass",
+          "maintenance": false,
+          "workers": [
+            [
+              1
+            ],
+            [
+              2
+            ],
+            [
+              4
+            ],
+            [
+              2,
+              3
+            ]
+          ]
+        },
+        {
+          "robot": true,
+          "trays": true,
+          "route": "bypass",
+          "maintenance": false,
+          "workers": [
+            [
+              1
+            ],
+            [
+              2
+            ],
+            [
+              4
+            ],
+            [
+              2,
+              3
+            ]
+          ]
+        },
+        {
+          "robot": true,
+          "trays": true,
+          "route": "bypass",
+          "maintenance": true,
+          "workers": [
+            [
+              1
+            ],
+            [
+              2
+            ],
+            [
+              4
+            ],
+            [
+              2,
+              3
+            ]
+          ]
+        },
+        {
+          "robot": true,
+          "trays": true,
+          "route": "bypass",
+          "maintenance": false,
+          "workers": [
+            [
+              1
+            ],
+            [
+              2
+            ],
+            [
+              3
+            ],
+            [
+              4
+            ],
+            [
+              2,
+              3
+            ]
+          ]
+        },
+        {
+          "robot": true,
+          "trays": true,
+          "route": "bypass",
+          "maintenance": true,
+          "workers": [
+            [
+              1
+            ],
+            [
+              2
+            ],
+            [
+              4
+            ],
+            [
+              2,
+              3
+            ]
+          ]
+        },
+        {
+          "robot": true,
+          "trays": true,
+          "route": "bypass",
+          "maintenance": false,
+          "workers": [
+            [
+              1
+            ],
+            [
+              2
+            ],
+            [
+              4
+            ],
+            [
+              2,
+              3
+            ]
+          ]
+        },
+        {
+          "robot": true,
+          "trays": true,
+          "route": "bypass",
+          "maintenance": true,
+          "workers": [
+            [
+              1
+            ],
+            [
+              2
+            ],
+            [
+              4
+            ],
+            [
+              2,
+              3
+            ]
+          ]
+        },
+        {
+          "robot": true,
+          "trays": true,
+          "route": "bypass",
+          "maintenance": false,
+          "workers": [
+            [
+              1
+            ],
+            [
+              2
+            ],
+            [
+              3
+            ],
+            [
+              4
+            ],
+            [
+              2,
+              3
+            ]
+          ]
+        },
+        {
+          "robot": true,
+          "trays": true,
+          "route": "bypass",
+          "maintenance": false,
+          "workers": [
+            [
+              1
+            ],
+            [
+              2
+            ],
+            [
+              3
+            ],
+            [
+              4
+            ],
+            [
+              2,
+              3
+            ]
+          ]
+        },
+        {
+          "robot": true,
+          "trays": true,
+          "route": "bypass",
+          "maintenance": false,
+          "workers": [
+            [
+              1
+            ],
+            [
+              2
+            ],
+            [
+              3
+            ],
+            [
+              4
+            ],
+            [
+              2,
+              3
+            ]
+          ]
+        },
+        {
+          "robot": true,
+          "trays": true,
+          "route": "bypass",
+          "maintenance": true,
+          "workers": [
+            [
+              1
+            ],
+            [
+              2
+            ],
+            [
+              4
+            ],
+            [
+              2,
+              3
+            ]
+          ]
+        },
+        {
+          "robot": true,
+          "trays": true,
+          "route": "bypass",
+          "maintenance": false,
+          "workers": [
+            [
+              1
+            ],
+            [
+              2
+            ],
+            [
+              4
+            ],
+            [
+              2,
+              3
+            ]
+          ]
+        }
+      ]
+    }
+  }
+]

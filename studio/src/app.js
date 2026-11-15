@@ -5,14 +5,14 @@ import {environmentLayers} from '../../4_Horses_Environment_v02/visual/environme
 
 const $=id=>document.getElementById(id);
 const html=value=>String(value??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
-const euros=value=>new Intl.NumberFormat('ru-RU',{style:'currency',currency:'EUR'}).format((value??0)/100);
-const number=value=>new Intl.NumberFormat('ru-RU',{maximumFractionDigits:2}).format(value??0);
+const euros=value=>new Intl.NumberFormat('en-US',{style:'currency',currency:'EUR'}).format((value??0)/100);
+const number=value=>new Intl.NumberFormat('en-US',{maximumFractionDigits:2}).format(value??0);
 const duration=seconds=>[Math.floor(seconds/3600),Math.floor(seconds/60)%60,Math.floor(seconds)%60].map(v=>String(v).padStart(2,'0')).join(':');
-const strategy={manual:'Ручной план',candidate:'Кандидат',reference:'Контрольная стратегия',local:'Локальный прогон'};
-const workerStates={idle:'Ожидание',walk:'Переход',prepare:'Подготовка',pick:'Комплектация',pack:'Упаковка',inspect:'Контроль',assist:'Помощь роботу',break:'Перерыв',not_purchased:'Не приобретён',disabled:'Выключен маршрутом',jammed:'Застревание',helper_walking:'Помощник идёт',service:'Обслуживание',finished:'Завершено'};
-const importantLabels={jam:'Застревание',assist:'Помощь',rework:'Переделка',break:'Перерыв',escaped:'Выдан брак',scrap:'Списание'};
-const layerLabels={'ENV_FLOOR_AND_GRID':['Пол и CAD-сетка','▦'],'ENV_WALLS_AND_DOCKS':['Стены и доки','▥'],'ENV_WORKSTATIONS_DETAIL':['Оснастка постов','⌑'],'ENV_ROBOT_CELL':['Ячейка робота','◇'],'ENV_BREAK_AREA':['Отдых и KPI','◷'],'ENV_OVERHEAD':['Фермы и свет','⌁']};
-const costsLabels={depreciation:'Амортизация',service:'Обслуживание робота',shifts:'Оплата смен',overtime:'Сверхурочные',trays:'Лотки',materials:'Упаковочные материалы',rework:'Переделка',late:'Опоздания',unfulfilled:'Брак и незавершённые',escaped:'Выданный брак'};
+const strategy={manual:'Manual Baseline',candidate:'Candidate Plan',reference:'Adaptive Reference',local:'Local Run','naive-route-all':'Naive Route-All'};
+const workerStates={idle:'Idle',walk:'Walking',prepare:'Prep',pick:'Picking',pack:'Packing',inspect:'QC Inspect',assist:'Robot Assist',break:'Break',not_purchased:'Not Purchased',disabled:'Bypassed / Off',jammed:'Jammed',helper_walking:'Helper En Route',service:'Clearing Jam',finished:'Finished'};
+const importantLabels={jam:'Robot Jam',assist:'Jam Assist',rework:'Rework',break:'Break',escaped:'Escaped Defect',scrap:'Scrap'};
+const layerLabels={'ENV_FLOOR_AND_GRID':['Floor & CAD Grid','▦'],'ENV_WALLS_AND_DOCKS':['Walls & Docks','▥'],'ENV_WORKSTATIONS_DETAIL':['Workstations','⌑'],'ENV_ROBOT_CELL':['Robot Cell','◇'],'ENV_BREAK_AREA':['Break & KPI','◷'],'ENV_OVERHEAD':['Overhead Trusses','⌁']};
+const costsLabels={depreciation:'Depreciation',service:'Robot Service',shifts:'Shift Wages',overtime:'Overtime',trays:'Trays',materials:'Packing Materials',rework:'Rework',late:'Late Penalties',unfulfilled:'Scrap & Unfulfilled',escaped:'Escaped Defects'};
 let source=null,current=[],snapshots=[],mode='single',time=0,playing=false,speed=60,activeInspector=0,requestVersion=0,lastPaint=-1,lastInspector=-1,loading=false,disposed=false;
 const players=[null,null],playerPromises=[null,null],panelStats=[{},{}];
 const layerState=new Map(environmentLayers),preset='overview';
@@ -24,24 +24,25 @@ $('bridge-url').value=query.get('index')||defaultCatalogUrl;
 
 function showError(error){
   console.error(error);$('error-message').textContent=error.message||String(error);$('error-panel').hidden=false;
-  $('connection-dot').className='dot error';$('connection-text').textContent='Требуется внимание';
+  $('connection-dot').className='dot error';$('connection-text').textContent='Attention required';
 }
 function connected(label){$('connection-dot').className='dot connected';$('connection-text').textContent=label;$('error-panel').hidden=true;}
-function setPlaying(value){playing=Boolean(value)&&current.length>0&&!loading;$('play').firstChild.textContent=playing?'❚❚ ':'▶ ';$('play').querySelector('span').textContent=playing?'Пауза':'Воспроизвести';$('replay-status').classList.toggle('live',playing);paintStatus();}
+function setPlaying(value){playing=Boolean(value)&&current.length>0&&!loading;$('play').firstChild.textContent=playing?'❚❚ ':'▶ ';$('play').querySelector('span').textContent=playing?'Pause':'Play';$('replay-status').classList.toggle('live',playing);paintStatus();}
 function paintStatus(){
-  $('replay-status').textContent=loading?'Загрузка…':!current.length?'Ожидание данных':time>=maxDuration()?'Смена завершена':playing?'● Воспроизведение':'На паузе';
+  $('replay-status').textContent=loading?'Loading…':!current.length?'Awaiting data':time>=maxDuration()?'Shift complete':playing?'● Playing':'Paused';
 }
 function maxDuration(){return Math.max(0,...current.map(item=>item.replay.durationSeconds));}
 function tickSeconds(){return current[0]?.replay.tickSeconds||30;}
 function controlState(enabled){for(const id of ['play','reset','next-event','timeline'])$(id).disabled=!enabled;}
-function runLabel(run){return `${strategy[run.strategy]||run.label||run.id} · seed ${run.seed}`;}
+function runDisplayName(run){return run.label&&run.label!==run.strategy?run.label:(strategy[run.strategy]||run.label||run.id);}
+function runLabel(run){return `${runDisplayName(run)} · seed ${run.seed}`;}
 function options(element,entries,label,selected){
   const previous=selected??element.value;element.replaceChildren(...entries.map(entry=>{const option=document.createElement('option');option.value=entry.id;option.textContent=label(entry);return option;}));
   if(entries.some(e=>e.id===previous))element.value=previous;
   element.disabled=!entries.length;
 }
 function setWeeks(count=12){
-  const select=$('week-select'),previous=select.value||'0';select.replaceChildren(...Array.from({length:count},(_,i)=>{const o=document.createElement('option');o.value=String(i);o.textContent=`week-${String(i).padStart(2,'0')} / неделя ${i+1}`;return o;}));
+  const select=$('week-select'),previous=select.value||'0';select.replaceChildren(...Array.from({length:count},(_,i)=>{const o=document.createElement('option');o.value=String(i);o.textContent=`week-${String(i).padStart(2,'0')} / Week ${i+1}`;return o;}));
   select.value=Number(previous)<count?previous:'0';
 }
 function updateModeFields(){
@@ -63,7 +64,7 @@ async function ensurePlayer(index){
       players[index]=player;
       for(const [name,visible] of layerState)player.setLayer(name,visible);
       player.setCameraPreset(cameraPreset);$('loading-'+side).hidden=true;player.resize();return player;
-    }).catch(error=>{$('loading-'+side).innerHTML='<strong>Не удалось загрузить 3D-сцену</strong><small>Подробности в сообщении об ошибке</small>';playerPromises[index]=null;throw error;});
+    }).catch(error=>{$('loading-'+side).innerHTML='<strong>Failed to load 3D scene</strong><small>See error message for details</small>';playerPromises[index]=null;throw error;});
   }
   return playerPromises[index];
 }
@@ -81,69 +82,99 @@ async function chooseReplay(){
     current=entries;time=0;lastPaint=-1;lastInspector=-1;loading=false;
     const first=entries[0];if(first.quarter)setWeeks(first.quarter.weeks.length);
     $('seed-tag').textContent='SEED '+first.run.seed;
-    $('workspace-title').textContent=entries.length===2?'Два плана. Одна смена.':first.quarter?`Квартал · неделя ${first.week+1}`:strategy[first.run.strategy]||'Локальная смена';
+    $('workspace-title').textContent=entries.length===2?(first.quarter?`Two Plans · Week ${first.week+1} (${first.weekSummary?.label||'Compare'})`:'Two Plans. One Shift.'):first.quarter?`${runDisplayName(first.run)} · Week ${first.week+1}`:runDisplayName(first.run);
     const plan=first.replay.manifest.plan;
-    $('plan-summary').innerHTML=[`${plan.workers.length} работников`,plan.robot?'Робот приобретён':'Без робота',plan.trays?'С лотками':'Без лотков',`Маршрут: ${plan.route}`].map(s=>`<span class="plan-chip">${html(s)}</span>`).join('');
-    entries.forEach((item,index)=>{const side=index?'right':'left';$('scene-label-'+side).textContent=`${entries.length===2?(index?'B / ':'A / '):''}${strategy[item.run.strategy]||item.run.label||item.run.id}`;$('scene-info-'+side).textContent=`SEED ${item.run.seed} · ${item.replay.manifest.plan.workers.length} чел.`;});
+    $('plan-summary').innerHTML=[`${plan.workers.length} workers`,plan.robot?'Robot active':'No robot',plan.trays?'With trays':'No trays',`Route: ${plan.route}`].map(s=>`<span class="plan-chip">${html(s)}</span>`).join('');
+    entries.forEach((item,index)=>{const side=index?'right':'left';$('scene-label-'+side).textContent=`${entries.length===2?(index?'B / ':'A / '):''}${runDisplayName(item.run)}`;$('scene-info-'+side).textContent=`SEED ${item.run.seed} · ${item.replay.manifest.plan.workers.length} workers`;});
     $('timeline').max=String(Math.max(...entries.map(i=>i.replay.horizonTicks)));
-    $('duration').textContent='Горизонт '+duration(maxDuration());
-    controlState(true);connected(source.label+' · '+source.index.runs.length+' прогонов');paint(true);paintStatus();
+    $('duration').textContent='Horizon '+duration(maxDuration());
+    controlState(true);connected(source.label+' · '+source.index.runs.length+' runs');paint(true);paintStatus();
     window.dispatchEvent(new CustomEvent('replay-ready',{detail:{runs:entries.map(i=>i.replay.runId)}}));
   }catch(error){if(version===requestVersion){loading=false;showError(error);controlState(current.length>0);paintStatus();}}
 }
 async function acceptSource(next){
   source=next;const runs=next.index.runs.filter(r=>r.mode==='v1'),quarters=next.index.runs.filter(r=>r.mode!=='v1');
   options($('run-select'),runs,runLabel,query.get('run')||runs.find(r=>r.strategy==='reference')?.id);
-  options($('quarter-select'),quarters,runLabel);
-  options($('comparison-select'),next.index.comparisons,p=>`${p.mode==='v1'?'Смена':'Квартал'} · seed ${p.seed} / ${p.left.split('-')[1]} → ${p.right.split('-')[1]}`);
+  options($('quarter-select'),quarters,runLabel,query.get('quarter')||quarters.find(r=>r.strategy==='reference'||r.slug==='qwen_grpo')?.id);
+  options($('comparison-select'),next.index.comparisons,p=>`${p.mode==='v1'?'Shift':'Quarter'} · seed ${p.seed} / ${p.left.replace(/^(v1|quarterly)-/,'').replace(/-seed\d+$/,'')} → ${p.right.replace(/^(v1|quarterly)-/,'').replace(/-seed\d+$/,'')}`);
   document.querySelector('[data-mode="quarter"]').hidden=!(next.index.quarterly_available||quarters.length);
   document.querySelector('[data-mode="compare"]').disabled=!next.index.comparisons.length;
+  const qMode=query.get('mode');
+  if(qMode&&['single','compare','quarter'].includes(qMode))mode=qMode;
   if(!runs.length&&quarters.length)mode='quarter';else if(mode==='quarter'&&!quarters.length||mode==='compare'&&!next.index.comparisons.length)mode='single';
-  $('source-kind').textContent=next.label==='Локальные файлы'?'LOCAL':'BRIDGE';
+  $('source-kind').textContent=next.label==='Local files'?'LOCAL':'BRIDGE';
   setWeeks();updateModeFields();await chooseReplay();
 }
 async function connect(){
-  setPlaying(false);$('connection-text').textContent='Подключение к мосту…';
+  setPlaying(false);$('connection-text').textContent='Connecting to bridge…';
   try{await acceptSource(await openRemote($('bridge-url').value));}catch(error){showError(error);}
 }
 
 function setTime(seconds){time=Math.min(maxDuration(),Math.max(0,Number(seconds)||0));lastPaint=-1;paint(true);if(time>=maxDuration())setPlaying(false);}
 function panelBadges(state,index){
-  const badges=[];for(const queue of ['Q1','R']){const overflow=Math.max(0,state.queues[queue].length-18);if(overflow)badges.push(`+${overflow} в ${queue}`);}
+  const badges=[];for(const queue of ['Q1','R']){const overflow=Math.max(0,state.queues[queue].length-18);if(overflow)badges.push(`+${overflow} in ${queue}`);}
   if(['jammed','helper_walking','service'].includes(state.robot.state))badges.push(workerStates[state.robot.state]);
-  if(state.ended&&state.counters.unfinished)badges.push(`${state.counters.unfinished} незавершённых на H`);
+  if(state.ended&&state.counters.unfinished)badges.push(`${state.counters.unfinished} unfinished at H`);
+  const entry=current[index];
+  if(entry?.weekDiagnostics?.status==='critical')badges.push('SLA Alert');
   const node=$('scene-badges-'+(index?'right':'left'));
-  const summary=`<span class="canvas-badge summary">Годных ${state.counters.good} · авто ${state.counters.auto_finished}</span>`;
+  const summary=`<span class="canvas-badge summary">Good ${state.counters.good} · Auto ${state.counters.auto_finished}</span>`;
   const markup=summary+badges.map(text=>`<span class="canvas-badge">${html(text)}</span>`).join('');if(node.innerHTML!==markup)node.innerHTML=markup;
 }
 function paint(force=false){
   if(!current.length)return;
   if(force||time!==lastPaint){
     snapshots=current.map(item=>item.replay.seekTo(Math.min(time,item.replay.durationSeconds)));lastPaint=time;
-    const tick=time/tickSeconds();$('clock').textContent=duration(time);$('tick-label').textContent=`Тик ${number(tick)} / ${$('timeline').max}`;$('timeline').value=String(tick);
+    const tick=time/tickSeconds();$('clock').textContent=duration(time);$('tick-label').textContent=`Tick ${number(tick)} / ${$('timeline').max}`;$('timeline').value=String(tick);
     snapshots.forEach(panelBadges);
   }
   if(force||lastInspector<0||performance.now()-lastInspector>=160){renderInspector();lastInspector=performance.now();}
 }
+function renderDiagnostics(entry){
+  const diag=entry.diagnostics,wdiag=entry.weekDiagnostics,box=$('diagnostics-summary'),body=$('diagnostics-details');
+  if(!diag){box.hidden=true;return;}
+  box.hidden=false;
+  const ov=diag.overall||{};
+  $('diagnostics-badge').textContent=ov.win?'WIN':ov.feasible?'NO WIN':'FAIL';
+  const headline=ov.headline_summary||entry.run.diagnostics_headline||'';
+  const mistakes=(diag.key_mistakes||[]).slice(0,3);
+  const weekNotes=wdiag?.active_mistakes||[];
+  const highlights=(wdiag?.highlight_ticks||[]).slice(0,4);
+  let out='';
+  if(ov.reward_fraction)out+=`<div class="diag-score">Reward: <strong>${html(ov.reward_fraction)}</strong> (${Number(ov.reward_float||0).toFixed(4)})</div>`;
+  if(headline)out+=`<p class="diag-headline">${html(headline)}</p>`;
+  if(weekNotes.length)out+=`<div class="diag-group"><strong>Week ${entry.week+1} Callouts</strong>${weekNotes.map(m=>`<div class="diag-callout warn">${html(m)}</div>`).join('')}</div>`;
+  else if(mistakes.length)out+=`<div class="diag-group"><strong>Quarter Root Causes</strong>${mistakes.map(m=>`<div class="diag-callout ${html(m.severity||'warn')}">${html(m.hud_callout||m.category||'')}</div>`).join('')}</div>`;
+  if(highlights.length){
+    out+=`<div class="diag-group"><strong>Jump to Highlight Tick</strong><div class="diag-jumps">${highlights.map(h=>{const t=h.focus_tick??h.start_tick??0;return `<button type="button" class="diag-jump" data-seek-tick="${Number(t)}" data-reason="${html(h.reason||h.kind)}">${html(h.kind)} @ t=${Number(t)}</button>`;}).join('')}</div></div>`;
+  }
+  if(body.innerHTML!==out)body.innerHTML=out;
+}
 function renderInspector(){
   const entry=current[activeInspector],state=snapshots[activeInspector];if(!entry||!state)return;
   const c=state.counters;
-  const cards=[['good',c.good,'Годных'],['',c.on_time,'Вовремя'],['',state.arrivedCount,'Поступило'],['',state.inSystem,'В системе'],['warn',c.escaped,'Выдан брак'],['warn',c.scrap,'Списано']];
+  const cards=[['good',c.good,'Good'],['',c.on_time,'On-Time'],['',state.arrivedCount,'Arrived'],['',state.inSystem,'In System'],['warn',c.escaped,'Escaped'],['warn',c.scrap,'Scrap']];
   $('metrics').innerHTML=cards.map(([cls,value,label])=>`<div class="metric ${cls}"><strong>${number(value)}</strong><span>${label}</span></div>`).join('');
   $('metrics-tick').textContent=number(state.tickFloat??state.tick)+' TICK';
-  $('throughput').innerHTML=`Упаковок: <strong>${c.pack_finished}</strong> / ${c.pack_started} начато · авто ${c.auto_finished}<br>Активный труд: <strong>${number(c.labor_ticks*entry.replay.tickSeconds/3600)} ч</strong> · переделок ${c.rework_started}<br>Лотков: ${c.trays_used} · ещё не поступило: ${state.notArrived} · незавершено на H: ${c.unfinished}<br>Сверхурочные по людям: ${c.overtime_ticks.map(number).join(' / ')} тик.`;
+  $('throughput').innerHTML=`Packed: <strong>${c.pack_finished}</strong> / ${c.pack_started} started · auto ${c.auto_finished}<br>Active labor: <strong>${number(c.labor_ticks*entry.replay.tickSeconds/3600)} h</strong> · rework ${c.rework_started}<br>Trays: ${c.trays_used} · pending arrival: ${state.notArrived} · unfinished at H: ${c.unfinished}<br>Overtime per worker: ${c.overtime_ticks.map(number).join(' / ')} ticks`;
+  renderDiagnostics(entry);
   $('queue-body').innerHTML=['Q1','Q2','Q3','Q4','R'].map(q=>`<tr><td>${q}</td><td>${state.queues[q].length}</td><td>${state.reserved[q]??'—'}</td><td>${state.capacity?.[q]??'∞'}</td></tr>`).join('');
   const resources=[...Object.values(state.workers),{id:'robot',...state.robot}];
   $('resources').innerHTML=resources.map(w=>`<div class="resource-row"><i class="resource-dot ${w.state==='break'?'break':['jammed','helper_walking','service'].includes(w.state)?'jammed':!['idle','disabled','not_purchased'].includes(w.state)?'busy':''}"></i><strong>${w.id==='robot'?'RBT':html(w.id.toUpperCase())}</strong><span>${html(workerStates[w.state]||w.state)}</span><small>${w.orderId!=null?'#'+w.orderId:w.zone?'Z'+w.zone:''}</small></div>`).join('');
   const economy=entry.replay.manifest.economy;
-  $('costs').innerHTML=Object.entries(costsLabels).map(([key,label])=>`<div class="cost-row"><span>${label}</span><strong>${euros(economy.costs[key])}</strong></div>`).join('')+`<div class="cost-row total"><span>Всего OpEx</span><strong>${euros(economy.total)}</strong></div>`;
-  $('purchase').innerHTML=`<span>Покупка оборудования · CapEx</span><strong>${euros(economy.purchase)}</strong>`;
+  $('costs').innerHTML=Object.entries(costsLabels).map(([key,label])=>`<div class="cost-row"><span>${label}</span><strong>${euros(economy.costs[key])}</strong></div>`).join('')+`<div class="cost-row total"><span>Total OpEx</span><strong>${euros(economy.total)}</strong></div>`;
+  $('purchase').innerHTML=`<span>Equipment Purchase · CapEx</span><strong>${euros(economy.purchase)}</strong>`;
   const ev=entry.evaluation;
-  $('evaluation').innerHTML=ev?`<h3>Evaluation / набор дней</h3><div class="seeds">evaluation_seeds: <strong>${entry.evaluationSeeds.length?entry.evaluationSeeds.map(html).join(', '):'не указаны в файле'}</strong></div><div class="evaluation-flags">${[['valid','План корректен'],['feasible','Ограничения'],['win','Победа']].map(([key,label])=>`<span class="flag ${ev[key]?'yes':''}">${ev[key]?'✓':'–'} ${label}</span>`).join('')}</div><p>${ev.metrics?`Расходы набора: ${euros(ev.metrics.total_cost)}<br>Базовый план: ${euros(ev.metrics.base_cost)}<br>`:''}Оценка относится к перечисленному набору дней.${ev.reasons?.length?'<br>Причины: '+ev.reasons.map(reason=>html({cost:'расходы',labor:'труд',automation:'доля автоматизации',budget:'бюджет'}[reason]||reason)).join(', '):''}</p>`:'<h3>Evaluation</h3><p>В этом пакете нет оценки набора дней. Итог одной смены показан выше.</p>';
+  $('evaluation').innerHTML=ev?`<h3>Evaluation / Seed Suite</h3><div class="seeds">evaluation_seeds: <strong>${entry.evaluationSeeds.length?entry.evaluationSeeds.map(html).join(', '):'not listed'}</strong></div><div class="evaluation-flags">${[['valid','Valid'],['feasible','Feasible'],['win','Win']].map(([key,label])=>`<span class="flag ${ev[key]?'yes':''}">${ev[key]?'✓':'–'} ${label}</span>`).join('')}</div><p>${ev.metrics?`Suite OpEx: ${euros(ev.metrics.total_cost)}<br>Manual Baseline: ${euros(ev.metrics.base_cost)}<br>`:''}Evaluated across the listed seed suite.${ev.reasons?.length?'<br>Reasons: '+ev.reasons.map(html).join(', '):''}</p>`:'<h3>Evaluation</h3><p>Single-shift replay shown above.</p>';
   $('quarter-summary').hidden=!entry.quarter;
-  if(entry.quarter){const w=entry.weekSummary,q=entry.quarter;$('quarter-details').innerHTML=[['Квартал / расходы',euros(q.total_cost)],['Квартал / CapEx',euros(q.purchase)],['Перенос заказов',`${w.carryover_in??0} → ${w.carryover_out??0}`],['Износ',`${w.wear_start??0} → ${w.wear_end??0}`],['Ввод в эксплуатацию',w.commissioning_active?'Да':'Нет'],['Обслуживание',w.maintenance?'Да':'Нет']].map(([key,value])=>`<div class="quarter-row"><span>${key}</span><strong>${html(value)}</strong></div>`).join('');}
+  if(entry.quarter){const w=entry.weekSummary,q=entry.quarter;$('quarter-details').innerHTML=[['Quarter / OpEx',euros(q.total_cost)],['Quarter / CapEx',euros(q.purchase)],['Carryover',`${w.carryover_in??0} → ${w.carryover_out??0}`],['Wear',`${w.wear_start??0} → ${w.wear_end??0}`],['Commissioning',w.commissioning_active?'Yes':'No'],['Maintenance',w.maintenance?'Yes':'No']].map(([key,value])=>`<div class="quarter-row"><span>${key}</span><strong>${html(value)}</strong></div>`).join('');}
 }
 
+$('diagnostics-details').addEventListener('click',event=>{
+  const btn=event.target.closest('[data-seek-tick]');if(!btn||!current.length)return;
+  const tick=Number(btn.dataset.seekTick||0);setPlaying(false);setTime(tick*tickSeconds());
+  if(btn.dataset.reason)$('event-note').textContent=btn.dataset.reason;
+});
 $('source-form').addEventListener('submit',event=>{event.preventDefault();connect();});
 for(const id of ['local-files','local-folder'])$(id).addEventListener('change',async event=>{try{await acceptSource(await openLocal(event.target.files));}catch(error){showError(error);}finally{event.target.value='';}});
 for(const id of ['run-select','comparison-select','quarter-select','week-select'])$(id).addEventListener('change',()=>{updateModeFields();chooseReplay();});
@@ -159,7 +190,7 @@ $('timeline').addEventListener('input',event=>setTime(Number(event.target.value)
 $('speed').addEventListener('change',event=>{speed=Number(event.target.value);});
 $('next-event').addEventListener('click',()=>{
   const filter=$('event-filter').value,next=current.flatMap(item=>item.replay.importantEvents.map(event=>({...event,seconds:event.tick*item.replay.tickSeconds}))).filter(event=>event.seconds>time+1e-6&&(filter==='all'||event.kind===filter)).sort((a,b)=>a.seconds-b.seconds)[0];
-  setPlaying(false);if(next){setTime(next.seconds);$('event-note').textContent=`${importantLabels[next.kind]} · тик ${next.tick}${next.orderId!=null?' · заказ #'+next.orderId:''}`;}else{$('event-note').textContent='Следующих событий этого типа нет';}
+  setPlaying(false);if(next){setTime(next.seconds);$('event-note').textContent=`${importantLabels[next.kind]} · tick ${next.tick}${next.orderId!=null?' · order #'+next.orderId:''}`;}else{$('event-note').textContent='No further events of this type';}
 });
 $('error-close').addEventListener('click',()=>$('error-panel').hidden=true);
 $('inspector-toggle').addEventListener('click',event=>{const hidden=document.querySelector('.application').classList.toggle('no-inspector');event.currentTarget.setAttribute('aria-expanded',String(!hidden));requestAnimationFrame(()=>players.forEach(p=>p?.resize()));});

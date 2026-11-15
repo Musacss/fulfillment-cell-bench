@@ -1,0 +1,63 @@
+name: Deploy 3D Replay Studio to GitHub Pages
+
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+jobs:
+  build-and-deploy:
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python 3.12
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Set up Node.js 22
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+
+      - name: Export v1 + v2 Quarterly + Multi-Model AI-Mistakes 3D Pack
+        env:
+          PYTHONPATH: src
+          PYTHONDONTWRITEBYTECODE: "1"
+        run: |
+          python scripts/export_3d_pack.py --out artifacts/3d-pack --seeds 11 29 47
+          python scripts/export_ai_mistakes_3d.py --out artifacts/3d-pack --seeds 11 29 47
+
+      - name: Install and build 3D Replay Studio
+        run: |
+          npm --prefix studio install
+          npm --prefix studio run build
+          cp -R artifacts/3d-pack studio/dist/3d-pack
+          touch studio/dist/.nojekyll
+
+      - name: Configure Pages
+        uses: actions/configure-pages@v5
+
+      - name: Upload Pages artifact
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: studio/dist
+
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4

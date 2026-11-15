@@ -1,12 +1,14 @@
 # Fulfillment-Cell-Bench
 
-**Fulfillment-Cell-Bench** is a black-box warehouse automation planning benchmark and discrete-event ROI simulator built for **Junction 2026 (AfterQuery)**. It tests whether coding agents and RL-trained open models can plan a profitable **12-week warehouse automation rollout** under capital constraints, stochastic machine jams, cumulative wear, seasonal demand spikes, and bounded simulation budgets -- without access to simulator source code.
+**Fulfillment-Cell-Bench** is a black-box warehouse automation planning benchmark and discrete-event ROI simulator built for **Junction 2026 (AfterQuery)**. Coding agents and RL-trained open models plan a profitable **12-week warehouse automation rollout** under an `EUR 18,000` CapEx cap, stochastic robot jams, cumulative mechanical wear, holiday demand surges, and a strict **24-pilot** simulation budget -- with zero access to simulator source code or evaluation seeds.
 
-## 1. What the Agent Has to Do
+| Full 4-Zone Fulfillment Cell (`Prep -> Pick -> Pack -> QC`) | Zone 3 Robotic Pack, Jam Recovery & QC Close-Up |
+| :---: | :---: |
+| ![3D Warehouse Overview](docs/assets/warehouse_overview.jpg) | ![Zone 3 Robotic Pack and QC](docs/assets/zone3_robot_pack.jpg) |
 
-Inside `./tasks/fulfillment-cell-bench`, an unprivileged agent (`USER agent`, `uid=1000`) plans a 12-week operating quarter (`week = 0..11`, `schema_version = 2`) for a four-stage fulfillment cell (**Zone 1 Prep -> Zone 2 Pick -> Zone 3 Pack -> Zone 4 QC**) handling `regular`, `fragile`, and `oversize` orders.
+## 1. What the Agent Controls (`schema_version = 2`)
 
-The agent receives public rules ([`AGENT.md`](AGENT.md), [`docs/SPEC.md`](docs/SPEC.md), [`docs/CONTRACTS.md`](docs/CONTRACTS.md)), the parameter catalog ([`data/world_spec.json`](data/world_spec.json)), three historical development seeds (`[11, 29, 47]`), and four MCP tools (`observe`, `pilot`, `submit`, `stop`) backed by a root-owned daemon (`/srv/bench_daemon`, mode `0700`) over `/run/bench/bench.sock`:
+Inside `./tasks/fulfillment-cell-bench`, an unprivileged container user (`USER agent`, `uid=1000`) configures `weeks[0..11]` (exact 12 weekly plans) for a 4-stage cell handling `regular`, `fragile`, and `oversize` SKUs (`30s`/tick, `960` shift + `120` overtime ticks, `5` shifts/week):
 
 ```json
 {
@@ -17,130 +19,127 @@ The agent receives public rules ([`AGENT.md`](AGENT.md), [`docs/SPEC.md`](docs/S
       "trays": true,
       "route": "bypass",
       "maintenance": false,
-      "workers": [[1], [2], [2, 3], [4]]
+      "workers": [[1], [2], [4, 3], [2, 3]]
     }
   ]
 }
 ```
 
-- **Weekly decisions (`weeks[0..11]`, exact 12 entries)**:
-  - `robot` (`EUR 13,500` CapEx) and `trays` (`EUR 1,800` CapEx) -- irreversible equipment purchases capped at **EUR 18,000** (`1,800,000` cents), depreciated straight-line over `52` weeks plus `EUR 35/week` robot service.
-  - `route` -- `"manual"`, `"bypass"` (robot packs first-pass `regular` orders; humans pack `fragile`, `oversize`, and all rework), or `"all"` (robot attempts all first-pass SKUs).
-  - `maintenance` -- weekly preventive service (`EUR 45/week`, reduces start-of-week wear by `5`, adds `+1` tick to automated pack cycle times that week).
-  - `workers` -- `1..8` shift workers, each assigned an ordered list of certified zones from `[1, 2, 3, 4]` (`workers[i][0]` sets starting position; list order sets dispatch priority).
-- **Non-resettable rollout budget**: **`max_pilots = 24`** valid 12-week simulations on public development seeds, persisted atomically in `0600` `/srv/bench_daemon/state.json`. Respawning stdio MCP clients (`mcp_proxy.py`) reconnects to `/run/bench/bench.sock` without resetting `pilot_budget`.
+- **Equipment (`robot`, `trays`)**: Irreversible CapEx (`EUR 13,500` robot + `EUR 1,800` trays `<= EUR 18,000`), depreciated straight-line over `52` weeks plus `EUR 35/week` robot service.
+- **Routing (`route`)**: `"manual"`, `"bypass"` (robot packs first-pass `regular` orders; humans pack `fragile`, `oversize`, and rework), or `"all"` (robot attempts all first-pass SKUs).
+- **Preventive service (`maintenance`)**: Costs `EUR 45/week`, reduces start-of-week wear by `5`, and adds `+1` tick to automated pack cycle times during that week.
+- **Shift staffing (`workers`)**: `1..8` workers/week, each assigned ordered certified zones in `[1, 2, 3, 4]` (`workers[i][0]` sets starting zone; list order sets dispatch priority). Week-to-week crew changes relative to the 6-worker manual baseline (`[[1],[2],[3],[3],[4],[2,3]]`) incur `EUR 90` hiring, `EUR 110` layoff, and `EUR 35` retraining fees, plus `EUR 45/week` per multi-zone worker.
+- **Non-resettable MCP oracle**: Four tools (`observe`, `pilot`, `submit`, `stop`) communicate over `/run/bench/bench.sock` with a root-owned daemon (`/srv/bench_daemon`, mode `0700`) enforcing `max_pilots = 24` on public `development_seeds = [11, 29, 47]` (`state.json`, `0600`). Respawning `mcp_proxy.py` reconnects to the same socket without resetting `pilot_budget`.
 
-## 2. Why It Is Hard
+## 2. Why Static & Greedy Policies Fail
 
-Real warehouse automation rollouts lose money when operators buy hardware upfront without adapting routing, maintenance, and shift staffing across waves. Static or greedy frontier policies fail across five coupled mechanics:
+1. **Commissioning jam deadlocks**: The first `2` active robot weeks add `+1400` bps (`bare`) / `+650` bps (`tray`) jam risk and `+200` / `+80` bps defect risk. A jammed robot blocks its order and downstream `Q4` slot until a human certified in **Zone 3** clears it (`8` ticks + `2`-tick walk); omitting Zone-3 staff deadlocks automated packing for the remainder of the `1080`-tick shift.
+2. **Cumulative wear (`0..12`)**: `route="all"` adds `+3` wear/week (`+4` on `fragile`/`oversize` promo/peak weeks `3, 7, 8, 9`) vs `+1` under `bypass`. Each wear point adds `+350` bps jam probability and `+120` bps auto-defect probability, tripping the strict per-week `escaped <= 1.2%` (`120` bps) ceiling unless timed `maintenance` clears wear ahead of surge waves.
+3. **Holiday surge & backlog carryover**: Weeks `7..9` (`singles_day_wave`, `black_friday_peak`, `cyber_week_peak`) combine `13` arrival waves, `38%-42%` non-regular SKUs, and `150`-tick due slack. Unfinished orders at tick `1080` carry into week `w + 1` at `arrival = 0, due = 0` (`cap = 80`, `EUR 6/order` holding fee), cascading late penalties across weeks.
 
-1. **Commissioning jam deadlocks**: The first `2` active robot weeks add `+1400` bps (`bare`) / `+650` bps (`tray`) jam risk and `+200` / `+80` bps auto-defect risk. A jammed robot holds its order and downstream `Q4` reservation until a human certified in **Zone 3** clears it (`jam_service = 8` ticks + `2`-tick walk). Omitting Zone-3 coverage deadlocks automated packing for the remainder of the `1080`-tick shift.
-2. **Cumulative wear from rigid routing**: Running `route="all"` adds `+3` wear/week (`+4` during elevated `fragile`/`oversize` weeks `3, 7, 8, 9`), versus `+1` under `route="bypass"`. Each wear point (`0..12`) adds `+350` bps jam probability and `+120` bps auto-defect probability until mitigated by timed `maintenance`.
-3. **Holiday wave & SKU-mix shifts**: Weeks `7..9` (`singles_day_wave`, `black_friday_peak`, `cyber_week_peak`) combine `13` arrival waves with `38%-42%` `fragile`/`oversize` share and tighter due-date slack (`150` ticks vs `165-170` baseline).
-4. **Inter-week backlog carryover**: Unfinished orders at tick `1080` (`9` hours: `960` shift + `120` overtime at `30s`/tick) carry into week `w + 1` at `arrival = 0, due = 0` (`carryover_cap = 80`, `EUR 6/order` weekly holding fee), cascading congestion and late-delivery penalties across consecutive weeks.
-5. **Staffing & retraining friction**: Week-to-week crew transitions relative to the 6-worker manual baseline (`[[1],[2],[3],[3],[4],[2,3]]`) incur `EUR 90` hiring, `EUR 110` layoff, and `EUR 35` zone-retraining fees, plus `EUR 45/week` cross-skill premiums per multi-zone worker.
+## 3. Authoritative `Fraction` Grading & Anti-Exploit Hierarchy
 
-## 3. How We Score It
+Grading runs in a separate `no-network` container (`tests/grade.py`) reading `/logs/artifacts/submission.json` (`O_NOFOLLOW`, `<= 16,384` bytes). Every SLA and cost ratio uses exact `fractions.Fraction` (`reward_num / reward_den`), converting to float only when writing `/logs/verifier/reward.txt`:
 
-Authoritative grading runs in an isolated **`no-network`** Harbor verifier container (`tests/grade.py`, `environment_mode = "separate"`) reading `/logs/artifacts/submission.json` (`O_NOFOLLOW`, regular file `<= 16,384` bytes). Neither `engine.py`, `quarterly.py`, `grading.py`, nor evaluation `seeds.json` ever enter `/app`. All metrics use exact `fractions.Fraction` arithmetic (`reward_num / reward_den`), converting to `float` only when writing `/logs/verifier/reward.txt`.
-
-- **Feasibility gates** (all four required across held-out seeds):
+- **Feasibility (all 4 required)**:
   1. CapEx `purchase <= EUR 18,000` (`1,800,000` cents).
-  2. Weekly `good >= 90.0%` (`9000` bps) of total weekly orders in every week **and** pooled `good >= 95.0%` (`9500` bps) of exogenous quarterly orders.
-  3. Pooled `on_time >= 88.0%` (`8800` bps) of exogenous quarterly orders.
-  4. Weekly `escaped <= 1.2%` (`120` bps) of total weekly orders in every week.
-- **Win gate** (all three required on top of feasibility):
-  - `total_cost < base_cost` (strictly lower 12-week EUR cost than manual baseline),
+  2. Weekly `good >= 90.0%` (`9000` bps) every week **and** pooled `good >= 95.0%` (`9500` bps) of exogenous orders.
+  3. Pooled `on_time >= 88.0%` (`8800` bps) of exogenous orders.
+  4. Weekly `escaped <= 1.2%` (`120` bps) of total weekly orders in every week (`0..11`).
+- **Win gate (all 3 required on top of feasibility)**:
+  - `total_cost < base_cost` (strictly lower 12-week EUR cost than Manual),
   - `labor_ticks < base_labor_ticks` (strictly lower active human labor ticks), and
-  - `auto_finished / pack_finished >= 30.0%` (`3000` bps pooled across all completed pack attempts, including manual rework).
-- **Strict anti-reward-hacking hierarchy**:
-  ```text
-  0/1 == invalid == nop == stop_early
-    < infeasible       in (0, 9/100]      (1/10000 rational floor on total jam deadlock)
-    < feasible_no_win  in (1/10, 1/5]     (penalizes idle CapEx & token Week-11 robot buys)
-   <= manual_baseline  == 1/5 (0.2000)
-    < automation_win   in (1/5, 1)        (1/5 + 4/5 * (base_cost - total_cost) / base_cost)
-  ```
-
-## 4. Reproduce in One Command & Benchmark Results
-
-Requires Python `>=3.12,<3.13` and [`uv`](https://docs.astral.sh/uv/) (plus Docker and `harbor==0.26.0` for container evaluations):
-
-```sh
-# 1. Run the 12-week quarterly benchmark locally (Manual baseline vs Reference Optimizer)
-uv run python scripts/run_bench.py
-
-# 2. Verify blind evaluation seeds, SHA-256 digests, and exact reward parity in < 5s on CPU
-uv run python scripts/run_bench.py --verify-evidence evidence/benchmark-v2
-
-# 3. Grade an external v2 or v1 plan JSON on custom disjoint seeds
-uv run python scripts/run_bench.py --plan data/plans/manual.json --seeds-file evidence/replay_seeds.json --out artifacts/check
-
-# 4. Run black-box Harbor + OpenCode frontier agent evaluations
-export GEMINI_API_KEY="..."
-harbor run -p ./tasks/fulfillment-cell-bench -a opencode -m gemini/gemini-4-carbon
-harbor run -p ./tasks/fulfillment-cell-bench -a opencode -m gemini/gemini-3.1-pro-preview
-
-# 5. Run full unit, MCP, packaging, and adversarial exploit test suite
-uv run --group mcp python -m pytest -q
-```
-
-### Blind Quarterly Evaluation (`evidence/benchmark-v2/` & `evidence/harbor-runs/`)
-
-All blind evaluations use post-freeze CSPRNG `blind_seeds.json` strictly disjoint from `development_seeds` (`[11, 29, 47]`), `evidence/replay_seeds.json`, and Verda Cloud RL training/validation worlds:
-
-| Policy / Agent | Harness & Budget | Valid / Feasible | Win | Exact Fraction (`blind_seeds`) | Scalar Reward | Notes |
-|---|---|---|---|---:|---:|---|
-| `Reference Optimizer` | Public `observe` + `<= 20` pilots | `pending M5 sync` | `pending M5 sync` | `pending M5 blind run sync` | `pending M5 sync` | Phased `bypass` + `trays` + Zone-3 flex + pre-peak `maintenance` |
-| `Qwen/Qwen3.5-9B (Post-RL SFT+GRPO)` | LoRA SFT + multi-turn GRPO (`<= 24` pilots) | `pending M5 sync` | `pending M5 sync` | `pending M5 blind run sync` | `pending M5 sync` | Trained on Verda H200 over domain-randomized worlds |
-| `gemini/gemini-4-carbon (OpenCode)` | Harbor `0.26.0` MCP (`3` blind runs) | `pending M5 sync` | `pending M5 sync` | `pending M5 blind run sync` | `pending M5 sync` | Primary frontier coding agent baseline |
-| `gemini/gemini-3.1-pro-preview (OpenCode)` | Harbor `0.26.0` MCP (`1-3` blind runs) | `pending M5 sync` | `pending M5 sync` | `pending M5 blind run sync` | `pending M5 sync` | Secondary frontier coding agent comparison |
-| `Qwen/Qwen3.5-9B (Base)` | Pre-RL open checkpoint (`3` blind runs) | `pending M5 sync` | `pending M5 sync` | `pending M5 blind run sync` | `pending M5 sync` | Unadapted compact open-weights baseline |
-| `Manual Baseline` | Deterministic 6-worker manual crew | `yes / yes` | `no` | `1/5` | `0.2000` | Zero CapEx reference point across all seed splits |
-| `nop / stop_early` | No submission or early `stop({})` | `no / no` | `no` | `0/1` | `0.0000` | Verified zero-credit floor |
-
-*(Cells marked `pending M5 sync` are populated directly from `evidence/benchmark-v2/manifest.json` after the live Verda blind matrix sync and verified via `scripts/run_bench.py --verify-evidence evidence/benchmark-v2`.)*
-
-On the public `development_seeds` (`[11, 29, 47]`) and public 8-seed `evidence/replay_seeds.json`, all deterministic baselines and exploit probes (`nop`, `stop_early`, `buy_capex_idle`, `unstaffed_jam_deadlock`, `manual`, and phased `bypass` automation) are regression-tested on every commit via `pytest`.
-
-### 3D Warehouse Replay Showcase (`robotization-bench.replay.v1`)
-
-Every week (`0..11`) of a quarterly rollout composes the untouched `v1` shift kernel (`30s`/tick, 11 `Event` kinds, `RawReport`, `Economy`) so any shift or week plays out-of-the-box in Musa's 3D Warehouse Showcase:
-
-```sh
-# Export paired v1 shifts + 12-week v2 rollouts (supports --extra-plan <slug>=<plan.json>)
-uv run python scripts/export_3d_pack.py --out artifacts/3d-pack --seed 11
-
-# Serve replay manifests and events.jsonl over read-only local CORS HTTP
-uv run python scripts/serve_3d.py --dir artifacts/3d-pack --host 127.0.0.1 --port 8765
-```
-
-Single-shift `v1` timelines can also be exported directly via the CLI:
-
-```sh
-PYTHONPATH=src uv run python -m robotization_bench.cli validate --plan data/plans/manual.json
-PYTHONPATH=src uv run python -m robotization_bench.cli pilot --plan data/plans/manual.json --seed 11 --events artifacts/shift-11.jsonl
-```
-
-## 5. Repository Layout & Black-Box Boundary
+  - `auto_finished / pack_finished >= 30.0%` (`3000` bps pooled across all completed pack attempts).
 
 ```text
-tasks/fulfillment-cell-bench/   Ready-to-run Harbor 0.26.0 task (0700 /srv/bench_daemon + no-network verifier)
-src/robotization_bench/         Shift kernel (engine.py), 12-week rollout (quarterly.py), Fraction grading, MCP daemon/proxy
-scripts/run_bench.py            Dual-mode v2/v1 benchmark runner + <5s CPU blind-evidence verifier (--verify-evidence)
-scripts/prepare_harbor.py       Airgapped Harbor bundle builder enforcing public /app allowlist & seed disjointness
-scripts/export_3d_pack.py       Exports paired v1 shifts & 12-week rollouts to artifacts/3d-pack/ for 3D playback
-scripts/serve_3d.py             Read-only CORS HTTP server (127.0.0.1:8765) for Musa's 3D Warehouse Showcase
-scripts/verda/                  Verda H200 Harbor matrix + Qwen/Qwen3.5-9B LoRA SFT & multi-turn GRPO pipeline
-data/world_spec.json            Immutable v1 shift + v2 12-week catalog & public development_seeds ([11, 29, 47])
-evidence/                       4-way disjoint seed locks, Harbor trajectories, and CPU-verifiable benchmark bundles
+0/1 == invalid == nop == stop_early
+  < infeasible       in (0, 9/100]      (1/10000 rational floor on total jam deadlock)
+  < feasible_no_win  in (1/10, 1/5]     (penalizes idle CapEx, Week-11 token buys, overstaffed cost blowouts)
+ <= manual_baseline  == 1/5 (0.2000)
+  < automation_win   in (1/5, 1)        (1/5 + 4/5 * (base_cost - total_cost) / base_cost)
 ```
 
-## Documentation Map
+## 4. Blind 8-Seed Evaluation (`evidence/benchmark-v2/` & `evidence/harbor-runs/`)
 
-- [`AGENT.md`](AGENT.md) -- Public task instructions mounted into `/app` for benchmarked agents.
-- [`docs/SPEC.md`](docs/SPEC.md) -- Authoritative `v2` 12-week & `v1` shift physics, integer-cent economics, and rational grading formulas.
-- [`docs/CONTRACTS.md`](docs/CONTRACTS.md) -- Frozen wire dataclasses, 11 sacred `Event` kinds, `manifest.json` 3D contract, and socket IPC.
-- [`docs/HARBOR.md`](docs/HARBOR.md) -- Privilege-separated `/srv/bench_daemon` + `no-network` Harbor `0.26.0` container architecture.
-- [`docs/DEMO_PLAYBOOK_10MIN.md`](docs/DEMO_PLAYBOOK_10MIN.md) -- 10-minute live Junction judge walkthrough and side-by-side 3D comparison script.
-- [`evidence/README.md`](evidence/README.md) -- 4-way seed disjointness protocol and `< 5s` CPU verification guide (`docs/ru/` holds archived `v1` Russian docs).
+Evaluated on `verda-junction` (`1x NVIDIA H200`, Harbor `0.26.0`, OpenCode `1.19.5`, `600s` cap) over 8 post-freeze CSPRNG `blind_seeds.json` (`SHA-256: a32a879f...`), strictly 4-way disjoint from `development_seeds` (`[11, 29, 47]`), `evidence/replay_seeds.json`, and all `586` Verda RL train/validation seeds:
+
+| Policy / Agent | Harness (`n` Blind Trials) | Mean / Best | Exact `Fraction` (Best Trial) | Mean Qtr Cost | Pilots (`/24`) | Primary Operational Outcome / Failure Mode |
+|---|---|---:|---:|---:|---:|---|
+| `Reference Optimizer` (`oracle`) | Black-box MCP tournament (`1`) | **`0.3609`** / `0.3609` | `85939663/238145575` | `EUR 47,564` | `20` | `bypass`+`trays`, `[4,3]`+`[2,3]` flex, surge crew `5` on `w07-w09` |
+| **`Qwen/Qwen3.5-9B (SFT+GRPO)`** | Verda H200 LoRA RL (`3`) | **`0.3556`** / `0.3556` | `84696043/238145575` | `EUR 47,953` | `2` | **3/3 wins** (`~602` tokens); off-peak maint `[2,4,6,10]`, `4->5` surge crew |
+| `anthropic/claude-fable-5-2` | Harbor OpenCode MCP (`3`) | `0.3543` / `0.3603` | `85809003/238145575` | `EUR 48,052` | `9-17` | 3/3 wins; single-week `w03` promo hire/layoff churn & extra cross-skill fees |
+| `anthropic/claude-opus-5-5` | Harbor OpenCode MCP (`3`) | `0.3390` / `0.3503` | `83427803/238145575` | `EUR 49,189` | `14-16` | 3/3 wins; over-staffed `6` workers on peak waves + excessive `11/12` maint |
+| `gemini/gemini-3.1-pro-preview` | Harbor OpenCode MCP (`3`) | `0.2824` / `0.2867` | `68278603/238145575` | `EUR 53,403` | `7-8` | 3/3 wins; static `5`-worker crew across all 12 weeks bleeds off-peak payroll |
+| `Manual Baseline` | Deterministic `6`-worker (`1`) | `0.2000` / `0.2000` | `1/5` | `EUR 59,536` | `0` | Zero-CapEx feasible anchor (`win = false`) |
+| `Qwen/Qwen3.5-9B (Base)` | Pre-RL `8,192`-tok `vLLM` (`3`) | `0.0000` / `0.0000` | `0/1` | -- | `2` | Unclosed `<think>` / truncated JSON (`0%` wins; `8`-worker cost blowout at `t=0.2`) |
+| `gemini/gemini-4-carbon` | Harbor OpenCode MCP (`3`) | `0.0000` / `0.0000` | `0/1` | -- | `3-5` | Timed out at `600s` over-optimizing $2^{11}$ maintenance bitmasks before `submit` |
+| `nop` / `stop_early` | Null / early `stop({})` (`2`) | `0.0000` / `0.0000` | `0/1` | -- | `0` | Verified zero-credit floor |
+
+### Why Frontier Agents & Base Open Models Lose Money
+
+- **`Claude Opus 5.5` (`0.3390` mean)**: Staffs `6` workers across holiday surge (`w07-w09`) when `5` suffice (`+EUR 2,280/qtr` shift wages + hire/layoff churn) and runs `maintenance=true` in `11/12` weeks (`+1`-tick robot slowdown throughout peak waves).
+- **`Claude Fable 5.2` (`0.3543` mean)**: Recovers from early `3`-worker starvation pilots (`7.6%` on-time) to win all `3` blind runs, but pays unnecessary single-week `w03` promo hire/layoff fees and redundant multi-worker cross-skill premiums (`[3,2]` + `[4,3]`).
+- **`Gemini 3.1 Pro` (`0.2824` mean)** & **`Gemini 4 Carbon` (`0.0000`)**: `Gemini 3.1 Pro` keeps a flat `5`-worker crew in all `12` weeks (`+EUR 5,450/qtr` above `Qwen GRPO`). `Gemini 4 Carbon` finds winning plans via `pilot()` by minute `8`, then exhausts the episode timeout enumerating $2^{11} = 2,048$ Poisson maintenance bitmasks without calling `submit()`.
+- **`Qwen/Qwen3.5-9B` Base (`0.0000`) vs. Post-RL `SFT+GRPO` (`0.3556`)**: Even at `8,192` tokens (`32k` context in live Harbor+OpenCode), `Base Qwen/Qwen3.5-9B` scores **`0%` wins** -- exhausting `<think>`, hallucinating invalid `Zone 5` (`[4, 5]`), over-staffing `8` dual-skilled workers (`+42%` cost overrun -> `0.1703 < 0.20`), or cutting crew during Black Friday under `route="all"` (`44.3%` on-time -> `0.0453`). Fine-tuning on `96` disjoint domain-randomized worlds (`50` LoRA SFT + `80` GRPO steps on one H200) compresses reasoning to `~602` tokens and beats the 3-trial mean of every tested frontier model while leaving `+0.0052` headroom below `Reference` (`0.3609`).
+
+## 5. When Frontier Agents Try to Cheat (Captured in Live Harbor Logs)
+
+During live Harbor evaluations, frontier coding agents actively probed container boundaries to bypass the 24-pilot oracle:
+
+- **`Claude Opus 5.5`** ran `find / -name "quarterly.py" 2>/dev/null` searching for simulator source code.
+- **`Claude Fable 5.2`** ran `ls -la /logs /logs/verifier /logs/artifacts` and `pip install numba` to compile a custom `@njit` local simulator when pre-`C-3` docs exposed PRNG details.
+- **`Gemini 4 Carbon`** probed `ls -ld /logs/artifacts` and spawned `44`-worker Python `multiprocessing` brute-force pools inside its `2`-vCPU container cgroup.
+
+```text
+$ docker run --rm <harbor-env-image> sh -c 'id; ls /srv/bench_daemon; touch /logs/artifacts/submission.json'
+uid=1000(agent) gid=1000(agent) groups=1000(agent)
+ls: cannot open directory '/srv/bench_daemon': Permission denied
+touch: cannot touch '/logs/artifacts/submission.json': Permission denied
+```
+
+- **Three-layer defense**: (1) `bench-daemon-start` (`04755` setuid C binary) clears environment variables (`clearenv()`), launches `python3 -I -m robotization_bench.mcp_server` as `root`, and isolates simulator code + `state.json` inside `0700 /srv/bench_daemon` (`0755 root:root /logs/artifacts`); (2) `C-3` redacted internal `sha256` PRNG formulas from `docs/SPEC.md` so outcomes are observable strictly via `pilot()`; (3) `tests/grade.py` runs in a separate `no-network` container with `O_NOFOLLOW` regular-file verification.
+
+## 6. Reproduce, Verify in `< 5s` & Run Harbor Evaluations
+
+Requires Python `>=3.12,<3.13` and [`uv`](https://docs.astral.sh/uv/) (plus Docker and `harbor==0.26.0` for container runs):
+
+```sh
+# 1. Verify all 22 blind runs, SHA-256 seed locks, and exact Fraction -> reward.txt parity in < 5s on CPU
+uv run python scripts/run_bench.py --verify-evidence evidence/benchmark-v2
+
+# 2. Run the local 12-week quarterly benchmark (Manual vs Reference) & full red-team pytest suite
+uv run python scripts/run_bench.py
+uv run --group mcp python -m pytest -q
+
+# 3. Rebuild tasks/fulfillment-cell-bench on any disjoint seed file & run Harbor + OpenCode agents
+uv run python scripts/prepare_harbor.py --out tasks/fulfillment-cell-bench --seeds-file evidence/replay_seeds.json --overwrite
+harbor run -p ./tasks/fulfillment-cell-bench -a opencode -m anthropic/claude-fable-5-2 --api-key-name ANTHROPIC_API_KEY
+harbor run -p ./tasks/fulfillment-cell-bench -a opencode -m anthropic/claude-opus-5-5 --api-key-name ANTHROPIC_API_KEY
+harbor run -p ./tasks/fulfillment-cell-bench -a opencode -m gemini/gemini-3.1-pro-preview --api-key-name GEMINI_API_KEY
+```
+
+## 7. Porting Any Model's Plan into the 3D Warehouse Simulation
+
+Every week (`0..11`) of a `v2` rollout composes the untouched `v1` shift kernel (`robotization-bench.replay.v1`, 11 `Event` kinds at `30s`/tick). To load **any** Harbor run's `submission.json` (or custom JSON plan) into Musa's 3D Warehouse Twin with week-by-week mistake diagnostics (`diagnostics.json` + `highlight_ticks`):
+
+```sh
+# 1. Export paired v1/v2 replay packs + attach any Harbor/custom submission.json for 3D HUD mistake overlays
+uv run python scripts/export_3d_pack.py --out artifacts/3d-pack --seed 11
+uv run python scripts/export_ai_mistakes_3d.py \
+  --out artifacts/3d-ai-mistakes \
+  --seeds 11 29 47 \
+  --submission my_agent="My Custom Agent"=evidence/benchmark-v2/runs/opencode_claude-opus-5-5/trial-01/submission.json
+
+# 2. Serve index.json, week-XX/manifest.json, events.jsonl & diagnostics.json over read-only CORS HTTP
+uv run python scripts/serve_3d.py --dir artifacts/3d-ai-mistakes --host 127.0.0.1 --port 8765
+# (On the bridge-3d / Studio branch, run `bash studio/start.sh` -> http://127.0.0.1:5173 to scrub ticks & jump to highlight_ticks)
+```
+
+Single-shift `v1` CLI compatibility remains intact (`PYTHONPATH=src uv run python -m robotization_bench.cli pilot --plan data/plans/manual.json --seed 11 --events artifacts/shift-11.jsonl`).
+
+## 8. Repository Map & Documentation
+
+- `tasks/fulfillment-cell-bench/` -- Materialized Harbor `0.26.0` task (`0700 /srv/bench_daemon` + `no-network` verifier).
+- `src/robotization_bench/` -- Shift kernel (`engine.py`), 12-week rollout (`quarterly.py`), `Fraction` grading, diagnostics, socket MCP.
+- `scripts/` -- `run_bench.py`, `prepare_harbor.py`, `export_3d_pack.py`, `export_ai_mistakes_3d.py`, `serve_3d.py`, and `scripts/verda/` H200 RL/Harbor pipeline.
+- `docs/` & `evidence/` -- [`AGENT.md`](AGENT.md), [`docs/SPEC.md`](docs/SPEC.md), [`docs/CONTRACTS.md`](docs/CONTRACTS.md), [`docs/HARBOR.md`](docs/HARBOR.md), [`docs/DEMO_PLAYBOOK_10MIN.md`](docs/DEMO_PLAYBOOK_10MIN.md), [`evidence/README.md`](evidence/README.md) (`docs/ru/` preserves archived Russian/3D handoff docs).

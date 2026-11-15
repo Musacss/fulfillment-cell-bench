@@ -73,7 +73,7 @@ async function audit(directory,id){
 
 const index=await readJSON(path.join(root,'artifacts/3d-pack/index.json'));
 const real=[];
-for(const run of index.runs)real.push(await audit(path.join(root,'artifacts/3d-pack',run.bundle_dir),run.id));
+for(const run of index.runs.filter(r=>r.mode==='v1'))real.push(await audit(path.join(root,'artifacts/3d-pack',run.bundle_dir),run.id));
 const fixtureRoot=path.join(root,'artifacts/replay-player-fixtures'),controlled=[];
 for(const name of (await fs.readdir(fixtureRoot)).sort())controlled.push(await audit(path.join(fixtureRoot,name),name));
 const sum=(list,key)=>list.reduce((n,r)=>n+r.final[key],0);
