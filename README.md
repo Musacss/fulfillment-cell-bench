@@ -53,7 +53,7 @@ Tested via `harbor==0.26.0` + OpenCode (`10-minute` limit per trial) on `8` unse
 | Model / Strategy | Runs | Average Score (Best) | Mean 12-Wk Cost | Practice Runs Used (`/24`) | What Happened on the Warehouse Floor |
 |---|---:|---:|---:|---:|---|
 | **`Reference Solver` (`oracle`)** | `1` | **`0.3609`** (`0.3609`) | `EUR 47,564` | `20` | **Beats every AI trial**: `bypass` + trays, `4` off-peak workers, `5` in peak Weeks `7-9` |
-| **`Qwen/Qwen3.5-9B (Trained RL)`** | `3` | **`0.3556`** (`0.3556`) | `EUR 47,953` | `2` | **3/3 wins (#2 overall)**: learned warehouse physics in RL; needs only `2` quick check runs |
+| **`Qwen/Qwen3.5-9B (Trained RL)`** | `3` | **`0.3556`** (`0.3556`) | `EUR 47,953` | `2` | **3/3 wins (#1 AI model on average)**: learned warehouse physics in RL; needs only `2` check runs |
 | `Claude Fable 5.2` | `3` | `0.3543` (`0.3603`) | `EUR 48,052` | `9-17` | 3/3 wins, but hires & fires extra staff for a single 1-week promo (`Week 3`) |
 | `Claude Opus 5.5` | `3` | `0.3390` (`0.3503`) | `EUR 49,189` | `14-16` | 3/3 wins, but over-hires (`6` peak workers) and runs maintenance `11/12` weeks |
 | `Gemini 3.1 Pro` | `3` | `0.2824` (`0.2867`) | `EUR 53,403` | `7-8` | 3/3 wins, but keeps `5` workers all 12 weeks -- wasting `EUR 5,450` in quiet weeks |
