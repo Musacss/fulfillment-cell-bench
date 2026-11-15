@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 // Independent player acceptance tests. No production events or simulator code are changed.
 import assert from 'node:assert/strict';
+import {existsSync} from 'node:fs';
 import fs from 'node:fs/promises';
 import path from 'node:path';
 import crypto from 'node:crypto';
@@ -27,7 +28,13 @@ function command(executable,args,label){
  assert.equal(result.status,0,`${label} failed (${result.status}):\n${result.stdout}\n${result.stderr}`);
  return result.stdout;
 }
-command(path.join(ROOT,'.venv/bin/python'),['scripts/generate_player_fixtures.py'],'isolated engine fixtures');
+const venvPython=path.join(ROOT,'.venv/bin/python');
+const pyExe=existsSync(venvPython)?venvPython:'uv';
+const pyPrefix=existsSync(venvPython)?[]:['run','python'];
+if (!process.argv[2] && (!existsSync(path.join(pack,'v1-manual-seed11/manifest.json')) || !existsSync(path.join(pack,'v1-manual-seed29/manifest.json')))){
+ command(pyExe,[...pyPrefix,'scripts/export_3d_pack.py','--all-dev-seeds','--out',pack],'export default 3d pack');
+}
+command(pyExe,[...pyPrefix,'scripts/generate_player_fixtures.py'],'isolated engine fixtures');
 
 async function bundle(directory,id=path.basename(directory)){
  const manifest=await readJSON(path.join(directory,'manifest.json'));
