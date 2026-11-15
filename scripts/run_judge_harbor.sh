@@ -30,7 +30,7 @@ Options:
   -k, --trials N               Number of frontier trials (default: 3)
   -n, --concurrency N          Parallel trial concurrency (default: 3)
   -p, --task-dir DIR           Harbor task directory (default: ./tasks/fulfillment-cell-bench)
-      --seeds-file JSON        Optional custom holdout seeds JSON (rebuilds into a temp task copy)
+      --seeds-file JSON        Holdout seeds JSON (default: ./evidence/benchmark-v2/blind_seeds.json)
   -o, --out DIR                Output directory for Harbor logs (default: ./artifacts/judge-harbor-eval)
       --controls-only          Run oracle, nop, and stop_early only (skip opencode LLM trials)
   -h, --help                   Show this help message
@@ -68,6 +68,9 @@ WORK_TMP="$(mktemp -d "${TMPDIR:-/tmp}/fcb-judge.XXXXXX")"
 trap 'rm -rf "$WORK_TMP"' EXIT
 
 ACTIVE_TASK="$TASK_DIR"
+if [[ -z "$SEEDS_FILE" && "$TASK_DIR" == "${REPO_ROOT}/tasks/fulfillment-cell-bench" && -f "${REPO_ROOT}/evidence/benchmark-v2/blind_seeds.json" ]]; then
+  SEEDS_FILE="${REPO_ROOT}/evidence/benchmark-v2/blind_seeds.json"
+fi
 if [[ -n "$SEEDS_FILE" ]]; then
   ACTIVE_TASK="${WORK_TMP}/custom-task"
   PYTHONPATH="${REPO_ROOT}/src" "${PY_CMD[@]}" "${REPO_ROOT}/scripts/prepare_harbor.py" \

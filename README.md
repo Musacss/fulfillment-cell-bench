@@ -86,7 +86,7 @@ touch: cannot touch '/logs/artifacts/submission.json': Permission denied
 
 ## 5. Quick Start: Verify Our Results & Run the Judge Evaluation
 
-Requires Python `>=3.12,<3.13` and [`uv`](https://docs.astral.sh/uv/) (plus Docker and `harbor==0.26.0` for live container runs). `./tasks/fulfillment-cell-bench` is pre-packaged with the locked 8 unseen seeds, so Harbor commands reproduce the table above right after `git clone`:
+Requires Python `>=3.12,<3.13` and [`uv`](https://docs.astral.sh/uv/) (plus Docker and `harbor==0.26.0` for live container runs). `scripts/run_judge_harbor.sh` automatically stages our 8 unseen test seeds (`evidence/benchmark-v2/blind_seeds.json`) into a temp task copy so one command reproduces the table above right after `git clone`:
 
 ```sh
 # 1. Instant < 5s offline check: re-simulates all 22 blind runs on your CPU and verifies exact scores
@@ -99,11 +99,11 @@ uv run --group mcp python -m pytest -q
 # 3. One-command live Harbor judge suite: runs Reference (oracle) + Do-Nothing + Stop-Early + 3 agent runs
 bash scripts/run_judge_harbor.sh -m anthropic/claude-fable-5-2
 
-# 4. Or run individual Harbor commands directly (and optionally swap in your own private seed list)
+# 4. Or run individual Harbor commands directly (pass --seeds-file to stage blind_seeds.json or custom judge seeds)
+uv run python scripts/prepare_harbor.py --out /tmp/fcb-blind --seeds-file evidence/benchmark-v2/blind_seeds.json
 harbor run -p ./tasks/fulfillment-cell-bench -a oracle
 harbor run -p ./tasks/fulfillment-cell-bench -a nop
 harbor run -p ./tasks/fulfillment-cell-bench -a opencode -m anthropic/claude-opus-5-5 -k 3 -n 3
-uv run python scripts/prepare_harbor.py --out tasks/fulfillment-cell-bench --seeds-file /path/to/judge_seeds.json --overwrite
 ```
 
 ## 6. Watch Any Model Inside the 3D Warehouse Simulation
