@@ -55,13 +55,16 @@ jobs:
           cp -R artifacts/3d-pack studio/dist/3d-pack
           touch studio/dist/.nojekyll
 
-      - name: Check if GitHub Pages is enabled on repository
+      - name: Check if GitHub Pages is configured for GitHub Actions workflow
         id: check_pages
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          HAS_PAGES=$(gh api "repos/${{ github.repository }}" --jq '.has_pages' 2>/dev/null || echo "false")
-          echo "enabled=${HAS_PAGES}" >> "$GITHUB_OUTPUT"
+          if [ "$(gh api "repos/${{ github.repository }}/pages" --jq '.build_type == "workflow"' 2>/dev/null || echo "false")" = "true" ]; then
+            echo "enabled=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "enabled=false" >> "$GITHUB_OUTPUT"
+          fi
 
       - name: Upload Pages artifact
         uses: actions/upload-pages-artifact@v3
