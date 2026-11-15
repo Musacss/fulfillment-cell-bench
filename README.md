@@ -101,38 +101,43 @@ touch: cannot touch '/logs/artifacts/submission.json': Permission denied
 
 ## 6. Reproduce, Verify in `< 5s` & Run Harbor Evaluations
 
-Requires Python `>=3.12,<3.13` and [`uv`](https://docs.astral.sh/uv/) (plus Docker and `harbor==0.26.0` for container runs):
+Requires Python `>=3.12,<3.13` and [`uv`](https://docs.astral.sh/uv/) (plus Docker and `harbor==0.26.0` for live container runs). `./tasks/fulfillment-cell-bench` ships pre-built on the locked 8 blind seeds (`a32a879f...`), so Harbor commands reproduce the table above out of the box:
 
 ```sh
-# 1. Verify all 22 blind runs, SHA-256 seed locks, and exact Fraction -> reward.txt parity in < 5s on CPU
+# 1. Offline < 5s CPU check: re-simulates all 22 blind runs & verifies exact Fraction -> reward.txt parity
 uv run python scripts/run_bench.py --verify-evidence evidence/benchmark-v2
 
-# 2. Run the local 12-week quarterly benchmark (Manual vs Reference) & full red-team pytest suite
+# 2. Local 12-week simulator benchmark (Manual vs Reference) & full red-team / E2E test suite
 uv run python scripts/run_bench.py
 uv run --group mcp python -m pytest -q
 
-# 3. Rebuild tasks/fulfillment-cell-bench on any disjoint seed file & run Harbor + OpenCode agents
-uv run python scripts/prepare_harbor.py --out tasks/fulfillment-cell-bench --seeds-file evidence/replay_seeds.json --overwrite
-harbor run -p ./tasks/fulfillment-cell-bench -a opencode -m anthropic/claude-fable-5-2 --api-key-name ANTHROPIC_API_KEY
-harbor run -p ./tasks/fulfillment-cell-bench -a opencode -m anthropic/claude-opus-5-5 --api-key-name ANTHROPIC_API_KEY
-harbor run -p ./tasks/fulfillment-cell-bench -a opencode -m gemini/gemini-3.1-pro-preview --api-key-name GEMINI_API_KEY
+# 3. One-command live Harbor judge suite: runs reference (oracle) + do-nothing (nop) + stop-early + 3x OpenCode runs
+bash scripts/run_judge_harbor.sh -m anthropic/claude-fable-5-2
+
+# 4. Individual Harbor commands (or swap in private judge holdout seeds via prepare_harbor.py)
+harbor run -p ./tasks/fulfillment-cell-bench -a oracle
+harbor run -p ./tasks/fulfillment-cell-bench -a nop
+harbor run -p ./tasks/fulfillment-cell-bench -a opencode -m anthropic/claude-opus-5-5 -k 3 -n 3
+uv run python scripts/prepare_harbor.py --out tasks/fulfillment-cell-bench --seeds-file /path/to/judge_seeds.json --overwrite
 ```
 
 ## 7. Porting Any Model's Plan into the 3D Warehouse Simulation
 
-Every week (`0..11`) of a `v2` rollout composes the untouched `v1` shift kernel (`robotization-bench.replay.v1`, 11 `Event` kinds at `30s`/tick). To load **any** Harbor run's `submission.json` (or custom JSON plan) into Musa's 3D Warehouse Twin with week-by-week mistake diagnostics (`diagnostics.json` + `highlight_ticks`):
+Every week (`0..11`) of a `v2` rollout composes the untouched `v1` shift kernel (`robotization-bench.replay.v1`, 11 `Event` kinds at `30s`/tick). To inspect all bundled Claude/Gemini/Qwen rollouts or port **any** Harbor run's `submission.json` into the 3D Warehouse Twin with HUD mistake callouts (`diagnostics.json` + `highlight_ticks`):
 
 ```sh
-# 1. Export paired v1/v2 replay packs + attach any Harbor/custom submission.json for 3D HUD mistake overlays
-uv run python scripts/export_3d_pack.py --out artifacts/3d-pack --seed 11
+# 1a. Zero-flag export: automatically bundles Manual, Reference + all 6 real Claude/Gemini/Qwen runs
+uv run python scripts/export_ai_mistakes_3d.py --out artifacts/3d-ai-mistakes
+
+# 1b. Or port your own Harbor / custom submission.json alongside Manual & Reference
 uv run python scripts/export_ai_mistakes_3d.py \
   --out artifacts/3d-ai-mistakes \
   --seeds 11 29 47 \
   --submission my_agent="My Custom Agent"=evidence/benchmark-v2/runs/opencode_claude-opus-5-5/trial-01/submission.json
 
-# 2. Serve index.json, week-XX/manifest.json, events.jsonl & diagnostics.json over read-only CORS HTTP
+# 2. Serve index.json, week-XX/manifest.json, events.jsonl & diagnostics.json over local CORS HTTP
 uv run python scripts/serve_3d.py --dir artifacts/3d-ai-mistakes --host 127.0.0.1 --port 8765
-# (On the bridge-3d / Studio branch, run `bash studio/start.sh` -> http://127.0.0.1:5173 to scrub ticks & jump to highlight_ticks)
+# (With the 3D Studio player checked out, run `bash studio/start.sh` -> http://127.0.0.1:5173 to scrub ticks & jump to highlight_ticks)
 ```
 
 Single-shift `v1` CLI compatibility remains intact (`PYTHONPATH=src uv run python -m robotization_bench.cli pilot --plan data/plans/manual.json --seed 11 --events artifacts/shift-11.jsonl`).
