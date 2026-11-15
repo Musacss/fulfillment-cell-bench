@@ -39,7 +39,7 @@ Work products lived across four separate refs that had never been unified onto `
 1. **PR #5 Conflict Resolution & Merge (`727eb82`)**:
    - Merged `swarm/e2e-suite` (`f0ce5d5`), `origin/main` (`9c6c3fb`), and `origin/bridge-3d` (`4f10906`) into `ilyas/dev`, resolving all 3-way conflicts in favor of the hardened `v2` modules while preserving all `docs/ru/examples/*.json` plans and `export_ai_mistakes_3d.py` defaults.
    - Verified GitHub reported `"mergeable": "MERGEABLE"` and `"mergeStateStatus": "CLEAN"` on PR #5 and merged cleanly into `Musacss/fulfillment-cell-bench:main` (`727eb82`).
-2. **PR #7 Studio, CI & Diagnostics Integration (`feat/replay-studio-and-pages-deploy` -> `main`)**:
+2. **PR [#7](https://github.com/Musacss/fulfillment-cell-bench/pull/7) Studio, CI & Diagnostics Integration (`feat/replay-studio-and-pages-deploy` -> `main`, merged `47578f5`)**:
    - Merged `origin/codex/replay-studio` (`d346831`), preserving all 15 frozen GLB SHA-256 hashes and sacred `v1` 7-key `Event` replay parsing (`studio/src/replay.js`).
    - Wired English Studio UI labels, auto-detected relative `./3d-pack/index.json` on HTTPS hosts, and added the `AI DIAGNOSTICS / HUD` inspector (`key_mistakes`, `hud_callout`, `active_mistakes`, interactive `highlight_ticks` seek buttons).
    - Added `.github/workflows/deploy-studio-pages.yml` for automated GitHub Pages deployment from `main`.
