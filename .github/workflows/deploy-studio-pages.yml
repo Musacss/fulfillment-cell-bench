@@ -1,4 +1,4 @@
-name: Deploy 3D Replay Studio to GitHub Pages
+name: Build & Deploy 3D Replay Studio
 
 on:
   push:
@@ -16,11 +16,10 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
-  build-and-deploy:
-    environment:
-      name: github-pages
-      url: ${{ steps.deployment.outputs.page_url }}
+  build-studio:
     runs-on: ubuntu-latest
+    outputs:
+      pages_enabled: ${{ steps.check_pages.outputs.enabled }}
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -34,6 +33,12 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: "22"
+
+      - name: Verify Harbor bundle parity
+        env:
+          PYTHONPATH: src
+          PYTHONDONTWRITEBYTECODE: "1"
+        run: python scripts/prepare_harbor.py --check
 
       - name: Export v1 + v2 Quarterly + Multi-Model AI-Mistakes 3D Pack
         env:
@@ -50,13 +55,29 @@ jobs:
           cp -R artifacts/3d-pack studio/dist/3d-pack
           touch studio/dist/.nojekyll
 
-      - name: Configure Pages
-        uses: actions/configure-pages@v5
+      - name: Check if GitHub Pages is enabled on repository
+        id: check_pages
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          HAS_PAGES=$(gh api "repos/${{ github.repository }}" --jq '.has_pages' 2>/dev/null || echo "false")
+          echo "enabled=${HAS_PAGES}" >> "$GITHUB_OUTPUT"
 
       - name: Upload Pages artifact
         uses: actions/upload-pages-artifact@v3
         with:
           path: studio/dist
+
+  deploy-pages:
+    needs: build-studio
+    if: needs.build-studio.outputs.pages_enabled == 'true'
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    runs-on: ubuntu-latest
+    steps:
+      - name: Configure Pages
+        uses: actions/configure-pages@v5
 
       - name: Deploy to GitHub Pages
         id: deployment
