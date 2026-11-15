@@ -4,6 +4,8 @@ Most real-world warehouse robot rollouts lose money in their first quarter -- no
 
 **Fulfillment-Cell-Bench** turns that 12-week warehouse rollout into a black-box reinforcement learning environment built for **Junction 2026 (AfterQuery)**. AI agents cannot read the simulator code or see the test seeds: they get **24 practice test runs ("pilots")** to experiment, then submit one 12-week plan that is graded on unseen quarters.
 
+**Live 3D Warehouse Replay Studio (No Install Needed):** [Open Live 3D Showcase](https://freezegu.github.io/4-horses-replay-studio/) (GitHub Pages mirror: [`musacss.github.io/fulfillment-cell-bench`](https://musacss.github.io/fulfillment-cell-bench/))
+
 | Full 4-Zone Cell (`Prep -> Pick -> Pack -> QC`) | Zone 3 Packing Robot, Safety Cage & QC |
 | :---: | :---: |
 | ![3D Warehouse Overview](docs/assets/warehouse_overview.jpg) | ![Zone 3 Robotic Pack and QC](docs/assets/zone3_robot_pack.jpg) |
