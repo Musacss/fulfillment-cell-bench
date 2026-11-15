@@ -135,9 +135,9 @@ uv run python scripts/export_ai_mistakes_3d.py \
   --seeds 11 29 47 \
   --submission my_agent="My Custom Agent"=evidence/benchmark-v2/runs/opencode_claude-opus-5-5/trial-01/submission.json
 
-# 2. Serve index.json, week-XX/manifest.json, events.jsonl & diagnostics.json over local CORS HTTP
+# 2. Serve the 3D replay bundle (Terminal A) and launch the interactive 3D Replay Studio (Terminal B)
 uv run python scripts/serve_3d.py --dir artifacts/3d-ai-mistakes --host 127.0.0.1 --port 8765
-# (With the 3D Studio player checked out, run `bash studio/start.sh` -> http://127.0.0.1:5173 to scrub ticks & jump to highlight_ticks)
+bash studio/start.sh   # opens http://127.0.0.1:5173 to scrub 30s ticks & jump to highlight_ticks
 ```
 
 Single-shift `v1` CLI compatibility remains intact (`PYTHONPATH=src uv run python -m robotization_bench.cli pilot --plan data/plans/manual.json --seed 11 --events artifacts/shift-11.jsonl`).
