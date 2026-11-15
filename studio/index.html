@@ -1,0 +1,49 @@
+<!doctype html>
+<html lang="ru">
+<head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="theme-color" content="#142b43"><title>4 Horses — Replay Studio</title></head>
+<body>
+  <header class="app-header">
+    <div class="brand"><span class="brand-symbol">4H</span><div><strong>4 HORSES</strong><span>REPLAY STUDIO <b>01</b></span></div></div>
+    <nav class="mode-switch" aria-label="Режим просмотра"><button data-mode="single" class="selected">Смена</button><button data-mode="compare">Сравнение</button><button data-mode="quarter" hidden>12 недель</button></nav>
+    <div class="connection"><span id="connection-dot" class="dot"></span><span id="connection-text">Подключение к мосту…</span><span class="readonly">READ ONLY</span></div>
+    <button id="inspector-toggle" class="header-button" aria-expanded="true">Показатели</button>
+  </header>
+  <div class="application">
+    <aside class="sidebar">
+      <section class="source-section"><div class="section-heading"><span>01 / ИСТОЧНИК</span><span id="source-kind" class="mini-tag">BRIDGE</span></div>
+        <form id="source-form"><label class="field-label" for="bridge-url">URL каталога пакетов</label><div class="input-action"><input id="bridge-url" type="url" value="http://127.0.0.1:8765/index.json" spellcheck="false" aria-label="URL каталога пакетов"><button type="submit" title="Подключиться к мосту" aria-label="Подключиться">↗</button></div></form>
+        <div class="offline-actions"><label class="file-button" for="local-files">Открыть файлы<input id="local-files" type="file" accept=".json,.jsonl,.ndjson" multiple></label><label class="file-button" for="local-folder">Папка<input id="local-folder" type="file" webkitdirectory multiple></label></div>
+        <p class="hint">manifest.json + events.jsonl<br>или папка пакета целиком</p>
+      </section>
+      <section><div class="section-heading"><span>02 / ПРОГОН</span><span id="seed-tag" class="mini-tag">SEED —</span></div>
+        <div id="single-fields"><label class="field-label" for="run-select">Стратегия / день</label><select id="run-select" disabled><option>Загрузка каталога…</option></select></div>
+        <div id="comparison-fields" hidden><label class="field-label" for="comparison-select">Пара на одном seed</label><select id="comparison-select"></select></div>
+        <div id="quarter-fields" hidden><label class="field-label" for="quarter-select">Квартальная стратегия</label><select id="quarter-select"></select></div>
+        <div id="week-fields" hidden><label class="field-label" for="week-select">Неделя</label><select id="week-select"></select></div>
+        <div id="plan-summary" class="plan-summary">Рассчитанная смена без изменения правил производства.</div>
+      </section>
+      <section><div class="section-heading"><span>03 / КАМЕРА</span><span class="mini-tag">ORBIT</span></div><div class="camera-grid">
+        <button data-camera="overview" class="selected">▧ Общий план</button><button data-camera="q1">Q1 / Pick</button><button data-camera="robot">Ячейка робота</button><button data-camera="qc">ОТК / выход</button><button data-camera="break">Зона отдыха</button>
+      </div><p class="hint">Мышь — вращение · колесо — масштаб<br>Правая кнопка — панорама</p></section>
+      <section><div class="section-heading"><span>04 / СЛОИ СЦЕНЫ</span><span id="layer-count" class="mini-tag">5 / 6</span></div><div id="layers" class="layers"></div></section>
+      <div class="sidebar-foot"><span class="dot"></span>1 единица = 1 метр<span>GLB v02 / Y-UP</span></div>
+    </aside>
+    <main class="main-area">
+      <div class="workspace-heading"><div><span class="eyebrow">ЦИФРОВОЙ ДВОЙНИК / УЧАСТОК КОМПЛЕКТАЦИИ</span><h1 id="workspace-title">Смена в трёх измерениях</h1></div><span id="replay-status" class="status-badge">Ожидание данных</span></div>
+      <div id="error-panel" class="error-panel" role="alert" hidden><strong>Не удалось открыть реплей</strong><p id="error-message"></p><button id="error-close" aria-label="Скрыть ошибку">×</button></div>
+      <div id="scene-grid" class="scene-grid"><section class="scene-panel" id="panel-left"><div class="scene-title"><span id="scene-label-left">4 Horses / Environment v02</span><span id="scene-info-left">Подготовка сцены</span></div><canvas id="canvas-left" aria-label="Интерактивная 3D-сцена левого прогона"></canvas><div id="scene-badges-left" class="scene-badges"></div><div class="scene-credit">X / Z · CAD GRID 1 m</div><div id="loading-left" class="loading"><span class="spinner"></span><strong>Загрузка 3D-окружения</strong><small>Геометрия и анимации v02</small></div></section>
+        <section class="scene-panel" id="panel-right" hidden><div class="scene-title"><span id="scene-label-right">Сравнение</span><span id="scene-info-right"></span></div><canvas id="canvas-right" aria-label="Интерактивная 3D-сцена правого прогона"></canvas><div id="scene-badges-right" class="scene-badges"></div><div class="scene-credit">НЕЗАВИСИМЫЙ ПРОГОН</div><div id="loading-right" class="loading"><span class="spinner"></span><strong>Загрузка второй сцены</strong></div></section></div>
+      <div class="scene-legend"><span><i class="legend-box"></i>Заказ</span><span><i class="legend-reserve"></i>Бронь выхода</span><span><i class="legend-empty"></i>Свободный слот</span><span class="legend-note" id="event-note">Данные реплея определяют каждое состояние</span></div>
+      <section class="transport" aria-label="Управление воспроизведением"><div class="timeline-head"><strong id="clock">00:00:00</strong><span id="tick-label">Тик 0 / —</span><span id="duration">Горизонт смены —</span></div><input id="timeline" type="range" min="0" max="1080" step="0.02" value="0" disabled aria-label="Время смены в тиках"><div class="transport-actions"><button id="play" class="play-button" disabled>▶ <span>Воспроизвести</span></button><button id="reset" title="Сбросить просмотр" disabled>↶ Сброс</button><span class="divider"></span><label class="speed-label">Скорость<select id="speed"><option value="1">1×</option><option value="5">5×</option><option value="20">20×</option><option value="60" selected>60×</option><option value="100">100×</option></select></label><div class="event-navigation"><select id="event-filter" aria-label="Тип важного события"><option value="all">Все важные события</option><option value="jam">Застревание</option><option value="assist">Помощь</option><option value="rework">Переделка</option><option value="break">Перерыв</option><option value="escaped">Выдан брак</option><option value="scrap">Списание</option></select><button id="next-event" disabled>Следующее ▷</button></div></div></section>
+    </main>
+    <aside id="inspector" class="inspector"><div class="inspector-tabs"><button data-inspector="0" class="selected">Прогон A</button><button data-inspector="1" hidden>Прогон B</button></div>
+      <section><div class="section-heading"><span>СЕЙЧАС В СМЕНЕ</span><span id="metrics-tick" class="mini-tag">0 TICK</span></div><div id="metrics" class="metric-grid"></div><div id="throughput" class="throughput"></div></section>
+      <section><div class="section-heading"><span>БУФЕРЫ И РЕЗЕРВЫ</span></div><table class="queue-table"><thead><tr><th>Очередь</th><th>Ждут</th><th>Бронь</th><th>Мест</th></tr></thead><tbody id="queue-body"></tbody></table></section>
+      <section><div class="section-heading"><span>РЕСУРСЫ</span></div><div id="resources" class="resources"></div></section>
+      <section id="quarter-summary" hidden><div class="section-heading"><span>КВАРТАЛ / НЕДЕЛЯ</span></div><div id="quarter-details"></div></section>
+      <section class="economy-section"><details open><summary>Итог рассчитанной смены <span>OpEx</span></summary><div id="costs" class="costs"></div></details><div id="purchase" class="purchase"></div><p class="hint">Полная стоимость рассчитана ядром.<br>Просмотр не изменяет расходы.</p></section>
+      <section id="evaluation" class="evaluation"></section>
+    </aside>
+  </div>
+  <script type="module" src="/src/app.js"></script>
+</body></html>

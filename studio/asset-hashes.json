@@ -1,0 +1,62 @@
+{
+  "4_Horses_Environment_v02/warehouse_environment.glb": {
+    "sha256": "5f2fca307763538e56a6370c6d601ee35742dd6878d3894b7cfef24cd5c2bfce",
+    "bytes": 10071556
+  },
+  "4_Horses_Environment_v02/modules/carton_closed.glb": {
+    "sha256": "681e47fa2cb3ac42d65955b710d4e2108c5d177e8107f78ef5afbd7eea499873",
+    "bytes": 40244
+  },
+  "4_Horses_Environment_v02/modules/carton_open.glb": {
+    "sha256": "6cced5ad81bf1e7675e46be7829ad85f4a1ce6a1eaa988e132f044461de617d4",
+    "bytes": 20532
+  },
+  "4_Horses_Environment_v02/modules/humanoid_robot.glb": {
+    "sha256": "d6642cb22fe1dc9a593e16138ab46b74e53b9843d538c323c006b38211eb222d",
+    "bytes": 692720
+  },
+  "4_Horses_Environment_v02/modules/inspection_portal.glb": {
+    "sha256": "398a264f6010efd466eb421ca2ca6bc5794e1765e102f8ca81fb1cfef3388f86",
+    "bytes": 61928
+  },
+  "4_Horses_Environment_v02/modules/packing_bench_1800.glb": {
+    "sha256": "24080d52876ca0a20ff4ee4636256605006ae77b54d7458beeeb7bd6d8f9181c",
+    "bytes": 119328
+  },
+  "4_Horses_Environment_v02/modules/pallet_1200x800.glb": {
+    "sha256": "994682fe292ce6846380d33173ef4e28ffb5323285be0b9ead066bb05674f7ab",
+    "bytes": 20812
+  },
+  "4_Horses_Environment_v02/modules/roller_conveyor_1800.glb": {
+    "sha256": "f4baebb0769e7adbfd22fdcb75fe645b376caa39cc4ccf2545a223f84d57a4e0",
+    "bytes": 57156
+  },
+  "4_Horses_Environment_v02/modules/shelving_1800.glb": {
+    "sha256": "4f518f2c80fd550f5ac21167fb251c507758ccfbca5dfd5b001d9f94c89dbc35",
+    "bytes": 385060
+  },
+  "4_Horses_Environment_v02/modules/supply_trolley.glb": {
+    "sha256": "770c81a1edf41958f7050f590da8ea0c92023d0ee8a9ffee7e18b08e725ff359",
+    "bytes": 82504
+  },
+  "4_Horses_Environment_v02/modules/tote_600x400.glb": {
+    "sha256": "538f459a83d1d2a2f468b6e40afe89cade5d631df42750c767441fb0c8f278b5",
+    "bytes": 54224
+  },
+  "4_Horses_Environment_v02/modules/visual_layout.glb": {
+    "sha256": "e84c52536543064e7706a31212dedb7ed266f18a61442fa7ba5eaf162a77be11",
+    "bytes": 631796
+  },
+  "4_Horses_Environment_v02/modules/visual_support.glb": {
+    "sha256": "11c3f2d0a621d560eeb613ec337a350996619ee25b8eb9750c6b601a7587bdfe",
+    "bytes": 79476
+  },
+  "4_Horses_Environment_v02/modules/warehouse_worker.glb": {
+    "sha256": "e20726849e91117a7f0330de8478c9cb3cca1c2982a0d336b241fd7984d0e60d",
+    "bytes": 780856
+  },
+  "4_Horses_Environment_v02/modules/workbench_1800.glb": {
+    "sha256": "bd5607f3e3460a5bca3a229faaa287c49be89260f04b38174057bc1c74f7bdf7",
+    "bytes": 134200
+  }
+}

@@ -1,0 +1,354 @@
+[
+  {
+    "id": "carton_closed",
+    "file": "modules/carton_closed.glb",
+    "bounds_min_m": [
+      -0.2,
+      -0.1511,
+      0
+    ],
+    "bounds_max_m": [
+      0.2,
+      0.1511,
+      0.25204999
+    ],
+    "actual_envelope_m": [
+      0.40000001,
+      0.3022,
+      0.25204999
+    ],
+    "origin": "root-local",
+    "editable_parts": 24,
+    "bounds_coordinate_system": "Blender Z-up"
+  },
+  {
+    "id": "carton_open",
+    "file": "modules/carton_open.glb",
+    "bounds_min_m": [
+      -0.38841174,
+      -0.29375371,
+      0
+    ],
+    "bounds_max_m": [
+      0.38841174,
+      0.29375371,
+      0.25177289
+    ],
+    "actual_envelope_m": [
+      0.77682348,
+      0.58750742,
+      0.25177289
+    ],
+    "origin": "root-local",
+    "editable_parts": 13,
+    "bounds_coordinate_system": "Blender Z-up",
+    "purpose": "Separate catalog asset; no carton embedded in active environment work areas"
+  },
+  {
+    "id": "humanoid_robot",
+    "file": "modules/humanoid_robot.glb",
+    "bounds_min_m": [
+      -0.45681159,
+      -0.14800009,
+      0.01199999
+    ],
+    "bounds_max_m": [
+      0.45681159,
+      0.126,
+      1.85100004
+    ],
+    "actual_envelope_m": [
+      0.91362318,
+      0.27400009,
+      1.83900005
+    ],
+    "origin": "floor-center / Blender Z-up",
+    "rigged": true,
+    "bones": 32,
+    "clips": [
+      "Idle",
+      "Walk",
+      "CarryIdle",
+      "Reach",
+      "PickUp",
+      "PlaceDown",
+      "CarryWalk",
+      "RobotPack",
+      "Jammed",
+      "Service",
+      "Offline",
+      "RobotPack_Oversize",
+      "Jammed_Oversize",
+      "Service_Oversize"
+    ],
+    "visual_states_document": "VISUAL_PREPARATION_RU.md",
+    "bounds_coordinate_system": "Blender Z-up"
+  },
+  {
+    "id": "inspection_portal",
+    "file": "modules/inspection_portal.glb",
+    "bounds_min_m": [
+      -0.28,
+      -0.59000001,
+      0
+    ],
+    "bounds_max_m": [
+      0.39250001,
+      0.59000001,
+      1.80249997
+    ],
+    "actual_envelope_m": [
+      0.67250002,
+      1.18000002,
+      1.80249997
+    ],
+    "origin": "root-local",
+    "editable_parts": 22,
+    "bounds_coordinate_system": "Blender Z-up"
+  },
+  {
+    "id": "packing_bench_1800",
+    "file": "modules/packing_bench_1800.glb",
+    "bounds_min_m": [
+      -0.89999998,
+      -0.52499999,
+      0
+    ],
+    "bounds_max_m": [
+      0.89999998,
+      0.45000001,
+      2.04000002
+    ],
+    "actual_envelope_m": [
+      1.79999995,
+      0.97500001,
+      2.04000002
+    ],
+    "origin": "root-local",
+    "editable_parts": 66,
+    "bounds_coordinate_system": "Blender Z-up"
+  },
+  {
+    "id": "pallet_1200x800",
+    "file": "modules/pallet_1200x800.glb",
+    "bounds_min_m": [
+      -0.60000002,
+      -0.40000001,
+      0
+    ],
+    "bounds_max_m": [
+      0.60000002,
+      0.40000001,
+      0.15000001
+    ],
+    "actual_envelope_m": [
+      1.20000005,
+      0.80000001,
+      0.15000001
+    ],
+    "origin": "root-local",
+    "editable_parts": 20,
+    "bounds_coordinate_system": "Blender Z-up"
+  },
+  {
+    "id": "roller_conveyor_1800",
+    "file": "modules/roller_conveyor_1800.glb",
+    "bounds_min_m": [
+      -0.89999998,
+      -0.4365,
+      0
+    ],
+    "bounds_max_m": [
+      0.89999998,
+      0.45600001,
+      0.94700001
+    ],
+    "actual_envelope_m": [
+      1.79999995,
+      0.89250001,
+      0.94700001
+    ],
+    "origin": "root-local",
+    "editable_parts": 65,
+    "bounds_coordinate_system": "Blender Z-up"
+  },
+  {
+    "id": "shelving_1800",
+    "file": "modules/shelving_1800.glb",
+    "bounds_min_m": [
+      -0.94099998,
+      -0.351,
+      0
+    ],
+    "bounds_max_m": [
+      0.94099998,
+      0.351,
+      2.51099995
+    ],
+    "actual_envelope_m": [
+      1.88199997,
+      0.702,
+      2.51099995
+    ],
+    "origin": "root-local",
+    "editable_parts": 403,
+    "bounds_coordinate_system": "Blender Z-up"
+  },
+  {
+    "id": "supply_trolley",
+    "file": "modules/supply_trolley.glb",
+    "bounds_min_m": [
+      -0.48499998,
+      -0.30000001,
+      0
+    ],
+    "bounds_max_m": [
+      0.48499998,
+      0.30000001,
+      1.0925
+    ],
+    "actual_envelope_m": [
+      0.96999997,
+      0.60000002,
+      1.09250001
+    ],
+    "origin": "root-local",
+    "editable_parts": 48,
+    "bounds_coordinate_system": "Blender Z-up"
+  },
+  {
+    "id": "tote_600x400",
+    "file": "modules/tote_600x400.glb",
+    "bounds_min_m": [
+      -0.30000001,
+      -0.2,
+      0
+    ],
+    "bounds_max_m": [
+      0.30000001,
+      0.2,
+      0.22
+    ],
+    "actual_envelope_m": [
+      0.60000003,
+      0.40000001,
+      0.22
+    ],
+    "origin": "root-local",
+    "editable_parts": 25,
+    "bounds_coordinate_system": "Blender Z-up"
+  },
+  {
+    "id": "visual_layout",
+    "file": "modules/visual_layout.glb",
+    "origin": "world / Blender Z-up; exported glTF Y-up",
+    "purpose": "Four stage anchors, robot/helper anchors and Q1/Q2/Q3/Q4/R preview places",
+    "bindings": "visual_bindings.json",
+    "preview_counts_are_capacities": false,
+    "bounds_min_m": [
+      -11.55000001,
+      -3.39549999,
+      0
+    ],
+    "bounds_max_m": [
+      7.60500002,
+      3.08250004,
+      0.91750002
+    ],
+    "actual_envelope_m": [
+      19.15500003,
+      6.47800003,
+      0.91750002
+    ],
+    "bounds_coordinate_system": "Blender Z-up"
+  },
+  {
+    "id": "visual_support",
+    "file": "modules/visual_support.glb",
+    "origin": "individual template roots / Blender Z-up; exported glTF Y-up",
+    "purpose": "Order types, slot outlines, reservations, universal trays, manual bench and status icons",
+    "simulation_rules": false,
+    "template_count": 14,
+    "bounds_min_m": [
+      -0.55000001,
+      -0.56999999,
+      -0.075
+    ],
+    "bounds_max_m": [
+      0.55000001,
+      0.47,
+      0.86000001
+    ],
+    "actual_envelope_m": [
+      1.10000002,
+      1.03999999,
+      0.93500002
+    ],
+    "bounds_coordinate_system": "Blender Z-up"
+  },
+  {
+    "id": "warehouse_worker",
+    "file": "modules/warehouse_worker.glb",
+    "bounds_min_m": [
+      -0.45168133,
+      -0.171,
+      0.01199999
+    ],
+    "bounds_max_m": [
+      0.45168133,
+      0.149,
+      1.9440001
+    ],
+    "actual_envelope_m": [
+      0.90336267,
+      0.32000001,
+      1.93200011
+    ],
+    "origin": "floor-center / Blender Z-up",
+    "rigged": true,
+    "bones": 26,
+    "clips": [
+      "Idle",
+      "Walk",
+      "CarryIdle",
+      "Reach",
+      "PickUp",
+      "PlaceDown",
+      "CarryWalk",
+      "Prepare",
+      "Pick",
+      "Pack",
+      "Inspect",
+      "Assist",
+      "Break",
+      "Prepare_Oversize",
+      "Pick_Oversize",
+      "Pack_Oversize",
+      "Inspect_Oversize"
+    ],
+    "visual_states_document": "VISUAL_PREPARATION_RU.md",
+    "bounds_coordinate_system": "Blender Z-up"
+  },
+  {
+    "id": "workbench_1800",
+    "file": "modules/workbench_1800.glb",
+    "bounds_min_m": [
+      -0.89999998,
+      -0.52499999,
+      0
+    ],
+    "bounds_max_m": [
+      0.89999998,
+      0.45000001,
+      0.86000003
+    ],
+    "actual_envelope_m": [
+      1.79999995,
+      0.97500001,
+      0.86000003
+    ],
+    "origin": "root-local",
+    "editable_parts": 77,
+    "bounds_coordinate_system": "Blender Z-up"
+  }
+]

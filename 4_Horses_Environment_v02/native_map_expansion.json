@@ -1,0 +1,70 @@
+{
+  "passed": true,
+  "room_m": [
+    36,
+    18,
+    3.6
+  ],
+  "dock_positions_blender_m": [
+    [
+      -17.85,
+      -5.15,
+      0
+    ],
+    [
+      17.85,
+      -5.15,
+      0
+    ]
+  ],
+  "straight_aisle_blender_y_m": [
+    -5.9,
+    -4.4
+  ],
+  "lane_x_m": [
+    -17.7,
+    17.7
+  ],
+  "arrow_centers_x_m": [
+    -11.8,
+    0.0,
+    11.8
+  ],
+  "arrow_spacing_m": 11.8,
+  "equal_end_margins_m": [
+    5.9,
+    5.9
+  ],
+  "floor_axes_removed": true,
+  "zones_blender_bounds_m": {
+    "PREP": [
+      -12.4,
+      -8.55,
+      0.65,
+      4.9
+    ],
+    "PICK": [
+      -8.15,
+      -3.95,
+      0.65,
+      4.9
+    ],
+    "PACK_ROBOT": [
+      -3.55,
+      5.1,
+      0.65,
+      4.9
+    ],
+    "QC": [
+      5.4,
+      8.775,
+      0.65,
+      4.9
+    ]
+  },
+  "production_object_fingerprints_preserved": 3527,
+  "character_animation_actions_preserved": 31,
+  "glbs_unchanged": 15,
+  "native_acceptance": "passed",
+  "preview_updated": true
+}
