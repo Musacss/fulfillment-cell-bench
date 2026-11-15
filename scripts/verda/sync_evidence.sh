@@ -71,6 +71,8 @@ RSYNC_EXCLUDES=(
   "--exclude=*.key"
   "--exclude=id_ed25519*"
   "--exclude=id_rsa*"
+  "--exclude=*.safetensors"
+  "--exclude=checkpoint-*"
 )
 
 if [[ "$DRY_RUN" -eq 1 ]]; then
@@ -351,3 +353,7 @@ if violations:
 
 print(json.dumps({"status": "scrub_verified_clean", "target": str(root)}))
 PY
+
+if [[ -z "$SMOKE_LOCAL_DIR" && -d "${DEST_DIR}/benchmark-v2" ]]; then
+  PYTHONPATH="${REPO_ROOT}/src" "$PY_BIN" "${REPO_ROOT}/scripts/run_bench.py" --verify-evidence "${DEST_DIR}/benchmark-v2"
+fi

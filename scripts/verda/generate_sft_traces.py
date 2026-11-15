@@ -376,6 +376,7 @@ def main(argv: Sequence[str] | None = None) -> int:
     ap = argparse.ArgumentParser(description=__doc__)
     ap.add_argument("--out", type=Path, default=REPO_ROOT / "artifacts" / "verda" / "sft_traces.jsonl")
     ap.add_argument("--rl-seeds-out", type=Path, default=None)
+    ap.add_argument("--train-seeds-file", "--seeds-file", dest="train_seeds_file", type=Path, default=None)
     ap.add_argument("--existing-blind-seeds", type=Path, default=None)
     ap.add_argument("--train-count", "--num-traces", "--count", "-n", dest="train_count", type=int, default=16)
     ap.add_argument("--val-count", type=int, default=4)
@@ -400,10 +401,20 @@ def main(argv: Sequence[str] | None = None) -> int:
 
     forbidden = set(dev_seeds) | set(replay_seeds) | set(existing_blind or [])
     train_n = 1 if args.dry_run else (min(args.train_count, 2) if args.smoke_local else args.train_count)
-    val_n = 1 if args.dry_run else (min(args.val_count, 2) if args.smoke_local else args.val_count)
+    val_n = 1 if args.dry_run else min(args.val_count, max(1, train_n))
+
+    explicit_train_seeds: list[int] | None = None
+    if args.train_seeds_file is not None:
+        raw_explicit = json.loads(args.train_seeds_file.read_text(encoding="utf-8"))
+        if isinstance(raw_explicit, dict) and "rl_train_seeds" in raw_explicit:
+            explicit_train_seeds = list(raw_explicit["rl_train_seeds"])
+        elif isinstance(raw_explicit, list):
+            explicit_train_seeds = list(raw_explicit)
+        else:
+            raise ValueError("--train-seeds-file must contain a JSON list of ints or {rl_train_seeds: [...]}")
 
     if args.dry_run:
-        rl_train_seeds = _fast_disjoint_csprng_seeds(max(1, train_n), forbidden)
+        rl_train_seeds = explicit_train_seeds if explicit_train_seeds is not None else _fast_disjoint_csprng_seeds(max(1, train_n), forbidden)
         rl_val_seeds = _fast_disjoint_csprng_seeds(max(1, val_n), forbidden | set(rl_train_seeds))
         verify_4way_seed_disjointness(dev_seeds, replay_seeds, rl_train_seeds, rl_val_seeds, existing_blind)
         print(
@@ -421,7 +432,11 @@ def main(argv: Sequence[str] | None = None) -> int:
         )
         return 0
 
-    rl_train_seeds = sample_feasible_csprng_seeds(base_world, count=max(1, train_n), forbidden=forbidden)
+    rl_train_seeds = (
+        explicit_train_seeds
+        if explicit_train_seeds is not None
+        else sample_feasible_csprng_seeds(base_world, count=max(1, train_n), forbidden=forbidden)
+    )
     rl_val_seeds = sample_feasible_csprng_seeds(
         base_world, count=max(1, val_n), forbidden=forbidden | set(rl_train_seeds)
     )
@@ -429,7 +444,7 @@ def main(argv: Sequence[str] | None = None) -> int:
 
     traces: list[dict[str, Any]] = []
     target_traces = max(1, train_n)
-    pilot_budget_per_ep = 8 if args.smoke_local else 16
+    pilot_budget_per_ep = 8 if (args.smoke_local or train_n <= 2) else 16
     used_all = set(forbidden) | set(rl_train_seeds) | set(rl_val_seeds)
     candidate_eval_seeds = list(rl_train_seeds)
     attempt = 0

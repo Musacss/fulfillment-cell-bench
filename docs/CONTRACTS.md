@@ -70,5 +70,5 @@ Every JSONL line exported by `reporting.export_events` contains **all 7 keys** (
 
 ## 4. MCP Tools & Privilege-Separated Unix Socket Wire Protocol
 
-- **MCP tools** (`mcp_server.py` & `mcp_proxy.py`): `observe({})`, `pilot({"plan": ..., "seed": ..., "trace": false})`, `submit({"plan": ...})`, `stop({})`.
+- **MCP tools** (`mcp_server.py` & `mcp_proxy.py`): `observe({})` (returning `world`, `rules`, `manual`, `development_seeds`, `history`, and `pilot_budget: {"used": int, "max": int}`), `pilot({"plan": ..., "seed": ..., "trace": false})`, `submit({"plan": ...})`, `stop({})`.
 - **Unix socket IPC (`/run/bench/bench.sock`)**: Newline-delimited UTF-8 JSON requests `{"action": "observe"|"pilot"|"submit"|"stop", "args": {...}}` from `SocketEpisodeClient` (`mcp_proxy.py`, zero simulator imports) to the root-owned `mcp_server.py` daemon, returning `{"ok": true, "result": ...}` or `{"ok": false, "error_type": ..., "error": ...}` while persisting `pilot_used`, `max_pilots`, `closed`, and `submission` atomically in `0600` `/srv/bench_daemon/state.json`.

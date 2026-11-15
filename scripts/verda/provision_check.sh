@@ -73,6 +73,9 @@ fi
 if [[ "$DRY_RUN" -eq 0 ]]; then
   mkdir -p "$HF_HOME" "$UV_CACHE_DIR" "$VLLM_CACHE_ROOT" "$TRITON_CACHE_DIR" "$TORCHINDUCTOR_CACHE_DIR" "$XDG_CACHE_HOME" "$TMPDIR"
   sudo shutdown -h +360 "6h budget guard" >/dev/null 2>&1 || true
+  if command -v nvidia-smi >/dev/null 2>&1; then
+    nvidia-smi -L >/dev/null 2>&1 || true
+  fi
   if command -v docker >/dev/null 2>&1; then
     docker image prune -f >/dev/null 2>&1 || true
   fi

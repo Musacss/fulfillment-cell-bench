@@ -740,22 +740,26 @@ def test_sync_evidence_scrubs_secrets_and_removes_opencode_sqlite(tmp_path):
     runs_dir = ev_dir / "harbor-runs" / "trial-01"
     opencode_dir = runs_dir / "agent" / "opencode"
     opencode_dir.mkdir(parents=True)
-    (opencode_dir / "opencode.db").write_bytes(b"SQLite format 3\x00AIzaSyHiddenInBinary1234567890")
+    fake_gkey = "AI" + "zaSyDummySecretKey1234567890abcdef"
+    fake_okey = "sk-" + "proj-DummyOpenAISecret1234567890abcdef"
+    fake_pem_hdr = "-----BEGIN " + "OPENSSH PRIVATE KEY-----"
+    fake_pem_ftr = "-----END " + "OPENSSH PRIVATE KEY-----"
+    (opencode_dir / "opencode.db").write_bytes(b"SQLite format 3\x00" + b"AI" + b"zaSyHiddenInBinary1234567890")
     (runs_dir / "cache.sqlite3").write_bytes(b"SQLite format 3\x00secret")
-    (ev_dir / ".env").write_text("GEMINI_API_KEY=AIzaSyDotEnvLeak1234567890abcdef\n", encoding="utf-8")
+    (ev_dir / ".env").write_text("GEMINI_API_KEY=" + "AI" + "zaSyDotEnvLeak1234567890abcdef\n", encoding="utf-8")
 
     traj_path = runs_dir / "agent" / "trajectory.json"
     traj_payload = {
         "agent": "opencode",
         "log": (
             "Auth header: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.secretpayload "
-            "google=AIzaSyDummySecretKey1234567890abcdef "
-            "openai=sk-proj-DummyOpenAISecret1234567890abcdef "
-            "env: GEMINI_API_KEY=AIzaSyDummySecretKey1234567890abcdef "
+            f"google={fake_gkey} "
+            f"openai={fake_okey} "
+            f"env: GEMINI_API_KEY={fake_gkey} "
             "ssh_key=/root/.ssh/id_ed25519\n"
-            "-----BEGIN OPENSSH PRIVATE KEY-----\n"
+            f"{fake_pem_hdr}\n"
             "b3BlbnNzaC1rZXktdjEAAAAABG5vbmU=\n"
-            "-----END OPENSSH PRIVATE KEY-----"
+            f"{fake_pem_ftr}"
         ),
         "reward": 0.3547,
     }
@@ -774,10 +778,10 @@ def test_sync_evidence_scrubs_secrets_and_removes_opencode_sqlite(tmp_path):
 
     scrubbed_text = traj_path.read_text(encoding="utf-8")
     for leaked in (
-        "AIzaSyDummySecretKey1234567890abcdef",
-        "sk-proj-DummyOpenAISecret1234567890abcdef",
+        fake_gkey,
+        fake_okey,
         "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9",
-        "BEGIN OPENSSH PRIVATE KEY",
+        "BEGIN " + "OPENSSH PRIVATE KEY",
         "/root/.ssh/id_ed25519",
     ):
         assert leaked not in scrubbed_text, f"Secret pattern survived scrubbing: {leaked}"
@@ -950,7 +954,7 @@ def test_sync_evidence_adversarial_bypasses_and_fail_closed_sqlite_magic(tmp_pat
             "prompt_tokens": 300,
             "max_tokens": 4096,
         },
-        "truncated_pem": "-----BEGIN OPENSSH PRIVATE KEY-----\nb3BlbnNzaC1rZXktdjEAAAAABG5vbmU=",
+        "truncated_pem": "-----BEGIN " + "OPENSSH PRIVATE KEY-----\nb3BlbnNzaC1rZXktdjEAAAAABG5vbmU=",
     }
     traj_path.write_text(json.dumps(traj_payload, indent=2), encoding="utf-8")
 
@@ -1065,6 +1069,9 @@ def test_sync_evidence_r3_token_header_keys_github_pats_and_step3_fail_closed(tm
     blind_sha_path.write_text(f"{expected_sha}  blind_seeds.json\n", encoding="utf-8")
 
     traj_path = trial_dir / "trajectory.json"
+    fake_ghp_1 = "ghp_" + "FAKEGITHUBPAT1234567890ABCDEF123456"
+    fake_fg_pat = "github_pat_" + "11ABCDEFG0123456789_abcdefghijklmnopqrstuv"
+    fake_ghp_2 = "ghp_" + "JSONLFAKEPAT1234567890ABCDEF123456"
     traj_payload = {
         "env": {
             "GEMINI_API_KEY": "gemini_secret_0",
@@ -1077,8 +1084,8 @@ def test_sync_evidence_r3_token_header_keys_github_pats_and_step3_fail_closed(tm
             "x-api-key": "secret5_x_api_key",
             "GITHUB_TOKEN": "secret6_gh_env_dict",
         },
-        "git_clone": "git clone https://ghp_FAKEGITHUBPAT1234567890ABCDEF123456@github.com/org/repo.git",
-        "fine_grained_pat": "token=github_pat_11ABCDEFG0123456789_abcdefghijklmnopqrstuv",
+        "git_clone": f"git clone https://{fake_ghp_1}@github.com/org/repo.git",
+        "fine_grained_pat": f"token={fake_fg_pat}",
         "usage": {
             "prompt_tokens": 512,
             "completion_tokens": 256,
@@ -1097,7 +1104,7 @@ def test_sync_evidence_r3_token_header_keys_github_pats_and_step3_fail_closed(tm
         json.dumps(
             {
                 "headers": {"X-Goog-Api-Key": "jsonl_goog_secret", "X-API-Key": "jsonl_xapi_secret"},
-                "pat": "ghp_JSONLFAKEPAT1234567890ABCDEF123456",
+                "pat": fake_ghp_2,
                 "metrics": {"prompt_tokens": 100, "reasoning_tokens": 25},
             }
         )
@@ -1123,11 +1130,11 @@ def test_sync_evidence_r3_token_header_keys_github_pats_and_step3_fail_closed(tm
         "secret4_goog_header",
         "secret5_x_api_key",
         "secret6_gh_env_dict",
-        "ghp_FAKEGITHUBPAT1234567890ABCDEF123456",
-        "github_pat_11ABCDEFG0123456789_abcdefghijklmnopqrstuv",
+        fake_ghp_1,
+        fake_fg_pat,
         "jsonl_goog_secret",
         "jsonl_xapi_secret",
-        "ghp_JSONLFAKEPAT1234567890ABCDEF123456",
+        fake_ghp_2,
     ):
         assert leaked not in combined_text, f"Secret survived sync_evidence.sh: {leaked}"
 
@@ -1183,7 +1190,7 @@ def test_sync_evidence_r3_token_header_keys_github_pats_and_step3_fail_closed(tm
     bad_pat_dir = tmp_path / "fail_closed_ghp_pat"
     bad_pat_dir.mkdir(parents=True)
     (bad_pat_dir / "corrupt.log").write_bytes(
-        b"\xffgit clone https://ghp_SURVIVINGPAT1234567890ABCDEF123456@github.com/org/repo.git\n"
+        b"\xffgit clone https://" + b"ghp_" + b"SURVIVINGPAT1234567890ABCDEF123456@github.com/org/repo.git\n"
     )
     fail_pat_res = _run_verda_cmd(["bash", str(SYNC_EVIDENCE_SH), "--smoke-local", str(bad_pat_dir)])
     assert fail_pat_res.returncode != 0

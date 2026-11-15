@@ -629,7 +629,7 @@ def _run_live_sft_and_grpo(
 def main(argv: Sequence[str] | None = None) -> int:
     ap = argparse.ArgumentParser(description=__doc__)
     ap.add_argument("--traces", type=Path, default=REPO_ROOT / "artifacts" / "verda" / "sft_traces.jsonl")
-    ap.add_argument("--rl-seeds", type=Path, default=REPO_ROOT / "artifacts" / "verda" / "rl_seeds.json")
+    ap.add_argument("--rl-seeds", "--train-seeds-file", "--seeds-file", dest="rl_seeds", type=Path, default=REPO_ROOT / "artifacts" / "verda" / "rl_seeds.json")
     ap.add_argument("--existing-blind-seeds", type=Path, default=None)
     ap.add_argument("--out-dir", type=Path, default=REPO_ROOT / "artifacts" / "verda" / "qwen_rl")
     ap.add_argument("--checkpoint-dir", type=Path, default=Path("/root/bench/checkpoints"))
@@ -660,8 +660,15 @@ def main(argv: Sequence[str] | None = None) -> int:
 
     if args.rl_seeds.is_file():
         seed_doc = json.loads(args.rl_seeds.read_text(encoding="utf-8"))
-        rl_train_seeds = list(seed_doc["rl_train_seeds"])
-        rl_val_seeds = list(seed_doc["rl_val_seeds"])
+        if isinstance(seed_doc, list):
+            rl_train_seeds = list(seed_doc)
+            forb_val = set(dev_seeds) | set(replay_seeds) | set(blind_seeds or []) | set(rl_train_seeds) | {101, 203, 307, 409, 503}
+            rl_val_seeds = [secrets.randbelow(1_400_000_000) + 500_000]
+            while rl_val_seeds[0] in forb_val:
+                rl_val_seeds = [secrets.randbelow(1_400_000_000) + 500_000]
+        else:
+            rl_train_seeds = list(seed_doc["rl_train_seeds"])
+            rl_val_seeds = list(seed_doc["rl_val_seeds"])
     elif args.dry_run:
         forb = set(dev_seeds) | set(replay_seeds) | set(blind_seeds or []) | {101, 203, 307, 409, 503}
         rl_train_seeds = [secrets.randbelow(1_400_000_000) + 500_000]

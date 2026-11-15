@@ -881,6 +881,14 @@ def eval_qwen_group(group_slug: str, lora_dir: Path | None) -> None:
         merged = PeftModel.from_pretrained(base_m, str(lora_dir)).merge_and_unload()
         merged.save_pretrained(str(merge_dir), safe_serialization=True)
         tok.save_pretrained(str(merge_dir))
+        if (lora_dir / "chat_template.jinja").is_file():
+            shutil.copy2(lora_dir / "chat_template.jinja", merge_dir / "chat_template.jinja")
+        else:
+            hf_home = Path(os.environ.get("HF_HOME", "/tmp/fast-cache/hf"))
+            for ct in sorted(hf_home.rglob("chat_template.jinja")):
+                if "Qwen3.5-9B" in str(ct):
+                    shutil.copy2(ct, merge_dir / "chat_template.jinja")
+                    break
         del merged, base_m
         gc.collect()
         vllm_model = str(merge_dir)
@@ -897,8 +905,8 @@ def eval_qwen_group(group_slug: str, lora_dir: Path | None) -> None:
     llm = LLM(
         model=vllm_model,
         tensor_parallel_size=1,
-        gpu_memory_utilization=float(os.environ.get("VLLM_GPU_MEM_UTIL", "0.50")),
-        max_model_len=int(os.environ.get("VLLM_EVAL_MAX_MODEL_LEN", "16384")),
+        gpu_memory_utilization=float(os.environ.get("VLLM_GPU_MEM_UTIL", "0.30")),
+        max_model_len=int(os.environ.get("VLLM_EVAL_MAX_MODEL_LEN", "12288")),
         dtype="bfloat16",
         trust_remote_code=True,
     )
@@ -967,8 +975,11 @@ def eval_qwen_group(group_slug: str, lora_dir: Path | None) -> None:
         print(f"[qwen-blind] {group_slug}/{trial_tag} (pilot_seed={ds}): reward={rew}")
 
 
+import time
+
 eval_qwen_group("qwen3.5-9b_base", None)
 if adapter_dir.is_dir():
+    time.sleep(1.5)
     eval_qwen_group("qwen3.5-9b_post_rl_grpo", adapter_dir)
 PY
 fi
