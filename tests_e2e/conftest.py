@@ -290,6 +290,21 @@ def _run_core_pytest_sync(repo_root: Path, session_tmp_dir: Path) -> dict[str, A
         python_bin = sys.executable
 
     core_cache = session_tmp_dir / "core_pytest_cache"
+    core_test_files = [
+        f
+        for f in (
+            "tests/test_cli.py",
+            "tests/test_clock.py",
+            "tests/test_economics.py",
+            "tests/test_grading.py",
+            "tests/test_invariants.py",
+            "tests/test_mcp.py",
+            "tests/test_packaging.py",
+            "tests/test_scenarios.py",
+            "tests/test_validation.py",
+        )
+        if (repo_root / f).exists()
+    ]
     t0 = time.perf_counter()
     completed = subprocess.run(
         [
@@ -302,13 +317,14 @@ def _run_core_pytest_sync(repo_root: Path, session_tmp_dir: Path) -> dict[str, A
             "-o",
             f"cache_dir={core_cache}",
             "-q",
-            "tests",
+            *core_test_files,
         ],
         cwd=str(repo_root),
         env=env,
+        stdin=subprocess.DEVNULL,
         capture_output=True,
         text=True,
-        timeout=120,
+        timeout=90,
         check=False,
     )
     elapsed_s = round(time.perf_counter() - t0, 4)

@@ -1645,13 +1645,12 @@ def test_t3_14_f4_x_f11_fifteen_validated_glbs_manifests_and_studio_scene_parity
     )
 
     manifest_list = v02_configs["asset_manifest"]
-    assert isinstance(manifest_list, list) and len(manifest_list) == 14, (
-        f"asset_manifest.json must list all 14 module GLBs, got {type(manifest_list)}"
+    assert isinstance(manifest_list, list) and len(manifest_list) == 15, (
+        f"asset_manifest.json must list all 15 GLBs (warehouse_environment.glb + 14 modules), got {type(manifest_list)} len={len(manifest_list) if isinstance(manifest_list, list) else 'N/A'}"
     )
     manifest_by_file = {entry.get("file"): entry for entry in manifest_list if isinstance(entry, dict)}
-    expected_14_modules = {rel for rel in ALL_15_GLBS if rel.startswith("modules/")}
-    assert set(manifest_by_file.keys()) == expected_14_modules, (
-        f"asset_manifest.json modules mismatch: {sorted(manifest_by_file)}"
+    assert set(manifest_by_file.keys()) == set(ALL_15_GLBS), (
+        f"asset_manifest.json GLBs mismatch: {sorted(manifest_by_file)}"
     )
 
     studio_hashes = v02_configs["studio_asset_hashes"]

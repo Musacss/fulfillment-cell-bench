@@ -2705,7 +2705,7 @@ async function auditStudioBundle(repoRoot, v02Dir, gltfValidation) {
   };
 }
 
-async function auditStudioReplays(packDir, v02Dir) {
+async function auditStudioReplays(packDir, v02Dir, extraRunDir = null) {
   let player = null;
   try {
     lastCapturedScene = null;
@@ -2850,6 +2850,18 @@ async function auditStudioReplays(packDir, v02Dir) {
         shifts['test-jam-h32'] = await inspectSingleShiftReplay(player, liveScene, jRep, 'test-jam-h32', true);
       } catch (err) {
         shifts['test-jam-h32'] = { ok: false, error: String(err?.message ?? err) };
+      }
+    }
+
+    if (extraRunDir && fsSync.existsSync(path.join(extraRunDir, 'manifest.json'))) {
+      const extraId = path.basename(extraRunDir);
+      try {
+        const em = JSON.parse(await fs.readFile(path.join(extraRunDir, 'manifest.json'), 'utf8'));
+        const ee = await fs.readFile(path.join(extraRunDir, 'events.jsonl'), 'utf8');
+        const eRep = createReplay(em, ee, { runId: extraId });
+        shifts[extraId] = await inspectSingleShiftReplay(player, liveScene, eRep, extraId, true);
+      } catch (err) {
+        shifts[extraId] = { ok: false, error: String(err?.message ?? err) };
       }
     }
 
@@ -3530,7 +3542,7 @@ async function runReplayCheckMode(args, v02Dir, bindings) {
   }
 }
 
-async function runSessionMode(repoRoot, packDir) {
+async function runSessionMode(repoRoot, packDir, extraRunDir = null) {
   const t0 = performance.now();
   const v02Dir = path.join(repoRoot, '4_Horses_Environment_v02');
   const bindings = JSON.parse(await fs.readFile(path.join(v02Dir, 'visual_bindings.json'), 'utf8'));
@@ -3539,45 +3551,49 @@ async function runSessionMode(repoRoot, packDir) {
     ? JSON.parse(await fs.readFile(anchorsPath, 'utf8'))
     : {};
 
-  // 1. Validate & load all 15 GLBs
+  // 1. Validate & load all 15 GLBs in parallel
   const gltfValidation = {};
   const loadedGltfs = new Map();
   const loadedBufs = new Map();
 
-  for (const rel of ALL_15_GLBS) {
-    const abs = path.join(v02Dir, rel);
-    if (!fsSync.existsSync(abs)) {
-      gltfValidation[rel] = { exists: false };
-      continue;
-    }
-    const buf = await fs.readFile(abs);
-    loadedBufs.set(rel, buf);
-    const valReport = await validator.validateBytes(new Uint8Array(buf), { uri: rel, maxIssues: 100 });
-    const { jsonDoc } = parseGlbChunks(buf);
-    const gltf = await parseGltfScene(buf);
-    loadedGltfs.set(rel, gltf);
-    gltf.scene.updateMatrixWorld(true);
+  await Promise.all(
+    ALL_15_GLBS.map(async (rel) => {
+      const abs = path.join(v02Dir, rel);
+      if (!fsSync.existsSync(abs)) {
+        gltfValidation[rel] = { exists: false };
+        return;
+      }
+      const buf = await fs.readFile(abs);
+      loadedBufs.set(rel, buf);
+      const [valReport, gltf] = await Promise.all([
+        validator.validateBytes(new Uint8Array(buf), { uri: rel, maxIssues: 100 }),
+        parseGltfScene(buf),
+      ]);
+      const { jsonDoc } = parseGlbChunks(buf);
+      loadedGltfs.set(rel, gltf);
+      gltf.scene.updateMatrixWorld(true);
 
-    const threeNodeNames = [];
-    gltf.scene.traverse((o) => {
-      if (o.name) threeNodeNames.push(o.name);
-    });
-    const stats = countSceneMeshesAndTris(gltf.scene);
-    const envBox = boxToDict(new THREE.Box3().setFromObject(gltf.scene, true));
+      const threeNodeNames = [];
+      gltf.scene.traverse((o) => {
+        if (o.name) threeNodeNames.push(o.name);
+      });
+      const stats = countSceneMeshesAndTris(gltf.scene);
+      const envBox = boxToDict(new THREE.Box3().setFromObject(gltf.scene, true));
 
-    gltfValidation[rel] = {
-      exists: true,
-      bytes: buf.length,
-      sha256: sha256Hex(buf),
-      numErrors: valReport.issues.numErrors,
-      numWarnings: valReport.issues.numWarnings,
-      rawNodeNames: (jsonDoc.nodes ?? []).map((n) => n.name ?? ''),
-      threeNodeNames,
-      clipNames: gltf.animations.map((a) => a.name),
-      ...stats,
-      aabb: envBox,
-    };
-  }
+      gltfValidation[rel] = {
+        exists: true,
+        bytes: buf.length,
+        sha256: sha256Hex(buf),
+        numErrors: valReport.issues.numErrors,
+        numWarnings: valReport.issues.numWarnings,
+        rawNodeNames: (jsonDoc.nodes ?? []).map((n) => n.name ?? ''),
+        threeNodeNames,
+        clipNames: gltf.animations.map((a) => a.name),
+        ...stats,
+        aabb: envBox,
+      };
+    }),
+  );
 
   const envGltf = loadedGltfs.get('warehouse_environment.glb');
   const layoutGltf = loadedGltfs.get('modules/visual_layout.glb');
@@ -3590,8 +3606,10 @@ async function runSessionMode(repoRoot, packDir) {
   const environmentAudit = auditEnvironment(envGltf, layoutGltf, supportGltf, bindings);
 
   // 3. Character & Workstation Grasp audits
-  const workerAudit = await inspectCharacterGlb(loadedBufs.get('modules/warehouse_worker.glb'), 'worker');
-  const robotAudit = await inspectCharacterGlb(loadedBufs.get('modules/humanoid_robot.glb'), 'robot');
+  const [workerAudit, robotAudit] = await Promise.all([
+    inspectCharacterGlb(loadedBufs.get('modules/warehouse_worker.glb'), 'worker'),
+    inspectCharacterGlb(loadedBufs.get('modules/humanoid_robot.glb'), 'robot'),
+  ]);
 
   // Compute 20-core-joint rest-pose proportion parity between worker and robot
   const sharedCoreJoints = [
@@ -3613,10 +3631,13 @@ async function runSessionMode(repoRoot, packDir) {
 
   const workstationGrasp = auditWorkstationGrasp(workerGltf, robotGltf, layoutGltf, bindings);
 
-  // 4. Map idempotency, Studio Bundle, Studio Replay, Spatial, Negative & PNG audits
-  const mapIdempotency = await auditMapIdempotency(envGltf, layoutGltf, repoRoot);
-  const studioBundleAudit = await auditStudioBundle(repoRoot, v02Dir, gltfValidation);
-  const studioReplayAudit = await auditStudioReplays(packDir, v02Dir);
+  // 4. Map idempotency, Studio Bundle, Studio Replay, Spatial, Negative & PNG audits in parallel
+  const [mapIdempotency, studioBundleAudit, studioReplayAudit, pngAudit] = await Promise.all([
+    auditMapIdempotency(envGltf, layoutGltf, repoRoot),
+    auditStudioBundle(repoRoot, v02Dir, gltfValidation),
+    auditStudioReplays(packDir, v02Dir, extraRunDir),
+    auditPngs(repoRoot, v02Dir),
+  ]);
   const sampleManifest = studioReplayAudit._sample?.sampleManifest ?? null;
   const sampleEventsText = studioReplayAudit._sample?.sampleEventsText ?? null;
   delete studioReplayAudit._sample;
@@ -3631,7 +3652,6 @@ async function runSessionMode(repoRoot, packDir) {
     sampleManifest,
     sampleEventsText,
   );
-  const pngAudit = await auditPngs(repoRoot, v02Dir);
 
   return {
     ok: true,
@@ -3692,6 +3712,7 @@ function parseCliArgs(argv) {
     else if (a === '--probe-custom-glb') { out.mode = 'probe-custom-glb'; out.glbPath = argv[++i]; }
     else if (a === '--kind') out.kind = argv[++i];
     else if (a === '--run-dir') out.runDir = argv[++i];
+    else if (a === '--extra-run-dir') out.extraRunDir = argv[++i];
     else if (a === '--http-url') out.httpUrl = argv[++i];
   }
   return out;
@@ -3741,7 +3762,7 @@ async function main() {
       const bindings = JSON.parse(await fs.readFile(path.join(v02Dir, 'visual_bindings.json'), 'utf8'));
       payload = await runReplayCheckMode(args, v02Dir, bindings);
     } else {
-      payload = await runSessionMode(args.repo, args.packDir);
+      payload = await runSessionMode(args.repo, args.packDir, args.extraRunDir ?? null);
     }
   } catch (err) {
     payload = { ok: false, error: String(err?.stack ?? err?.message ?? err) };

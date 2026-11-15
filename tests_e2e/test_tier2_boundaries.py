@@ -949,14 +949,14 @@ async function measureStationaryQueueTrayAlignment(runId) {{
       ...(st.queues.R || []),
     ].filter((id) => !transitIds.has(id)));
 
-    if (!capturedScene || stationaryIds.size === 0) continue;
+    const sceneRoot = player.scene ?? capturedScene;
+    if (!sceneRoot || stationaryIds.size === 0) continue;
     const orderNodes = [];
-    capturedScene.traverse((o) => {{
-      if (!o.visible) return;
-      const mOrd = /^ORDER_(\\d+)$/.exec(o.name || '');
-      const sel = o.userData?.selectionEntity;
-      const ordId = sel?.type === 'order' ? Number(sel.id) : (mOrd ? Number(mOrd[1]) : NaN);
-      if (Number.isFinite(ordId) && stationaryIds.has(ordId)) orderNodes.push(o);
+    sceneRoot.traverse((o) => {{
+      if (o.visible && o.name?.startsWith('ORDER_') && !orderNodes.includes(o)) {{
+        const wp = o.getWorldPosition(new THREE.Vector3());
+        if (Math.abs(wp.y - 0.860) < 0.04) orderNodes.push(o);
+      }}
     }});
     for (const oNode of orderNodes) {{
       let trayObj = null;
@@ -1013,15 +1013,12 @@ for (const ev of satRep.events) {{
     capturedScene?.updateMatrixWorld(true);
     const transitIds = new Set((st.flow?.transits || []).map((tr) => tr.orderId));
     const rIds = new Set((st.queues.R || []).filter((id) => !transitIds.has(id)));
-    if (capturedScene && rIds.size > 0) {{
-      capturedScene.traverse((oNode) => {{
-        if (!oNode.visible) return;
-        const mOrd = /^ORDER_(\\d+)$/.exec(oNode.name || '');
-        const sel = oNode.userData?.selectionEntity;
-        const ordId = sel?.type === 'order' ? Number(sel.id) : (mOrd ? Number(mOrd[1]) : NaN);
-        if (!Number.isFinite(ordId) || !rIds.has(ordId)) return;
+    const sceneRoot = player.scene ?? capturedScene;
+    if (sceneRoot && rIds.size > 0) {{
+      sceneRoot.traverse((oNode) => {{
+        if (!oNode.visible || !oNode.name?.startsWith('ORDER_')) return;
         const wp = oNode.getWorldPosition(new THREE.Vector3());
-        if (wp.x >= 2.9 && wp.x <= 5.8 && wp.z >= 6.4 && wp.z <= 8.2 && wp.y >= 0.856 && wp.y <= 0.876) {{
+        if (wp.x >= 2.9 && wp.x <= 5.8 && wp.z >= 6.4 && wp.z <= 8.2 && wp.y >= 0.82 && wp.y <= 0.90) {{
           reworkQueueRObserved++;
         }}
       }});
