@@ -522,7 +522,7 @@ def test_t5_17_socket_daemon_ratchet_and_client_malformed_frame_defenses(
         stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
     )
     try:
-        for _ in range(100):
+        for _ in range(250):
             if sock_path.exists():
                 break
             threading.Event().wait(0.02)

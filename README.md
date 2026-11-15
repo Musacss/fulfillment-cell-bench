@@ -4,7 +4,7 @@ Most real-world warehouse robot rollouts lose money in their first quarter -- no
 
 **Fulfillment-Cell-Bench** turns that 12-week warehouse rollout into a black-box reinforcement learning environment built for **Junction 2026 (AfterQuery)**. AI agents cannot read the simulator code or see the test seeds: they get **24 practice test runs ("pilots")** to experiment, then submit one 12-week plan that is graded on unseen quarters.
 
-**Live 3D Warehouse Replay Studio (No Install Needed):** [Open Live 3D Showcase](https://freezegu.github.io/4-horses-replay-studio/) (GitHub Pages mirror: [`musacss.github.io/fulfillment-cell-bench`](https://musacss.github.io/fulfillment-cell-bench/))
+**Live 3D Warehouse Replay Studio (No Install Needed):** [Open Live 3D Showcase](https://freezegu.github.io/4-horses-replay-studio/) (GitHub Pages mirror: [`musacss.github.io/4-horses-replay-studio`](https://musacss.github.io/4-horses-replay-studio/?index=https://freezegu.github.io/4-horses-replay-studio/3d-pack/index.json))
 
 | Full 4-Zone Cell (`Prep -> Pick -> Pack -> QC`) | Zone 3 Packing Robot, Safety Cage & QC |
 | :---: | :---: |
@@ -132,4 +132,4 @@ bash studio/start.sh   # opens http://127.0.0.1:5173 -- scrub weeks, compare 2 m
 - `tasks/fulfillment-cell-bench/` -- Ready-to-run Harbor `0.26.0` task (`0700` socket daemon + isolated offline grader).
 - `evidence/benchmark-v2/` & `evidence/harbor-runs/` -- All `22` blind runs, seed hashes, RL curves, and sanitized Harbor logs.
 - `src/robotization_bench/` & `studio/` -- Python warehouse simulator, `Fraction` grader, and Three.js 3D Replay Studio.
-- `docs/` -- [`AGENT.md`](AGENT.md), [`docs/SPEC.md`](docs/SPEC.md), [`docs/CONTRACTS.md`](docs/CONTRACTS.md), [`docs/HARBOR.md`](docs/HARBOR.md), [`docs/DEMO_PLAYBOOK_10MIN.md`](docs/DEMO_PLAYBOOK_10MIN.md).
+- `docs/` -- [`AGENT.md`](AGENT.md), [`docs/SPEC.md`](docs/SPEC.md), [`docs/CONTRACTS.md`](docs/CONTRACTS.md), [`docs/HARBOR.md`](docs/HARBOR.md).

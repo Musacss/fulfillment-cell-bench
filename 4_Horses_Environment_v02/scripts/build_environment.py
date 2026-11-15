@@ -9,6 +9,9 @@ args = argparse.ArgumentParser()
 args.add_argument('--output', required=True)
 args.add_argument('--render', action='store_true')
 args.add_argument('--details', action='store_true')
+args.add_argument('--skip-env-export', action='store_true')
+args.add_argument('--write-manifest', action='store_true')
+args.add_argument('--write-geometry-report', action='store_true')
 opt = args.parse_args(sys.argv[sys.argv.index('--')+1:] if '--' in sys.argv else [])
 ROOT = Path(__file__).resolve().parent.parent
 OUT = Path(opt.output); OUT.mkdir(parents=True, exist_ok=True)
@@ -84,22 +87,25 @@ def box(name,dims,loc,material,parent=None,bevel=.003,rot=(0,0,0),dynamic=False)
     b=min(bevel,min(dims)*.19)
     key=('b',dims,material.name,round(b,6))
     if key not in cache:
-        x,y,z=[v*.5 for v in dims]
-        verts=[(-x,-y,-z),(-x,-y,z),(-x,y,-z),(-x,y,z),(x,-y,-z),(x,-y,z),(x,y,-z),(x,y,z)]
-        faces=[tuple(reversed(f)) for f in [(0,4,6,2),(1,3,7,5),(0,1,5,4),(2,6,7,3),(0,2,3,1),(4,5,7,6)]]
-        me=bpy.data.meshes.new(name+'_geometry'); me.from_pydata(verts,[],faces); me.update()
-        me.materials.append(material)
         if b>0:
-            tmp=mesh_obj('_bevel_temp',me,(0,0,0),None)
-            for p in me.polygons:p.use_smooth=True
-            mod=tmp.modifiers.new('Manufactured edge radius','BEVEL'); mod.width=b; mod.segments=3
-            mod.harden_normals=True
-            norm=tmp.modifiers.new('Weighted planar normals','WEIGHTED_NORMAL'); norm.keep_sharp=True; norm.weight=50
-            dg=bpy.context.evaluated_depsgraph_get()
-            cooked=bpy.data.meshes.new_from_object(tmp.evaluated_get(dg),preserve_all_data_layers=True,depsgraph=dg)
-            bpy.data.objects.remove(tmp,do_unlink=True)
-            cache[key]=cooked
-        else:cache[key]=me
+            bm=bmesh.new()
+            bmesh.ops.create_cube(bm,size=1.0)
+            bmesh.ops.scale(bm,vec=dims,verts=bm.verts)
+            bmesh.ops.bevel(bm,geom=list(bm.edges),offset=b,offset_type='OFFSET',segments=3,profile=0.5,affect='EDGES')
+            bmesh.ops.recalc_face_normals(bm,faces=list(bm.faces))
+            for f in bm.faces:
+                f.smooth=max(abs(c) for c in f.normal)<0.9999
+            me=bpy.data.meshes.new(name+'_geometry')
+            bm.to_mesh(me); bm.free(); me.update()
+            me.materials.append(material)
+            cache[key]=me
+        else:
+            x,y,z=[v*.5 for v in dims]
+            verts=[(-x,-y,-z),(-x,-y,z),(-x,y,-z),(-x,y,z),(x,-y,-z),(x,-y,z),(x,y,-z),(x,y,z)]
+            faces=[tuple(reversed(f)) for f in [(0,4,6,2),(1,3,7,5),(0,1,5,4),(2,6,7,3),(0,2,3,1),(4,5,7,6)]]
+            me=bpy.data.meshes.new(name+'_geometry'); me.from_pydata(verts,[],faces); me.update()
+            me.materials.append(material)
+            cache[key]=me
     return mesh_obj(name,cache[key],loc,parent,rot,dynamic)
 
 def cyl(name,r,depth,loc,material,parent=None,rot=(0,0,0),n=40,dynamic=False):
@@ -121,11 +127,14 @@ def beam(name,a,b,thick,material,parent=None):
 def text(name,body,size,loc,material,parent=None,rot=(0,0,0),align='LEFT'):
     curve=bpy.data.curves.new(name+'_font','FONT');curve.body=body;curve.size=size;curve.align_x=align
     curve.extrude=.00015;curve.resolution_u=4
-    o=bpy.data.objects.new(name,curve);sc.collection.objects.link(o);o.parent=parent;o.location=loc;o.rotation_euler=rot
     curve.materials.append(material)
-    bpy.ops.object.select_all(action='DESELECT')
-    bpy.context.view_layer.objects.active=o;o.select_set(True)
-    bpy.ops.object.convert(target='MESH');o.select_set(False)
+    tmp=bpy.data.objects.new(name+'_tmp',curve)
+    me=bpy.data.meshes.new_from_object(tmp)
+    bpy.data.objects.remove(tmp)
+    bpy.data.curves.remove(curve)
+    me.name=name+'_font'
+    if not me.materials:me.materials.append(material)
+    o=bpy.data.objects.new(name,me);sc.collection.objects.link(o);o.parent=parent;o.location=loc;o.rotation_euler=rot
     # Font tessellation can produce zero-area caps at coincident curve points.
     # Remove those faces at the source rather than shipping invalid triangles.
     bm=bmesh.new();bm.from_mesh(o.data)
@@ -160,7 +169,7 @@ def floor_arrow(name,x,y,parent):
     mesh.materials.append(M['white']);mesh.update()
     bm=bmesh.new();bm.from_mesh(mesh)
     bmesh.ops.triangulate(bm,faces=list(bm.faces));bm.to_mesh(mesh);bm.free();mesh.update()
-    o=mesh_obj(name,mesh,(x,y,.0041),parent)
+    o=mesh_obj(name,mesh,(x,y,.00655),parent,dynamic=True)
     o['geometry_role']='floor_arrow';o['direction']='+X'
     return o
 
@@ -251,7 +260,7 @@ def conveyor(index,x):
         box('Support cross tie',(.035,.54,.035),(xx,0,.24),M['steel'],g,.002)
     for i in range(20):
         xx=-.855+i*.09
-        o=cyl('ROLLER_%02d_%02d'%(index,i+1),.025,.62,(xx,0,.835),M['silver'],g,(math.pi/2,0,0),n=32,dynamic=True)
+        o=cyl('ROLLER_%02d_%02d'%(index,i+1),.025,.616,(xx,0,.835),M['silver'],g,(math.pi/2,0,0),n=32,dynamic=True)
         o['animation_role']='roller';o['radius']=.025;o['line_module']=index
     box('Drive cover',(.24,.105,.15),(.52,.396,.72),M['dark'],g,.014)
     for xx in [.44,.60]:bolt('Cover fastener',(xx,.453,.72),g,(math.pi/2,0,0))
@@ -355,8 +364,8 @@ def build_shell_back_wall(parent,width,depth,height):
     back_y=depth/2-.15
     for i in range(int(width/2)):
         x=-width/2+1+i*2
-        box('Back wall panel',(1.98,.13,height),(x,back_y,height/2),M['wall'],parent,.007)
-        box('Wall skirting',(1.98,.04,.18),(x,back_y-.09,.09),M['edge'],parent,.003)
+        box('Back wall panel',(2.002,.13,height),(x,back_y,height/2),M['wall'],parent,.004)
+        box('Wall skirting',(2.002,.04,.18),(x,back_y-.09,.09),M['edge'],parent,.002)
     for x in [-width/2+.15]+list(range(-14,15,4))+[width/2-.15]:
         box('Structural column',(.15,.21,height),(x,back_y-.15,height/2),M['steel'],parent,.004)
         box('Column guard',(.23,.26,.55),(x,back_y-.17,.275),M['yellow'],parent,.014)
@@ -376,7 +385,7 @@ build_shell_back_wall(shell,rw,rd,rh)
 lane_front,lane_back=CFG['layout']['walkway_y'];lane_center=(lane_front+lane_back)/2
 for y in [lane_front,lane_back]:box('Walkway edge',(rw-.6,.045,.002),(0,y,.003),M['white'],shell,.0005)
 for x in [-(rw-.6)/2,(rw-.6)/2]:box('Walkway end',(.045,abs(lane_back-lane_front),.002),(x,lane_center,.003),M['white'],shell,.0005)
-walkway_arrows=[floor_arrow('Walkway arrow %02d'%(i+1),x,lane_center,shell) for i,x in enumerate([-(rw-.6)/3,0,(rw-.6)/3])]
+walkway_arrows=[floor_arrow('WALKWAY_DIRECTION_ARROW_%02d'%(i+1),x,lane_center,shell) for i,x in enumerate([-(rw-.6)/3,0,(rw-.6)/3])]
 for z in CFG['stations']:
     x=z['center'][0]
     text('Floor zone '+z['id'],z['label'],.18,(x-.72,-1.15,.004),M['white'],shell)
@@ -392,11 +401,7 @@ for i,x in enumerate(CFG['conveyor']['centers_x'],1):conveyor(i,x)
 pick_x,pick_y=CFG['packing_bench']['positions'][0];pack_x,pack_y=CFG['packing_bench']['positions'][1]
 bench('BENCH_PICK',(pick_x,pick_y,0))
 bench('BENCH_PACK',(pack_x,pack_y,0),True)
-# R has a complete independent roller frame. Retain the legacy reference
-# anchors without placing another desk, shelf or tote beneath the accumulator.
-rework=group('BENCH_REWORK',CFG['layout']['rework'],typ='rework_station_reference')
-anchor('ANCHOR_BENCH_REWORK_WORK',(0,-.08,.86),rework,role='work_surface')
-anchor('ANCHOR_BENCH_REWORK_APPROACH',(0,-1.1,0),rework,role='worker_approach')
+# R has a complete independent roller frame without any legacy desk or shelf beneath it.
 r_buffer=group('QUEUE_R_ROLLER_SECTION',(4.36,-7.24,0),typ='rework_accumulation')
 r_buffer['surface_height_m']=.86;r_buffer['queue']='R';r_buffer['preview_capacity']=6
 r_buffer['slot_envelope_m']=[1.66,.82]
@@ -429,10 +434,10 @@ box('Optical lens',(.09,.13,.006),(0,0,1.357),M['blue'],qc,.003)
 for y in [-.36,.36]:
     box('Photoelectric cell',(.06,.04,.05),(-.12,y,1.03),M['dark'],qc,.004)
     cyl('Sensor lens',.008,.002,(-.12,y+(.021 if y<0 else -.021),1.03),M['red'],qc,(math.pi/2,0,0),n=16)
-box('Scale housing',(.62,.61,.07),(.03,0,.70),M['steel'],qc,.004)
-gate=box('STOPPER_GATE',(.025,.56,.075),(.36,0,.805),M['yellow'],qc,.003,dynamic=True)
+box('Scale housing',(.54,.61,.07),(0,0,.70),M['steel'],qc,.004)
+gate=box('STOPPER_GATE',(.025,.56,.075),(.29,0,.805),M['yellow'],qc,.003,dynamic=True)
 gate['animation_role']='stopper';gate['rest_z']=.805;gate['lift']=.085
-for y in [-.41,.41]:box('Stopper cylinder',(.065,.065,.14),(.36,y,.70),M['steel'],qc,.004)
+for y in [-.41,.41]:box('Stopper cylinder',(.065,.065,.14),(.29,y,.70),M['steel'],qc,.004)
 cyl('Tower base',.023,.20,(.08,.49,1.68),M['dark'],qc,n=32)
 for z,ma in [(1.66,M['red']),(1.72,M['amber']),(1.78,M['green'])]:cyl('Tower segment',.032,.045,(.08,.49,z),ma,qc,n=48)
 anchor('ANCHOR_QC_CENTER',(0,0,.86),qc,role='inspection')
@@ -442,6 +447,7 @@ dispatch=group('DISPATCH')
 for i,y in enumerate(CFG['layout']['dispatch_y']):
     p=pallet('DISPATCH_PALLET_%02d'%i,(10.0,y,0),dispatch)
     p['outcome']='good' if i==0 else 'escaped'
+    p['dynamic']=True
 # Q1's 3 x 2 preview occupies 1.66 x .82 m. Two empty euro pallets form
 # the base; a thin continuous load-spreading deck closes plank gaps and the
 # additional 10 mm at each side, precisely at the .15 m queue height.
@@ -471,24 +477,28 @@ for x in [-.5+i*.1 for i in range(11)]:
 for y in [-.4+i*.1 for i in range(9)]:
     for x in [-.59,.59]:beam('Scrap mesh vertical',(x,y,.05),(x,y,.69),.007,M['red'],scrap)
 
-# Two shrouds hide parcel creation and recycling outside the visible belt.
+# Two open-arch tunnel shrouds over line inlet/outlet with 0.325 m parcel clearance above 0.86 m rollers
+# and Transfer tray at Z_b in [0.786, 0.806] (below 0.810 m main rollers and above 0.785 m support).
 for name,x in [('INLET_HOOD',CFG['demo']['start_x']+.02),('OUTLET_HOOD',CFG['demo']['end_x']-.02)]:
     g=group(name,(x,0,0),typ='transfer_hood')
-    box('Transfer tray',(.70,.62,.035),(0,0,.82),M['dark'],g,.004)
-    for y in [-.36,.36]:box('Hood side',(.70,.045,.54),(0,y,1.095),M['teal'],g,.009)
-    box('Hood top',(.70,.76,.045),(0,0,1.385),M['teal'],g,.009)
-    # The opaque end plate masks replay recycling from the main camera.
+    box('Transfer tray',(.70,.608,.020),(0,0,.796),M['dark'],g,.003)
+    box('Hood side',(.70,.045,.54),(0,-.378,1.095),M['teal'],g,.009)
+    inner_x=.221 if x<0 else -.221
+    outer_x=-.131 if x<0 else .131
+    box('Hood side',(.258,.045,.54),(inner_x,.378,1.095),M['teal'],g,.009)
+    box('Hood side lintel',(.438,.045,.18),(outer_x,.378,1.275),M['teal'],g,.008)
+    box('Hood top',(.70,.80,.045),(0,0,1.385),M['teal'],g,.009)
     endx=-.325 if x<0 else .325
-    box('Outer end baffle',(.045,.70,.54),(endx,0,1.095),M['teal'],g,.008)
+    box('Outer end baffle',(.045,.74,.18),(endx,0,1.275),M['teal'],g,.008)
     box('Transfer support',(.055,.055,.73),(0,0,.42),M['steel'],g,.004)
-    box('Transfer foot',(.38,.45,.025),(0,0,.0125),M['steel'],g,.004)
+    box('Transfer foot',(.32,.38,.025),(0,0,.0125),M['steel'],g,.004)
 
 props=group('PROPS')
 # Only the paper storage belongs in this rear service pocket.
 px,py,pz=CFG['layout']['paper_stock']
 paper_pallet=pallet('PAPER_STOCK_PALLET',(px+.32,py,0),props)
-paper_pallet['storage_only']=True
-paper_rack=group('PAPER_STOCK_RACK',(px+.32,py,0),props,typ='paper_roll_storage')
+paper_pallet['storage_only']=True;paper_pallet['dynamic']=True
+paper_rack=group('PAPER_STOCK_RACK',(px+.32,py,0),props,typ='paper_roll_storage',dynamic=True)
 for x in [-.55,.55]:
     for y in [-.33,.33]:box('Paper rack upright',(.035,.035,.82),(x,y,.41),M['steel'],paper_rack,.003)
 for y in [-.33,.33]:
@@ -499,12 +509,9 @@ for i in range(3):
     cyl('Paper stock core',.027,.005,(px+i*.32,py,pz+.262),M['kraft'],props,n=32)
 
 anchors=group('ANCHORS')
-for a in CFG['future_mounts']:
-    anchor('MOUNT_'+a['id'],a['position'],anchors,role='future_actor',clearance=a['clearance'])
 anchor('ANCHOR_LINE_IN',(CFG['demo']['start_x'],0,.86),anchors,role='line_in')
 anchor('ANCHOR_LINE_OUT',(CFG['demo']['end_x'],0,.86),anchors,role='line_out')
 anchor('ANCHOR_PACK_GRASP',(pack_x,pack_y-.08,1.11),anchors,role='parcel_grasp')
-anchor('ANCHOR_REWORK',(*CFG['layout']['rework'][:2],.86),anchors,role='rework_surface')
 
 demo=CFG['demo'];start_x,end_x,stop_x=demo['start_x'],demo['end_x'],demo['stop_x']
 speed,dwell,cycle,count=demo['speed_mps'],demo['inspection_stop_seconds'],demo['cycle_seconds'],demo['carton_count']
@@ -546,10 +553,11 @@ sc.frame_set(1)
 def camera(name,pos,target,lens=48,ortho=None):
     d=bpy.data.cameras.new(name);o=bpy.data.objects.new(name,d);sc.collection.objects.link(o);o.location=pos
     o.rotation_euler=(Vector(target)-o.location).to_track_quat('-Z','Y').to_euler()
-    d.lens=lens
+    d.sensor_width=36.0;d.lens=lens
     if ortho:d.type='ORTHO';d.ortho_scale=ortho
+    else:d.type='PERSP'
     return o
-hero=camera('CAMERA_OVERVIEW',(22,-29,24),(0,.8,.35),ortho=37)
+hero=camera('CAMERA_OVERVIEW',(0.0,-32.0,25.0),(0.0,0.0,0.85),lens=28.0)
 camera('CAMERA_CONVEYOR',(-3.5,-4.5,3.0),(-4.5,0,.76),lens=52)
 camera('CAMERA_PACK',(pack_x+3.4,pack_y-3.6,3.2),(pack_x,pack_y,1.10),lens=55)
 camera('CAMERA_STORAGE',(-1.6,1.0,4.0),(-5.2,6.35,1.15),lens=48)
@@ -611,7 +619,9 @@ assert not connection_errors,connection_errors
 assert not [o.name for o in bpy.data.objects if o.type=='ARMATURE']
 report={'source_mesh_objects':sum(o.type=='MESH' for o in bpy.data.objects),'unique_meshes':len(bpy.data.meshes), 'invalid_vertices':bad_vertices,'degenerate_faces':degenerate,'conveyor_connection_errors':connection_errors,'robots':0,'people':0,'units':'meters','origin_convention':'bottom-center for portable props', 'native_dimensions':CFG}
 report['floor_markings']={'arrow_count':len(walkway_arrows),'arrow_connected_components_each':1,'label_center_xy_m':label_center,'lane_center_y_m':lane_center,'label_centered':True}
-(OUT/'geometry_report.json').write_text(json.dumps(report,indent=2,ensure_ascii=False))
+if opt.write_geometry_report:
+    (OUT/'geometry_report.json').write_text(json.dumps(report,indent=2,ensure_ascii=False))
+bpy.context.preferences.filepaths.save_version=0
 bpy.ops.wm.save_as_mainfile(filepath=str(OUT/'warehouse_environment.blend'))
 print('NATIVE_SCENE_SAVED',flush=True)
 
@@ -641,9 +651,11 @@ for name,obj in assets.items():
     obj.parent=oldpar;obj.location=oldloc;obj.rotation_euler=oldrot
     bpy.context.view_layer.update()
 print('MODULAR_ASSETS_EXPORTED',flush=True)
-(OUT/'asset_manifest.json').write_text(json.dumps(asset_manifest,ensure_ascii=False,indent=2))
+if opt.write_manifest:
+    (OUT/'asset_manifest.json').write_text(json.dumps(asset_manifest,ensure_ascii=False,indent=2))
 
-sys.path.insert(0,str(ROOT/'scripts'))
-from optimize_export import export_optimized
-export_optimized(OUT,render=opt.render,details=opt.details)
+if not opt.skip_env_export:
+    sys.path.insert(0,str(ROOT/'scripts'))
+    from optimize_export import export_optimized
+    export_optimized(OUT,render=opt.render,details=opt.details)
 print('BUILD_COMPLETE',flush=True)

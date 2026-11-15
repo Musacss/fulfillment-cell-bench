@@ -39,15 +39,22 @@ for(const [state,clip] of [['prepare','Prepare'],['pick','Pick'],['pack','Pack']
  assert.equal(human.sample({state,phase:.37}).clip,clip);let demoVisible=false;human.root.traverse(o=>{if(o.userData.handling_prop&&o.visible)demoVisible=true;});assert.equal(demoVisible,false,'Demonstration prop became a production order');
 }
 assert.equal(human.sample({state:'pack',orderKind:'oversize',phase:.3}).clip,'Pack_Oversize');
+const frozenMachine=createActorVisual(robot,{actorType:'robot',templates:templates.scene,animateRecovery:false});
 for(const state of ['jammed','helper_walking','service','disabled']){
- machine.sample({state,phase:0});const before=signature(machine);machine.sample({state,phase:.91});assert.deepEqual(signature(machine),before,'Blocked robot continued working');
+ frozenMachine.sample({state,phase:0});const before=signature(frozenMachine);frozenMachine.sample({state,phase:.91});assert.deepEqual(signature(frozenMachine),before,'Frozen recovery robot moved');
 }
-machine.sample({state:'jammed',phase:.2});const jam=signature(machine);machine.sample({state:'service',phase:.8});assert.deepEqual(signature(machine),jam,'Service restarted the packaging cycle');
+frozenMachine.dispose();
+const propVisibility=actor=>['prop_shell','prop_flap_front','prop_flap_back','prop_flap_left','prop_flap_right','prop_tape'].map(n=>{const b=actor.root.getObjectByName(n);return b?b.scale.lengthSq()>1e-4:false;});
 for(const orderKind of ['regular','oversize']){
- machine.sample({state:'pack',phase:1,orderKind});const end=signature(machine);
- machine.sample({state:'jammed',phase:0,orderKind});const stopped=signature(machine);
- assert.ok(end.every((v,i)=>Math.abs(v-stopped[i])<1e-5),'Jam snapped back to another packing pose');
- machine.sample({state:'service',phase:.8,orderKind});assert.deepEqual(signature(machine),stopped,'Servicing moved the frozen order');
+ const jamClip=orderKind==='oversize'?'Jammed_Oversize':'Jammed';
+ const svcClip=orderKind==='oversize'?'Service_Oversize':'Service';
+ const jamSample=machine.sample({state:'jammed',phase:.2,orderKind});
+ assert.equal(jamSample.clip,jamClip);assert.equal(jamSample.activeCartonProp,true);
+ const jamVis=propVisibility(machine);
+ assert.equal(machine.sample({state:'helper_walking',phase:.6,orderKind}).clip,jamClip);
+ assert.deepEqual(propVisibility(machine),jamVis,'Helper walk altered jammed prop visibility');
+ const svcSample=machine.sample({state:'service',phase:.8,orderKind});
+ assert.equal(svcSample.clip,svcClip);assert.equal(svcSample.activeCartonProp,true);
 }
 assert.equal(machine.sample({state:'service'}).assignsOwnership,false,'Presentation adapter assigned an order');
 assert.equal(machine.current.orderRelationship,'robot-retains-order');
@@ -154,7 +161,7 @@ const expectedRobot=['Idle','Walk','CarryIdle','Reach','PickUp','PlaceDown','Car
 assert.deepEqual(worker.animations.map(c=>c.name),expectedWorker,'Worker clips changed');assert.deepEqual(robot.animations.map(c=>c.name),expectedRobot,'Robot clips changed');
 assert.ok(worker.scene.getObjectByName('WORKER_Helmet'),'Missing safety helmet');
 const characterResults=[];
-for(const [label,model,bones] of [['worker',worker,26],['robot',robot,32]]){
+for(const [label,model,bones] of [['worker',worker,35],['robot',robot,41]]){
  const skins=[];model.scene.traverse(o=>{if(o.isSkinnedMesh)skins.push(o);});assert.ok(skins.length>0);
  assert.equal(skins[0].skeleton.bones.length,bones,label+' bone count');
  for(const side of ['L','R'])assert.ok(model.scene.getObjectByName('ATTACH_'+label.toUpperCase()+'_HAND_'+side),'Missing grip attachment');

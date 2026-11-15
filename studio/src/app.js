@@ -9,18 +9,66 @@ const euros=value=>new Intl.NumberFormat('en-US',{style:'currency',currency:'EUR
 const number=value=>new Intl.NumberFormat('en-US',{maximumFractionDigits:2}).format(value??0);
 const duration=seconds=>[Math.floor(seconds/3600),Math.floor(seconds/60)%60,Math.floor(seconds)%60].map(v=>String(v).padStart(2,'0')).join(':');
 const strategy={manual:'Manual Baseline',candidate:'Candidate Plan',reference:'Adaptive Reference',local:'Local Run','naive-route-all':'Naive Route-All'};
-const workerStates={idle:'Idle',walk:'Walking',prepare:'Prep',pick:'Picking',pack:'Packing',inspect:'QC Inspect',assist:'Robot Assist',break:'Break',not_purchased:'Not Purchased',disabled:'Bypassed / Off',jammed:'Jammed',helper_walking:'Helper En Route',service:'Clearing Jam',finished:'Finished'};
+const STAGE_CODES={1:'01 PREP',2:'02 PICK',3:'03 PACK',4:'04 QC'};
+const workerStates={idle:'Idle',walk:'Walking',prepare:'Prep',pick:'Picking',pack:'Packing',inspect:'QC Inspect',assist:'Robot Assist',break:'Break',not_purchased:'Auto-slot: off (AI decision)',disabled:'Auto-slot: standby',jammed:'Jammed',helper_walking:'Helper En Route',service:'Clearing Jam',finished:'Finished'};
 const importantLabels={jam:'Robot Jam',assist:'Jam Assist',rework:'Rework',break:'Break',escaped:'Escaped Defect',scrap:'Scrap'};
-const layerLabels={'ENV_FLOOR_AND_GRID':['Floor & CAD Grid','▦'],'ENV_WALLS_AND_DOCKS':['Walls & Docks','▥'],'ENV_WORKSTATIONS_DETAIL':['Workstations','⌑'],'ENV_ROBOT_CELL':['Robot Cell','◇'],'ENV_BREAK_AREA':['Break & KPI','◷'],'ENV_OVERHEAD':['Overhead Trusses','⌁']};
+const layerLabels={'ENV_FLOOR_AND_GRID':['Floor & CAD Grid','▦'],'ENV_WALLS_AND_DOCKS':['Walls & Docks','▥'],'ENV_WORKSTATIONS_DETAIL':['Workstations','⌑'],'ENV_ROBOT_CELL':['Robot Cell','◇'],'ENV_BREAK_AREA':['Break & KPI','◷']};
 const costsLabels={depreciation:'Depreciation',service:'Robot Service',shifts:'Shift Wages',overtime:'Overtime',trays:'Trays',materials:'Packing Materials',rework:'Rework',late:'Late Penalties',unfulfilled:'Scrap & Unfulfilled',escaped:'Escaped Defects'};
-let source=null,current=[],snapshots=[],mode='single',time=0,playing=false,speed=60,activeInspector=0,requestVersion=0,lastPaint=-1,lastInspector=-1,loading=false,disposed=false;
+
+let source=null,current=[],snapshots=[],mode='single',time=0,playing=false,speed=15,activeInspector=0,requestVersion=0,lastPaint=-1,lastInspector=-1,loading=false,disposed=false;
 const players=[null,null],playerPromises=[null,null],panelStats=[{},{}];
-const layerState=new Map(environmentLayers),preset='overview';
-let cameraPreset=preset;
+const layerState=new Map(environmentLayers.map(([name,visible])=>[name,name==='ENV_OVERHEAD'?false:visible]));
+let cameraPreset='overview';
 const query=new URLSearchParams(location.search);
 const isLocalHost=['127.0.0.1','localhost','[::1]'].includes(location.hostname);
 const defaultCatalogUrl=isLocalHost?DEFAULT_INDEX:new URL('./3d-pack/index.json',document.baseURI).href;
 $('bridge-url').value=query.get('index')||defaultCatalogUrl;
+
+const speedSelect=()=>$('speed-select')||$('speed');
+const ensureBlueprintButton=()=>{
+  const grid=$('camera-presets')||document.querySelector('.camera-grid');
+  if(!grid||grid.querySelector('[data-camera="blueprint"]'))return;
+  const btn=document.createElement('button');
+  btn.type='button';btn.dataset.camera='blueprint';btn.style.gridColumn='span 2';btn.textContent='⊞ Top-Down Blueprint';
+  const first=grid.firstElementChild;
+  if(first)first.insertAdjacentElement('afterend',btn);else grid.append(btn);
+};
+ensureBlueprintButton();
+if(speedSelect()){
+  const sel=speedSelect();
+  if(![...sel.options].some(o=>o.value==='15')){
+    const opt=new Option('15×','15',true,true);
+    sel.insertBefore(opt,sel.options[2]||null);
+  }
+  sel.value='15';
+}
+
+function displayRunName(run){
+  if(!run)return 'Local Run';
+  if(run.label&&run.label!==run.strategy)return run.label;
+  return strategy[run.strategy]||run.label||run.id||'Local Run';
+}
+function runLabel(run){return `${displayRunName(run)} · seed ${run.seed}`;}
+function plannedStageAllocation(plan){
+  const counts={1:0,2:0,3:0,4:0};
+  for(const zones of plan?.workers||[]){
+    const primary=zones?.[0];
+    if(counts[primary]!==undefined)counts[primary]++;
+  }
+  return `01 PREP:${counts[1]} · 02 PICK:${counts[2]} · 03 PACK:${counts[3]} · 04 QC:${counts[4]}`;
+}
+function liveStageCounts(state){
+  const counts={1:0,2:0,3:0,4:0};
+  for(const w of Object.values(state?.workers||{})){
+    if(counts[w.zone]!==undefined)counts[w.zone]++;
+  }
+  return counts;
+}
+function autoSlotLabel(plan,robotState){
+  if(!plan?.robot||robotState==='not_purchased')return 'Auto-slot: off (AI decision)';
+  if(plan.route==='manual'||robotState==='disabled')return 'Auto-slot: standby (manual route)';
+  return 'Auto-slot: active';
+}
 
 function showError(error){
   console.error(error);$('error-message').textContent=error.message||String(error);$('error-panel').hidden=false;
@@ -34,8 +82,6 @@ function paintStatus(){
 function maxDuration(){return Math.max(0,...current.map(item=>item.replay.durationSeconds));}
 function tickSeconds(){return current[0]?.replay.tickSeconds||30;}
 function controlState(enabled){for(const id of ['play','reset','next-event','timeline'])$(id).disabled=!enabled;}
-function runDisplayName(run){return run.label&&run.label!==run.strategy?run.label:(strategy[run.strategy]||run.label||run.id);}
-function runLabel(run){return `${runDisplayName(run)} · seed ${run.seed}`;}
 function options(element,entries,label,selected){
   const previous=selected??element.value;element.replaceChildren(...entries.map(entry=>{const option=document.createElement('option');option.value=entry.id;option.textContent=label(entry);return option;}));
   if(entries.some(e=>e.id===previous))element.value=previous;
@@ -44,6 +90,11 @@ function options(element,entries,label,selected){
 function setWeeks(count=12){
   const select=$('week-select'),previous=select.value||'0';select.replaceChildren(...Array.from({length:count},(_,i)=>{const o=document.createElement('option');o.value=String(i);o.textContent=`week-${String(i).padStart(2,'0')} / Week ${i+1}`;return o;}));
   select.value=Number(previous)<count?previous:'0';
+}
+function setCameraPreset(name){
+  cameraPreset=name;
+  players.forEach(player=>player?.setCameraPreset(cameraPreset));
+  document.querySelectorAll('[data-camera]').forEach(b=>b.classList.toggle('selected',b.dataset.camera===cameraPreset));
 }
 function updateModeFields(){
   $('single-fields').hidden=mode!=='single';$('comparison-fields').hidden=mode!=='compare';$('quarter-fields').hidden=mode!=='quarter';
@@ -62,11 +113,22 @@ async function ensurePlayer(index){
     const side=index?'right':'left';
     playerPromises[index]=createScenePlayer($('canvas-'+side),{assetBase:new URL('./scene/',document.baseURI).href,onStats:stats=>{panelStats[index]=stats||{};}}).then(player=>{
       players[index]=player;
-      for(const [name,visible] of layerState)player.setLayer(name,visible);
+      for(const [name,visible] of layerState)player.setLayer(name,name==='ENV_OVERHEAD'?false:visible);
       player.setCameraPreset(cameraPreset);$('loading-'+side).hidden=true;player.resize();return player;
     }).catch(error=>{$('loading-'+side).innerHTML='<strong>Failed to load 3D scene</strong><small>See error message for details</small>';playerPromises[index]=null;throw error;});
   }
   return playerPromises[index];
+}
+function renderPlanSummary(entry){
+  if(!entry)return;
+  const plan=entry.replay.manifest.plan;
+  const chips=[
+    `${plan.workers.length} workers (${plannedStageAllocation(plan)})`,
+    autoSlotLabel(plan,plan.robot?(plan.route==='manual'?'disabled':'idle'):'not_purchased'),
+    plan.trays?'With trays':'No trays',
+    `Route: ${plan.route}`,
+  ];
+  $('plan-summary').innerHTML=chips.map(s=>`<span class="plan-chip">${html(s)}</span>`).join('');
 }
 async function chooseReplay(){
   if(!source)return;
@@ -82,10 +144,13 @@ async function chooseReplay(){
     current=entries;time=0;lastPaint=-1;lastInspector=-1;loading=false;
     const first=entries[0];if(first.quarter)setWeeks(first.quarter.weeks.length);
     $('seed-tag').textContent='SEED '+first.run.seed;
-    $('workspace-title').textContent=entries.length===2?(first.quarter?`Two Plans · Week ${first.week+1} (${first.weekSummary?.label||'Compare'})`:'Two Plans. One Shift.'):first.quarter?`${runDisplayName(first.run)} · Week ${first.week+1}`:runDisplayName(first.run);
-    const plan=first.replay.manifest.plan;
-    $('plan-summary').innerHTML=[`${plan.workers.length} workers`,plan.robot?'Robot active':'No robot',plan.trays?'With trays':'No trays',`Route: ${plan.route}`].map(s=>`<span class="plan-chip">${html(s)}</span>`).join('');
-    entries.forEach((item,index)=>{const side=index?'right':'left';$('scene-label-'+side).textContent=`${entries.length===2?(index?'B / ':'A / '):''}${runDisplayName(item.run)}`;$('scene-info-'+side).textContent=`SEED ${item.run.seed} · ${item.replay.manifest.plan.workers.length} workers`;});
+    $('workspace-title').textContent=entries.length===2?(first.quarter?`Two Plans · Week ${first.week+1} (${first.weekSummary?.label||'Compare'})`:'Two Plans. One Shift.'):first.quarter?`${displayRunName(first.run)} · Week ${first.week+1}`:displayRunName(first.run);
+    renderPlanSummary(entries[activeInspector]||first);
+    entries.forEach((item,index)=>{
+      const side=index?'right':'left',plan=item.replay.manifest.plan;
+      $('scene-label-'+side).textContent=`${entries.length===2?(index?'B / ':'A / '):''}${displayRunName(item.run)}`;
+      $('scene-info-'+side).textContent=`SEED ${item.run.seed} · ${plan.workers.length} workers · ${plan.robot?'auto-slot ON':'auto-slot OFF'}`;
+    });
     $('timeline').max=String(Math.max(...entries.map(i=>i.replay.horizonTicks)));
     $('duration').textContent='Horizon '+duration(maxDuration());
     controlState(true);connected(source.label+' · '+source.index.runs.length+' runs');paint(true);paintStatus();
@@ -96,7 +161,13 @@ async function acceptSource(next){
   source=next;const runs=next.index.runs.filter(r=>r.mode==='v1'),quarters=next.index.runs.filter(r=>r.mode!=='v1');
   options($('run-select'),runs,runLabel,query.get('run')||runs.find(r=>r.strategy==='reference')?.id);
   options($('quarter-select'),quarters,runLabel,query.get('quarter')||quarters.find(r=>r.strategy==='reference'||r.slug==='qwen_grpo')?.id);
-  options($('comparison-select'),next.index.comparisons,p=>`${p.mode==='v1'?'Shift':'Quarter'} · seed ${p.seed} / ${p.left.replace(/^(v1|quarterly)-/,'').replace(/-seed\d+$/,'')} → ${p.right.replace(/^(v1|quarterly)-/,'').replace(/-seed\d+$/,'')}`);
+  options($('comparison-select'),next.index.comparisons,p=>{
+    const leftRun=next.index.runs.find(r=>r.id===p.left);
+    const rightRun=next.index.runs.find(r=>r.id===p.right);
+    const leftLabel=leftRun?displayRunName(leftRun):(leftRun?.label||leftRun?.strategy||p.left);
+    const rightLabel=rightRun?displayRunName(rightRun):(rightRun?.label||rightRun?.strategy||p.right);
+    return `${p.mode==='v1'?'Shift':'Quarter'} · seed ${p.seed} / ${leftLabel} → ${rightLabel}`;
+  });
   document.querySelector('[data-mode="quarter"]').hidden=!(next.index.quarterly_available||quarters.length);
   document.querySelector('[data-mode="compare"]').disabled=!next.index.comparisons.length;
   const qMode=query.get('mode');
@@ -112,10 +183,15 @@ async function connect(){
 
 function setTime(seconds){time=Math.min(maxDuration(),Math.max(0,Number(seconds)||0));lastPaint=-1;paint(true);if(time>=maxDuration())setPlaying(false);}
 function panelBadges(state,index){
-  const badges=[];for(const queue of ['Q1','R']){const overflow=Math.max(0,state.queues[queue].length-18);if(overflow)badges.push(`+${overflow} in ${queue}`);}
+  const entry=current[index],plan=entry?.replay.manifest.plan;
+  const zc=liveStageCounts(state);
+  const badges=[
+    autoSlotLabel(plan,state.robot.state),
+    `Stages 01:${zc[1]} · 02:${zc[2]} · 03:${zc[3]} · 04:${zc[4]}`,
+  ];
+  for(const queue of ['Q1','R']){const overflow=Math.max(0,state.queues[queue].length-18);if(overflow)badges.push(`+${overflow} in ${queue}`);}
   if(['jammed','helper_walking','service'].includes(state.robot.state))badges.push(workerStates[state.robot.state]);
   if(state.ended&&state.counters.unfinished)badges.push(`${state.counters.unfinished} unfinished at H`);
-  const entry=current[index];
   if(entry?.weekDiagnostics?.status==='critical')badges.push('SLA Alert');
   const node=$('scene-badges-'+(index?'right':'left'));
   const summary=`<span class="canvas-badge summary">Good ${state.counters.good} · Auto ${state.counters.auto_finished}</span>`;
@@ -154,15 +230,17 @@ function renderDiagnostics(entry){
 }
 function renderInspector(){
   const entry=current[activeInspector],state=snapshots[activeInspector];if(!entry||!state)return;
-  const c=state.counters;
+  renderPlanSummary(entry);
+  const c=state.counters,plan=entry.replay.manifest.plan,zc=liveStageCounts(state);
   const cards=[['good',c.good,'Good'],['',c.on_time,'On-Time'],['',state.arrivedCount,'Arrived'],['',state.inSystem,'In System'],['warn',c.escaped,'Escaped'],['warn',c.scrap,'Scrap']];
   $('metrics').innerHTML=cards.map(([cls,value,label])=>`<div class="metric ${cls}"><strong>${number(value)}</strong><span>${label}</span></div>`).join('');
   $('metrics-tick').textContent=number(state.tickFloat??state.tick)+' TICK';
   $('throughput').innerHTML=`Packed: <strong>${c.pack_finished}</strong> / ${c.pack_started} started · auto ${c.auto_finished}<br>Active labor: <strong>${number(c.labor_ticks*entry.replay.tickSeconds/3600)} h</strong> · rework ${c.rework_started}<br>Trays: ${c.trays_used} · pending arrival: ${state.notArrived} · unfinished at H: ${c.unfinished}<br>Overtime per worker: ${c.overtime_ticks.map(number).join(' / ')} ticks`;
   renderDiagnostics(entry);
   $('queue-body').innerHTML=['Q1','Q2','Q3','Q4','R'].map(q=>`<tr><td>${q}</td><td>${state.queues[q].length}</td><td>${state.reserved[q]??'—'}</td><td>${state.capacity?.[q]??'∞'}</td></tr>`).join('');
+  const stageHeader=`<div class="resource-row"><strong>AI · ${Object.keys(state.workers).length} WKR</strong><span>01:${zc[1]} · 02:${zc[2]} · 03:${zc[3]} · 04:${zc[4]}</span><small>${html(autoSlotLabel(plan,state.robot.state))}</small></div>`;
   const resources=[...Object.values(state.workers),{id:'robot',...state.robot}];
-  $('resources').innerHTML=resources.map(w=>`<div class="resource-row"><i class="resource-dot ${w.state==='break'?'break':['jammed','helper_walking','service'].includes(w.state)?'jammed':!['idle','disabled','not_purchased'].includes(w.state)?'busy':''}"></i><strong>${w.id==='robot'?'RBT':html(w.id.toUpperCase())}</strong><span>${html(workerStates[w.state]||w.state)}</span><small>${w.orderId!=null?'#'+w.orderId:w.zone?'Z'+w.zone:''}</small></div>`).join('');
+  $('resources').innerHTML=stageHeader+resources.map(w=>`<div class="resource-row"><i class="resource-dot ${w.state==='break'?'break':['jammed','helper_walking','service'].includes(w.state)?'jammed':!['idle','disabled','not_purchased'].includes(w.state)?'busy':''}"></i><strong>${w.id==='robot'?'RBT':html(w.id.toUpperCase())}</strong><span>${html(w.id==='robot'?autoSlotLabel(plan,w.state)+' · '+(workerStates[w.state]||w.state):(workerStates[w.state]||w.state))}</span><small>${w.orderId!=null?'#'+w.orderId:w.zone?(STAGE_CODES[w.zone]||'Z'+w.zone):''}</small></div>`).join('');
   const economy=entry.replay.manifest.economy;
   $('costs').innerHTML=Object.entries(costsLabels).map(([key,label])=>`<div class="cost-row"><span>${label}</span><strong>${euros(economy.costs[key])}</strong></div>`).join('')+`<div class="cost-row total"><span>Total OpEx</span><strong>${euros(economy.total)}</strong></div>`;
   $('purchase').innerHTML=`<span>Equipment Purchase · CapEx</span><strong>${euros(economy.purchase)}</strong>`;
@@ -181,18 +259,31 @@ $('source-form').addEventListener('submit',event=>{event.preventDefault();connec
 for(const id of ['local-files','local-folder'])$(id).addEventListener('change',async event=>{try{await acceptSource(await openLocal(event.target.files));}catch(error){showError(error);}finally{event.target.value='';}});
 for(const id of ['run-select','comparison-select','quarter-select','week-select'])$(id).addEventListener('change',()=>{updateModeFields();chooseReplay();});
 document.querySelectorAll('[data-mode]').forEach(button=>button.addEventListener('click',()=>{if(!source)return;mode=button.dataset.mode;updateModeFields();chooseReplay();}));
-document.querySelectorAll('[data-camera]').forEach(button=>button.addEventListener('click',()=>{cameraPreset=button.dataset.camera;players.forEach(player=>player?.setCameraPreset(cameraPreset));document.querySelectorAll('[data-camera]').forEach(b=>b.classList.toggle('selected',b===button));}));
-for(const [name,visible] of environmentLayers){
+document.querySelectorAll('[data-camera]').forEach(button=>button.addEventListener('click',()=>setCameraPreset(button.dataset.camera)));
+const visibleLayerEntries=environmentLayers.filter(([name])=>name!=='ENV_OVERHEAD'&&layerLabels[name]);
+const refreshLayerCount=()=>{
+  const activeCount=visibleLayerEntries.filter(([name])=>layerState.get(name)).length;
+  $('layer-count').textContent=`${activeCount} / ${visibleLayerEntries.length}`;
+};
+for(const [name,visible] of visibleLayerEntries){
   const row=document.createElement('label');row.className='layer-row';row.innerHTML=`<input type="checkbox" ${visible?'checked':''} data-layer="${name}">${layerLabels[name][0]}<span>${layerLabels[name][1]}</span>`;
-  row.querySelector('input').addEventListener('change',event=>{layerState.set(name,event.target.checked);players.forEach(p=>p?.setLayer(name,event.target.checked));$('layer-count').textContent=[...layerState.values()].filter(Boolean).length+' / 6';});$('layers').append(row);
+  row.querySelector('input').addEventListener('change',event=>{layerState.set(name,event.target.checked);players.forEach(p=>p?.setLayer(name,event.target.checked));refreshLayerCount();});$('layers').append(row);
 }
+refreshLayerCount();
 $('play').addEventListener('click',()=>{if(time>=maxDuration())setTime(0);setPlaying(!playing);});
 $('reset').addEventListener('click',()=>{setPlaying(false);setTime(0);});
 $('timeline').addEventListener('input',event=>setTime(Number(event.target.value)*tickSeconds()));
-$('speed').addEventListener('change',event=>{speed=Number(event.target.value);});
+speedSelect()?.addEventListener('change',event=>{speed=Number(event.target.value)||15;});
+$('event-filter').addEventListener('change',event=>{
+  const v=event.target.value;
+  if((v==='rework'||v==='scrap')&&cameraPreset!=='blueprint'&&cameraPreset!=='rework')setCameraPreset('rework');
+});
 $('next-event').addEventListener('click',()=>{
   const filter=$('event-filter').value,next=current.flatMap(item=>item.replay.importantEvents.map(event=>({...event,seconds:event.tick*item.replay.tickSeconds}))).filter(event=>event.seconds>time+1e-6&&(filter==='all'||event.kind===filter)).sort((a,b)=>a.seconds-b.seconds)[0];
-  setPlaying(false);if(next){setTime(next.seconds);$('event-note').textContent=`${importantLabels[next.kind]} · tick ${next.tick}${next.orderId!=null?' · order #'+next.orderId:''}`;}else{$('event-note').textContent='No further events of this type';}
+  setPlaying(false);if(next){
+    if((next.kind==='rework'||next.kind==='scrap')&&cameraPreset!=='blueprint'&&cameraPreset!=='rework')setCameraPreset('rework');
+    setTime(next.seconds);$('event-note').textContent=`${importantLabels[next.kind]} · tick ${next.tick}${next.orderId!=null?' · order #'+next.orderId:''}`;
+  }else{$('event-note').textContent='No further events of this type';}
 });
 $('error-close').addEventListener('click',()=>$('error-panel').hidden=true);
 $('inspector-toggle').addEventListener('click',event=>{const hidden=document.querySelector('.application').classList.toggle('no-inspector');event.currentTarget.setAttribute('aria-expanded',String(!hidden));requestAnimationFrame(()=>players.forEach(p=>p?.resize()));});
@@ -205,6 +296,6 @@ window.addEventListener('beforeunload',()=>{disposed=true;players.forEach(p=>p?.
 let lastFrame=performance.now();function animate(now){if(disposed)return;const delta=Math.min(.25,(now-lastFrame)/1000);lastFrame=now;if(playing&&!loading){time=Math.min(maxDuration(),time+delta*speed);if(time>=maxDuration())setPlaying(false);}paint();for(let i=0;i<current.length;i++){if(players[i]&&snapshots[i])players[i].render(snapshots[i],{playing,speed,deltaSeconds:delta});}requestAnimationFrame(animate);}requestAnimationFrame(animate);
 
 // A small read-only QA surface: all state is still derived by seekTo, never patched.
-window.replayStudio={get source(){return source?.index;},get states(){return snapshots;},get time(){return time;},get mode(){return mode;},seekTo:setTime,pause:()=>setPlaying(false),play:()=>setPlaying(true)};
+window.replayStudio={get source(){return source?.index;},get states(){return snapshots;},get time(){return time;},get speed(){return speed;},get mode(){return mode;},get cameraPreset(){return cameraPreset;},get stats(){return panelStats;},get players(){return players;},seekTo:setTime,pause:()=>setPlaying(false),play:()=>setPlaying(true),setCameraPreset};
 if(window.innerWidth<1000){document.querySelector('.application').classList.add('no-inspector');$('inspector-toggle').setAttribute('aria-expanded','false');}
 setWeeks();ensurePlayer(0).catch(showError);connect();

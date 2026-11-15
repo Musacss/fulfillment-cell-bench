@@ -290,8 +290,14 @@ def replay_seeds() -> list[int]:
 
 @pytest.fixture
 def short_sock_dir():
-    """macOS AF_UNIX sun_path <= 104 bytes: always allocate sockets under /tmp/fcb_*."""
-    with tempfile.TemporaryDirectory(dir="/tmp", prefix="fcb_") as raw:
+    """macOS AF_UNIX sun_path <= 104 bytes: prefer /tmp/fcb_*, fallback to gettempdir()."""
+    base_dir: str | None = "/tmp"
+    try:
+        probe = tempfile.mkdtemp(dir="/tmp", prefix="fcb_p_")
+        os.rmdir(probe)
+    except OSError:
+        base_dir = None
+    with tempfile.TemporaryDirectory(dir=base_dir, prefix="fcb_") as raw:
         yield Path(raw)
 
 

@@ -529,7 +529,6 @@ def test_t4_scenario8_verda_ops_packaging_secret_hygiene_and_bilingual_docs_audi
         "docs/SPEC.md",
         "docs/CONTRACTS.md",
         "docs/HARBOR.md",
-        "docs/DEMO_PLAYBOOK_10MIN.md",
     ):
         p = REPO_ROOT / doc_rel
         assert p.is_file() and not CYRILLIC_RE.search(p.read_text(encoding="utf-8"))

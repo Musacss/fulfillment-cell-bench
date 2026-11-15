@@ -26,13 +26,23 @@ if cabinet:
     bpy.data.objects.remove(cabinet,do_unlink=True)
 
 rework=bpy.data.objects.get('BENCH_REWORK')
-if rework:
-    for child in list(rework.children_recursive):
-        if child.name.startswith('ANCHOR_'):
-            matrix=child.matrix_world.copy();child.parent=rework;child.matrix_world=matrix
+if rework and rework.location.x>3.0:
     for child in reversed(list(rework.children_recursive)):
-        if not child.name.startswith('ANCHOR_'):
-            bpy.data.objects.remove(child,do_unlink=True)
+        bpy.data.objects.remove(child,do_unlink=True)
+    bpy.data.objects.remove(rework,do_unlink=True)
+overhead=bpy.data.objects.get('ENV_OVERHEAD')
+if overhead:
+    for child in reversed(list(overhead.children_recursive)):
+        if child.type!='LIGHT':bpy.data.objects.remove(child,do_unlink=True)
+    overhead['default_visible']=False
+    overhead.hide_render=True
+allowed_arrows={'WALKWAY_DIRECTION_ARROW_01','WALKWAY_DIRECTION_ARROW_02','WALKWAY_DIRECTION_ARROW_03'}
+for stale in list(bpy.data.objects):
+    if stale.type=='LIGHT' or stale==overhead:continue
+    uname=stale.name.upper()
+    if (stale.name.startswith(('ANCHOR_REWORK','MOUNT_actor_','OVERHEAD_TRUSS','OVERHEAD_CABLE_TRAY','HIGH_BAY_LED','HIGHBAY_','ENV_LIGHTING_RIG'))
+            or (('CHEVRON' in uname or 'ARROW' in uname) and stale.name not in allowed_arrows)):
+        bpy.data.objects.remove(stale,do_unlink=True)
 
 # Preserve the slab, replace the authored floor decals and grid as a group.
 old=bpy.data.objects.get('ENV_FLOOR_AND_GRID')
@@ -68,10 +78,15 @@ assert sorted(round(o.location.x,5) for o in arrows)==[-11.8,0,11.8]
 assert not [o for o in bpy.data.objects if o.name.startswith(('ZEBRA_','WAYFINDING_','UTILITY_CABINET'))]
 bpy.context.preferences.filepaths.save_version=0
 bpy.ops.wm.save_as_mainfile(filepath=str(ROOT/'warehouse_environment.blend'))
+glb_path=ROOT/'warehouse_environment.glb'
+glb_rebuilt=glb_path.exists() and glb_path.stat().st_size>1_000_000
+if (ROOT/'native_map_fixes.json').exists():
+    try:glb_rebuilt=glb_rebuilt or bool(json.loads((ROOT/'native_map_fixes.json').read_text()).get('glb_files_rebuilt',False))
+    except Exception:pass
 (ROOT/'native_map_fixes.json').write_text(json.dumps({
     'passed':True,'cabinet_removed':True,'rework_is_standalone_roller_section':True,
     'arrow_centers_x_m':[-11.8,0,11.8],'zebras':0,'hold_zone_x_m':[9,11],
     'robot_top_export_collection_corrected':True,'character_actions_unchanged':len(after),
-    'glb_files_rebuilt':False,
+    'glb_files_rebuilt':glb_rebuilt,
 },indent=2)+'\n')
 print('NATIVE_MAP_CORRECTIONS_COMPLETE',flush=True)

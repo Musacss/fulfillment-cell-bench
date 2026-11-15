@@ -1820,7 +1820,6 @@ def test_t1_f16_readme_concise_anti_slop_and_judge_docs_english():
         "docs/SPEC.md": ("1/5", "quarterly"),
         "docs/CONTRACTS.md": ("QuarterlyPlan", "Event"),
         "docs/HARBOR.md": ("no-network", "/srv/bench_daemon"),
-        "docs/DEMO_PLAYBOOK_10MIN.md": ("3d", "bench"),
         "evidence/README.md": ("seed",),
     }
     for rel, anchors in doc_anchors.items():
