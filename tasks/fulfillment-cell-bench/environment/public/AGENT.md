@@ -21,7 +21,7 @@ Interact with the environment through four MCP tools:
 - **`submit({"plan": <QuarterlyPlan>})`**: Validates and records your final 12-week plan into `/logs/artifacts/submission.json` via the privileged episode daemon, returns `{"terminal": true, "plan": ...}`, and permanently closes the episode. Submitting an invalid plan records `null` and scores `0`.
 - **`stop({})`**: Aborts without a plan (`plan: null`), closes the episode, and scores `0`.
 
-> Do NOT waste episode wall-clock time re-implementing the discrete-event simulator from scratch -- internal PRNG streams live inside the server, container CPU is capped (`2` vCPUs), and each `pilot` call simulates all 12 weeks in `< 0.2s` (`24` pilots available). Test hypotheses directly via `pilot` and call `submit` (terminal) well before the `1500s` timeout.
+> Do NOT waste episode wall-clock time re-implementing the discrete-event simulator from scratch -- internal PRNG streams live inside the server, container CPU is capped (`2` vCPUs), and each `pilot` call simulates all 12 weeks in `< 0.2s` (`24` pilots available). Test hypotheses directly via `pilot` and call `submit` (terminal) well before the `600s` timeout.
 
 An isolated airgapped verifier re-evaluates `/logs/artifacts/submission.json` from scratch on held-out evaluation seeds.
 
