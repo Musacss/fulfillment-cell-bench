@@ -418,13 +418,9 @@ harbor_runs_dir = Path(sys.argv[6])
 
 trial_dirs = sorted(
     p
-    for p in job_dir.iterdir()
-    if p.is_dir() and "__" in p.name and ((p / "verifier").exists() or (p / "result.json").exists() or (p / "agent").exists())
+    for p in [job_dir, *job_dir.glob("*"), *job_dir.glob("*/*")]
+    if p.is_dir() and ((p / "verifier").is_dir() or (p / "trial.log").is_file() or (p / "agent").is_dir())
 )
-if not trial_dirs:
-    trial_dirs = sorted(p for p in job_dir.glob("*/*__*") if p.is_dir())
-if not trial_dirs and ((job_dir / "verifier").exists() or (job_dir / "result.json").exists()):
-    trial_dirs = [job_dir]
 
 for idx in range(1, expected_trials + 1):
     trial_tag = f"trial-{idx:02d}"

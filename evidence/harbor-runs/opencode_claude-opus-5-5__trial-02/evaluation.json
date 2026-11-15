@@ -1,0 +1,33 @@
+{
+  "evaluation": {
+    "valid": true,
+    "feasible": true,
+    "win": true,
+    "reward_num": 77594823,
+    "reward_den": 238145575,
+    "metrics": {
+      "orders": 14348,
+      "good": 14336,
+      "on_time": 14314,
+      "escaped": 8,
+      "scrap": 4,
+      "unfinished": 0,
+      "auto_finished": 10258,
+      "pack_finished": 14564,
+      "labor_ticks": 263855,
+      "base_labor_ticks": 364486,
+      "total_cost": 40137688,
+      "base_cost": 47629115,
+      "purchase": 1530000
+    },
+    "reasons": []
+  },
+  "seeds_sha256": "a32a879f8fe5476d000884555749f50543527bcda4ecaf703c1be72a308dfc8b",
+  "world": "cell-quarterly-v2",
+  "source": {
+    "commit": null,
+    "world_sha256": "62b99fc9187d85c549331db857cb112921434a7391a19bef13cc61944ca720b2",
+    "schema_version": 2,
+    "harbor_checked_version": "0.26.0"
+  }
+}
