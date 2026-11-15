@@ -101,3 +101,55 @@ class Evaluation:
     reward_den: int
     metrics: dict[str, int]
     reasons: tuple[str, ...]
+
+
+QUARTERLY_SCHEMA_VERSION = 2
+
+
+class PilotBudgetExceeded(RuntimeError):
+    """Raised when episode pilot count reaches max_pilots."""
+
+
+@dataclass(frozen=True)
+class WeekPlan:
+    robot: bool
+    trays: bool
+    route: Route
+    maintenance: bool
+    workers: tuple[tuple[int, ...], ...]
+
+    def to_shift_plan(self) -> Plan:
+        return Plan(SCHEMA_VERSION, self.robot, self.trays, self.route, self.workers)
+
+
+@dataclass(frozen=True)
+class QuarterlyPlan:
+    schema_version: int
+    weeks: tuple[WeekPlan, ...]
+
+
+@dataclass(frozen=True)
+class WeekReport:
+    week: int
+    label: str
+    week_seed: int
+    carryover_in: int
+    carryover_out: int
+    wear_start: int
+    wear_end: int
+    commissioning_active: bool
+    shift_plan: Plan
+    scenario: Scenario
+    raw: RawReport
+    shift_economy: Economy
+    week_economy: Economy
+
+
+@dataclass(frozen=True)
+class QuarterReport:
+    schema_version: int
+    seed: int
+    purchase: int
+    total_cost: int
+    labor_ticks: int
+    weeks: tuple[WeekReport, ...]

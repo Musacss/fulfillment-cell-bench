@@ -11,9 +11,9 @@ Cloud credits and hackathon clocks vanish when multi-GPU VMs sit idle or when re
 
 ## Iron Rules
 
-1. **Right-Sized 1× GPU + Mandatory Dead-Man Timer:**
-   - Provision **1× `H100 80GB` or `A100 80GB`** Ubuntu VM (~€1.80–€2.80/h, total run < €25 of a €200 budget)—never multi-GPU `2×/4× H100` for 7B–8B LoRA/GRPO. Colocate vLLM (`--gpu-memory-utilization 0.42`) + bf16 LoRA GRPO trainer on the single 80GB GPU.
-   - First command on SSH login: `sudo shutdown -h +240 "4h budget guard"` (extend explicitly with `sudo shutdown -c && sudo shutdown -h +180` only while actively running).
+1. **GPU Allocation (`1×` or `2× H100 80GB`) + Mandatory Dead-Man Timer:**
+   - **`2× H100 80GB` (~€4/h, preferred when available):** Pin `CUDA_VISIBLE_DEVICES=0` to dedicated `vLLM` rollout serving (`--gpu-memory-utilization 0.85`) and `CUDA_VISIBLE_DEVICES=1` to dedicated bf16 LoRA SFT / multi-turn GRPO policy training (zero memory contention, 2–3× faster rollouts; also supports `14B` models if desired). Fallback on `1× 80GB` is colocating vLLM (`0.42`) + trainer.
+   - First command on SSH login: `sudo shutdown -h +360 "6h budget guard"` (extend explicitly with `sudo shutdown -c && sudo shutdown -h +240` while actively running so an forgotten VM after submission never drains remaining credits).
 2. **Strict 4-Way Disjoint Seed Split:**
    - **Public Dev (`development_seeds`):** Visible inside `observe`/`pilot` only.
    - **Smoke Replay (`replay_seeds.json`):** Docker/Harbor plumbing check (`oracle`, `nop`, `stop_early`)—never used for RL training or final claims.
@@ -40,6 +40,6 @@ Cloud credits and hackathon clocks vanish when multi-GPU VMs sit idle or when re
 
 | Excuse | Reality |
 |---|---|
-| "Spin up `2× H100 SXM` for 15h so vLLM and trainer have separate GPUs" | 7B bf16 LoRA + vLLM fits in ~55 GB on 1× 80GB GPU; 2× SXM without a shutdown timer risks burning the entire €200 credit on one idle night. |
+| "Leave the GPU VM running without a `shutdown -h` guard" | An unguarded multi-GPU node left alive after submission drains remaining credits; always arm `shutdown -h +360` on boot. |
 | "Train Qwen on `development_seeds` + `replay_seeds.json` to converge faster" | Contaminates evaluation and teaches constant-JSON memorization instead of `pilot`-driven adaptation. |
 | "Serving Qwen on Verda during our demo is enough" | Judges re-run evaluation from `README.md` with one command; commit every trajectory, submission JSON, and deterministic offline verifier. |

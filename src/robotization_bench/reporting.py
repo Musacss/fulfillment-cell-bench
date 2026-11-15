@@ -7,6 +7,8 @@ import importlib
 import json
 import os
 from pathlib import Path
+import re
+import stat
 from tempfile import NamedTemporaryFile
 from typing import Any
 
@@ -26,6 +28,14 @@ from .validation import parse_plan
 
 REPLAY_FORMAT_V1 = "robotization-bench.replay.v1"
 QUARTER_PACK_FORMAT_V1 = "robotization-bench.quarter-pack.v1"
+DIAGNOSTIC_CATEGORIES: tuple[str, ...] = (
+    "commissioning_jam_unassisted",
+    "route_all_unmaintained_wear",
+    "hiring_retraining_friction",
+    "sla_overtime_breach",
+    "backlog_carryover_surge",
+)
+_CYRILLIC_RE = re.compile(r"[\u0400-\u04ff]")
 
 _ECONOMY_COST_KEYS_V1 = frozenset(
     {
@@ -147,7 +157,7 @@ def _decimal_reward(num: int, den: int, places: int = 6) -> str:
 
 
 def _cell(text: str) -> str:
-    return " ".join(str(text).splitlines()).replace("|", r"\|")
+    return " ".join(str(text).splitlines()).replace("\\", r"\\").replace("|", r"\|")
 
 
 def compare(evaluations: dict[str, Evaluation]) -> str:
@@ -183,8 +193,8 @@ def compare(evaluations: dict[str, Evaluation]) -> str:
                 _euros(int(m["purchase"])),
                 _euros(int(m["total_cost"])),
                 _euros(int(m["base_cost"]) - int(m["total_cost"])),
-                f"{m['labor_ticks']} / {m['base_labor_ticks']}",
-                f"{m['auto_finished']} / {m['pack_finished']}",
+                f"{int(m['labor_ticks'])} / {int(m['base_labor_ticks'])}",
+                f"{int(m['auto_finished'])} / {int(m['pack_finished'])}",
             ]
             outcomes.append(
                 "| "
@@ -192,7 +202,7 @@ def compare(evaluations: dict[str, Evaluation]) -> str:
                     [
                         name,
                         *(
-                            str(m[k])
+                            str(int(m[k]))
                             for k in ("orders", "good", "on_time", "escaped", "scrap", "unfinished")
                         ),
                     ]
@@ -203,6 +213,8 @@ def compare(evaluations: dict[str, Evaluation]) -> str:
             values = [name, "invalid", "no", reward, "—", "—", "—", "—", "—"]
         rows.append("| " + " | ".join(values) + " |")
         reasons = _field(result, "reasons", ())
+        if isinstance(reasons, str):
+            reasons = (reasons,) if reasons else ()
         if reasons:
             details = ", ".join(_REASONS.get(r, _cell(r)) for r in reasons)
             notes.append(f"- {name}: {details}.")
@@ -272,6 +284,25 @@ def _atomic_write_json(destination: Path, payload: Any) -> None:
         pending = Path(output.name)
         try:
             output.write(text)
+            output.flush()
+            os.fsync(output.fileno())
+            output.close()
+            _ensure_not_symlink(destination)
+            pending.replace(destination)
+        finally:
+            pending.unlink(missing_ok=True)
+
+
+def _atomic_write_text(destination: Path, text: str) -> None:
+    _ensure_not_symlink(destination)
+    destination.parent.mkdir(parents=True, exist_ok=True)
+    content = text if text.endswith("\n") else text + "\n"
+    with NamedTemporaryFile(
+        mode="w", encoding="utf-8", newline="\n", dir=destination.parent, delete=False
+    ) as output:
+        pending = Path(output.name)
+        try:
+            output.write(content)
             output.flush()
             os.fsync(output.fileno())
             output.close()
@@ -451,7 +482,10 @@ def build_shift_manifest(
 ) -> dict[str, Any]:
     """Build Musa's exact robotization-bench.replay.v1 manifest with JSON-ready list/dict types."""
     events_name = _validate_events_filename(events_file)
-    world_wire = _validate_world_wire(_to_wire(world))
+    world_copy = _to_wire(world)
+    if type(world_copy) is dict:
+        world_copy.pop("quarterly", None)
+    world_wire = _validate_world_wire(world_copy)
     plan_wire = _to_wire(plan)
     parsed_plan = parse_plan(plan_wire, world_wire)
     scenario_wire = _validate_scenario_wire(_to_wire(scenario), world_wire)
@@ -557,19 +591,31 @@ def validate_shift_bundle(bundle_dir: Path) -> dict[str, Any]:
         raise ValueError("events.jsonl line 1: empty event trace for non-empty scenario")
 
     state: dict[int, tuple[str, int, int]] = {}
+    state_line: dict[int, int] = {}
+    last_transition: dict[int, tuple[int, str | None]] = {}
     occupied: dict[int, set[int]] = defaultdict(set)
-    active: dict[str, tuple[int, int, int]] = {}
+    active: dict[str, tuple[int, int, int, int]] = {}
+    active_line: dict[str, int] = {}
+    pending_walk: dict[str, tuple[int, int, int, int, int]] = {}
     robot_jammed = False
     robot_assisted_end: int | None = None
+    robot_assist_line: int | None = None
     done: Counter[str] = Counter()
     event_kinds: Counter[str] = Counter()
-    worker_events: dict[str, list[tuple[int, dict[str, Any]]]] = defaultdict(list)
+
+    worker_zones = {f"w{idx}": zones for idx, zones in enumerate(plan.workers)}
+    w_pos = {f"w{idx}": zones[0] for idx, zones in enumerate(plan.workers)}
+    w_busy_until = {f"w{idx}": 0 for idx in range(len(plan.workers))}
+    w_last_work = {f"w{idx}": 0 for idx in range(len(plan.workers))}
+    w_took_break = {f"w{idx}": False for idx in range(len(plan.workers))}
+    rig = "tray" if plan.trays else "bare"
 
     pack_started = 0
     pack_finished = 0
     auto_finished = 0
     trays_used = 0
     rework_started = 0
+    labor = 0
     last_tick = 0
 
     for line_no, line_text in enumerate(raw_lines, start=1):
@@ -600,6 +646,13 @@ def validate_shift_bundle(bundle_dir: Path) -> dict[str, Any]:
             raise ValueError(f"events.jsonl line {line_no}: unknown Event.kind {kind!r}")
         event_kinds[kind] += 1
 
+        if pending_walk:
+            pw_res, (pw_line, pw_tick, _pw_oid, _pw_stg, _pw_att) = next(iter(pending_walk.items()))
+            if kind != "walk" or resource != pw_res:
+                raise ValueError(
+                    f"events.jsonl line {pw_line}: missing immediate walk event on {pw_res} at tick {pw_tick}"
+                )
+
         if kind == "break":
             if (
                 order_id is not None
@@ -610,9 +663,13 @@ def validate_shift_bundle(bundle_dir: Path) -> dict[str, Any]:
                 or tick >= horizon
                 or tick < break_at
                 or end_tick - tick != break_length
+                or w_took_break[resource]
+                or resource in active
+                or tick < w_busy_until[resource]
             ):
                 raise ValueError(f"events.jsonl line {line_no}: invalid break event {ev!r}")
-            worker_events[resource].append((line_no, ev))
+            w_took_break[resource] = True
+            w_busy_until[resource] = end_tick
             continue
 
         if not _is_strict_int(order_id) or order_id not in by_id:
@@ -637,6 +694,8 @@ def validate_shift_bundle(bundle_dir: Path) -> dict[str, Any]:
             ):
                 raise ValueError(f"events.jsonl line {line_no}: invalid arrival event {ev!r}")
             state[order_id] = ("arrival", 1, 0)
+            state_line[order_id] = line_no
+            last_transition[order_id] = (tick, None)
 
         elif kind == "enqueue":
             if resource is not None or end_tick is not None:
@@ -656,7 +715,13 @@ def validate_shift_bundle(bundle_dir: Path) -> dict[str, Any]:
                     raise ValueError(
                         f"events.jsonl line {line_no}: illegal stage-{stage} enqueue transition from {previous!r}"
                     )
+            prev_tick = last_transition.get(order_id, (-1, None))[0]
+            if tick != prev_tick:
+                raise ValueError(
+                    f"events.jsonl line {line_no}: enqueue tick {tick} must match preceding transition tick {prev_tick}"
+                )
             state[order_id] = ("enqueue", stage, attempt)
+            state_line[order_id] = line_no
 
         elif kind == "start":
             if (
@@ -713,20 +778,56 @@ def validate_shift_bundle(bundle_dir: Path) -> dict[str, Any]:
                 raise ValueError(
                     f"events.jsonl line {line_no}: resource {resource!r} already busy with {active[resource]!r}"
                 )
-            active[resource] = (order_id, stage, attempt)
+
+            order_kind = by_id[order_id]["kind"]
             if resource == "robot":
+                expected_end = tick + world["time"]["auto"][rig][order_kind]
+                if end_tick != expected_end:
+                    raise ValueError(
+                        f"events.jsonl line {line_no}: robot start end_tick {end_tick} != expected {expected_end}"
+                    )
                 robot_jammed = False
                 robot_assisted_end = None
+                robot_assist_line = None
             else:
-                worker_events[resource].append((line_no, ev))
+                if tick < w_busy_until[resource]:
+                    raise ValueError(
+                        f"events.jsonl line {line_no}: overlapping interval on worker {resource} (available={w_busy_until[resource]}, tick={tick})"
+                    )
+                if tick >= break_at and not w_took_break[resource]:
+                    raise ValueError(
+                        f"events.jsonl line {line_no}: worker {resource} started work at tick {tick} >= break_at ({break_at}) before taking break"
+                    )
+                if stage not in worker_zones[resource]:
+                    raise ValueError(
+                        f"events.jsonl line {line_no}: worker {resource} assigned disallowed stage {stage} (zones={worker_zones[resource]})"
+                    )
+                travel = walk_ticks if w_pos[resource] != stage else 0
+                expected_end = tick + travel + world["time"]["manual"][order_kind][stage - 1]
+                if end_tick != expected_end:
+                    raise ValueError(
+                        f"events.jsonl line {line_no}: worker {resource} start end_tick {end_tick} != expected {expected_end}"
+                    )
+                w_pos[resource] = stage
+                w_busy_until[resource] = end_tick
+                w_last_work[resource] = min(horizon, end_tick)
+                labor += w_last_work[resource] - tick
+                if travel > 0:
+                    pending_walk[resource] = (line_no, tick, order_id, stage, attempt)
+
+            active[resource] = (order_id, stage, attempt, end_tick)
+            active_line[resource] = line_no
             state[order_id] = ("start", stage, attempt)
+            state_line[order_id] = line_no
 
         elif kind == "finish":
+            act = active.get(resource)
             if (
                 resource not in valid_resources
                 or end_tick is not None
                 or previous != ("start", stage, attempt)
-                or active.get(resource) != (order_id, stage, attempt)
+                or act is None
+                or act[:3] != (order_id, stage, attempt)
             ):
                 raise ValueError(
                     f"events.jsonl line {line_no}: invalid finish event {ev!r} from state {previous!r}"
@@ -738,27 +839,40 @@ def validate_shift_bundle(bundle_dir: Path) -> dict[str, Any]:
                     )
                 robot_jammed = False
                 robot_assisted_end = None
+                robot_assist_line = None
+            else:
+                if tick != act[3]:
+                    raise ValueError(
+                        f"events.jsonl line {line_no}: finish tick {tick} != expected end_tick {act[3]} on {resource!r}"
+                    )
             active.pop(resource)
+            active_line.pop(resource, None)
             if stage == 3:
                 pack_finished += 1
                 if resource == "robot":
                     auto_finished += 1
             state[order_id] = ("finish", stage, attempt)
+            state_line[order_id] = line_no
+            last_transition[order_id] = (tick, resource)
 
         elif kind == "jam":
+            act = active.get("robot")
             if (
                 resource != "robot"
                 or stage != 3
                 or attempt != 0
                 or end_tick is not None
                 or previous != ("start", 3, 0)
-                or active.get("robot") != (order_id, 3, 0)
+                or act is None
+                or act[:3] != (order_id, 3, 0)
+                or tick != act[3]
                 or robot_jammed
             ):
                 raise ValueError(f"events.jsonl line {line_no}: invalid jam event {ev!r}")
             robot_jammed = True
 
         elif kind == "assist":
+            act_robot = active.get("robot")
             if (
                 resource not in valid_workers
                 or stage != 3
@@ -767,24 +881,56 @@ def validate_shift_bundle(bundle_dir: Path) -> dict[str, Any]:
                 or end_tick <= tick
                 or tick >= horizon
                 or previous != ("start", 3, 0)
-                or active.get("robot") != (order_id, 3, 0)
+                or act_robot is None
+                or act_robot[:3] != (order_id, 3, 0)
                 or not robot_jammed
                 or robot_assisted_end is not None
+                or resource in active
+                or tick < w_busy_until[resource]
             ):
                 raise ValueError(f"events.jsonl line {line_no}: invalid assist event {ev!r}")
+            if tick >= break_at and not w_took_break[resource]:
+                raise ValueError(
+                    f"events.jsonl line {line_no}: worker {resource} started assist at tick {tick} >= break_at ({break_at}) before taking break"
+                )
+            if 3 not in worker_zones[resource]:
+                raise ValueError(
+                    f"events.jsonl line {line_no}: worker {resource} cannot assist at stage 3 (zones={worker_zones[resource]})"
+                )
+            travel = walk_ticks if w_pos[resource] != 3 else 0
+            expected_end = tick + travel + world["time"]["jam_service"]
+            if end_tick != expected_end:
+                raise ValueError(
+                    f"events.jsonl line {line_no}: worker {resource} assist end_tick {end_tick} != expected {expected_end}"
+                )
+            w_pos[resource] = 3
+            w_busy_until[resource] = end_tick
+            w_last_work[resource] = min(horizon, end_tick)
+            labor += w_last_work[resource] - tick
             robot_assisted_end = end_tick
-            worker_events[resource].append((line_no, ev))
+            robot_assist_line = line_no
+            if travel > 0:
+                pending_walk[resource] = (line_no, tick, order_id, 3, 0)
 
         elif kind == "walk":
+            if resource not in valid_workers or resource not in pending_walk:
+                raise ValueError(
+                    f"events.jsonl line {line_no}: walk event {ev!r} must immediately follow parent start/assist"
+                )
+            pw_line, pw_tick, pw_oid, pw_stg, pw_att = pending_walk.pop(resource)
             if (
-                resource not in valid_workers
+                line_no != pw_line + 1
+                or tick != pw_tick
+                or order_id != pw_oid
+                or stage != pw_stg
+                or attempt != pw_att
                 or not _is_strict_int(end_tick)
-                or end_tick != tick + walk_ticks
+                or end_tick != pw_tick + walk_ticks
                 or tick >= horizon
-                or previous != ("start", stage, attempt)
             ):
-                raise ValueError(f"events.jsonl line {line_no}: invalid walk event {ev!r}")
-            worker_events[resource].append((line_no, ev))
+                raise ValueError(
+                    f"events.jsonl line {line_no}: invalid walk event {ev!r} for parent line {pw_line}"
+                )
 
         elif kind in ("good", "escaped", "scrap"):
             if (
@@ -793,6 +939,7 @@ def validate_shift_bundle(bundle_dir: Path) -> dict[str, Any]:
                 or end_tick is not None
                 or previous != ("finish", 4, attempt)
                 or (kind == "scrap" and attempt != 1)
+                or last_transition.get(order_id) != (tick, resource)
             ):
                 raise ValueError(
                     f"events.jsonl line {line_no}: invalid terminal {kind!r} event {ev!r} from state {previous!r}"
@@ -801,81 +948,43 @@ def validate_shift_bundle(bundle_dir: Path) -> dict[str, Any]:
             if kind == "good" and tick <= by_id[order_id]["due"]:
                 done["on_time"] += 1
             state[order_id] = (kind, 4, attempt)
+            state_line[order_id] = line_no
 
-    # Worker intervals, walk sub-intervals, breaks, H-clipped labor_ticks & overtime_ticks
-    labor = 0
-    overtime: list[int] = []
-    for index, zones in enumerate(plan.workers):
-        w_name = f"w{index}"
-        w_evs = worker_events[w_name]
-        position = zones[0]
-        available = 0
-        last_work = 0
-        took_break = False
-        used_walk_lines: set[int] = set()
+    if pending_walk:
+        pw_res, (pw_line, pw_tick, _pw_oid, _pw_stg, _pw_att) = next(iter(pending_walk.items()))
+        raise ValueError(
+            f"events.jsonl line {pw_line}: missing required walk event on {pw_res} at tick {pw_tick}"
+        )
 
-        for ev_line, ev in w_evs:
-            if ev["kind"] not in ("start", "assist", "break"):
-                continue
-            t = ev["tick"]
-            end = ev["end_tick"]
-            if not (available <= t < end):
+    for res, (_oid, _stg, _att, exp_end) in active.items():
+        if res != "robot":
+            if exp_end <= horizon:
                 raise ValueError(
-                    f"events.jsonl line {ev_line}: overlapping interval on worker {w_name} (available={available}, tick={t}, end_tick={end})"
+                    f"events.jsonl line {active_line[res]}: unfinished worker job on {res} has end_tick {exp_end} <= horizon {horizon}"
                 )
-            available = end
-            if ev["kind"] == "break":
-                if took_break:
+        else:
+            if not robot_jammed:
+                if exp_end <= horizon:
                     raise ValueError(
-                        f"events.jsonl line {ev_line}: duplicate break on worker {w_name}"
+                        f"events.jsonl line {active_line['robot']}: unfinished unjammed robot job has end_tick {exp_end} <= horizon {horizon}"
                     )
-                took_break = True
-                continue
-            if t >= break_at and not took_break:
+            elif robot_assisted_end is not None and robot_assisted_end <= horizon:
+                err_ln = robot_assist_line or active_line["robot"]
                 raise ValueError(
-                    f"events.jsonl line {ev_line}: worker {w_name} started work at tick {t} >= break_at ({break_at}) before taking break"
+                    f"events.jsonl line {err_ln}: assisted jammed robot completed service at tick {robot_assisted_end} <= horizon {horizon} without finish"
                 )
-            if ev["stage"] not in zones:
-                raise ValueError(
-                    f"events.jsonl line {ev_line}: worker {w_name} assigned disallowed stage {ev['stage']} (zones={zones})"
-                )
-            same_tick_walks = [
-                (w_ln, w_ev)
-                for w_ln, w_ev in w_evs
-                if w_ev["kind"] == "walk" and w_ev["tick"] == t
-            ]
-            if position != ev["stage"]:
-                if len(same_tick_walks) != 1 or (
-                    same_tick_walks[0][1]["order_id"],
-                    same_tick_walks[0][1]["stage"],
-                    same_tick_walks[0][1]["attempt"],
-                    same_tick_walks[0][1]["end_tick"],
-                ) != (ev["order_id"], ev["stage"], ev["attempt"], t + walk_ticks):
-                    err_ln = same_tick_walks[0][0] if same_tick_walks else ev_line
-                    raise ValueError(
-                        f"events.jsonl line {err_ln}: missing or mismatched walk sub-interval for {w_name} transition {position}->{ev['stage']}"
-                    )
-                used_walk_lines.add(same_tick_walks[0][0])
-            elif same_tick_walks:
-                raise ValueError(
-                    f"events.jsonl line {same_tick_walks[0][0]}: unexpected walk for {w_name} already at stage {position}"
-                )
-            position = ev["stage"]
-            last_work = min(horizon, end)
-            labor += last_work - t
-        for w_ln, w_ev in w_evs:
-            if w_ev["kind"] == "walk" and w_ln not in used_walk_lines:
-                raise ValueError(
-                    f"events.jsonl line {w_ln}: orphan walk event on {w_name} at tick {w_ev['tick']}"
-                )
-        overtime.append(max(0, last_work - shift_ticks))
 
-    # Post-loop order conservation & RawReport parity
+    overtime = [max(0, w_last_work[f"w{idx}"] - shift_ticks) for idx in range(len(plan.workers))]
+
+    # Post-loop order conservation, RawReport parity & Economy formula parity
     if state.keys() != by_id.keys():
         missing = sorted(set(by_id.keys()) - set(state.keys()))
         raise ValueError(f"Orders missing arrival events in trace: {missing[:10]}")
-    if any(v[0] not in {"start", "enqueue", "good", "escaped", "scrap"} for v in state.values()):
-        raise ValueError("Invalid terminal/in-flight order state at end of trace")
+    for oid, st_val in state.items():
+        if st_val[0] not in {"start", "enqueue", "good", "escaped", "scrap"}:
+            raise ValueError(
+                f"events.jsonl line {state_line[oid]}: invalid incomplete order state {st_val!r} at end of trace"
+            )
 
     unfinished = sum(v[0] in {"start", "enqueue"} for v in state.values())
     total_orders = len(by_id)
@@ -903,6 +1012,30 @@ def validate_shift_bundle(bundle_dir: Path) -> dict[str, Any]:
                 f"Manifest raw.{key} ({raw[key]!r}) does not match reconstructed trace value ({expected_val!r})"
             )
 
+    reconstructed_raw = RawReport(
+        schema_version=SCHEMA_VERSION,
+        seed=scenario["seed"],
+        total=total_orders,
+        good=done["good"],
+        on_time=done["on_time"],
+        escaped=done["escaped"],
+        scrap=done["scrap"],
+        unfinished=unfinished,
+        pack_started=pack_started,
+        pack_finished=pack_finished,
+        auto_finished=auto_finished,
+        trays_used=trays_used,
+        rework_started=rework_started,
+        labor_ticks=labor,
+        overtime_ticks=tuple(overtime),
+        events=(),
+    )
+    expected_economy = _to_wire(calculate(world, plan, reconstructed_raw))
+    if economy != expected_economy:
+        raise ValueError(
+            f"Manifest economy {economy!r} does not match calculated shift economy {expected_economy!r}"
+        )
+
     return {
         "ok": True,
         "bundle_dir": str(bundle_dir),
@@ -923,13 +1056,115 @@ def validate_shift_bundle(bundle_dir: Path) -> dict[str, Any]:
     }
 
 
+_QUARTERLY_GENERATOR_KEYS = (
+    "waves",
+    "spacing",
+    "orders_min",
+    "orders_span",
+    "jitter_span",
+    "regular_bps",
+    "fragile_bps",
+    "due_offset",
+    "due_span",
+)
+
+
+def _build_week_world_fallback(
+    world: Mapping[str, Any],
+    week_num: int,
+    *,
+    commissioning: bool,
+    wear: int,
+    maintenance: bool,
+) -> World:
+    w = _to_wire(dict(world))
+    q = w.pop("quarterly", None)
+    if not isinstance(q, Mapping):
+        return w
+    w["schema_version"] = SCHEMA_VERSION
+
+    profiles = q.get("week_profiles")
+    if (
+        isinstance(profiles, list)
+        and 0 <= week_num < len(profiles)
+        and isinstance(profiles[week_num], Mapping)
+        and isinstance(w.get("generator"), dict)
+    ):
+        profile = profiles[week_num]
+        for key in _QUARTERLY_GENERATOR_KEYS:
+            if key in profile:
+                w["generator"][key] = profile[key]
+
+    wear_spec = q.get("wear") if isinstance(q.get("wear"), Mapping) else {}
+    comm_spec = q.get("commissioning") if isinstance(q.get("commissioning"), Mapping) else {}
+    max_wear = int(wear_spec.get("max_wear", 12))
+    maint_reduction = int(wear_spec.get("maintenance_reduction", 5))
+    reduced_wear = wear - maint_reduction if maintenance else wear
+    effective_wear = min(max_wear, max(0, reduced_wear))
+
+    comm_jam_map = (
+        comm_spec.get("jam_bonus_bps")
+        if isinstance(comm_spec.get("jam_bonus_bps"), Mapping)
+        else {}
+    )
+    comm_def_map = (
+        comm_spec.get("defect_bonus_bps")
+        if isinstance(comm_spec.get("defect_bonus_bps"), Mapping)
+        else {}
+    )
+    jam_per_wear = int(wear_spec.get("jam_bps_per_wear", 0))
+    def_per_wear = int(wear_spec.get("defect_bps_per_wear", 0))
+
+    prob_bps = w.get("prob_bps")
+    kinds = w.get("kinds", ())
+    if isinstance(prob_bps, dict):
+        for rig in ("bare", "tray"):
+            jam_add = (int(comm_jam_map.get(rig, 0)) if commissioning else 0) + (
+                effective_wear * jam_per_wear
+            )
+            def_add = (int(comm_def_map.get(rig, 0)) if commissioning else 0) + (
+                effective_wear * def_per_wear
+            )
+            if isinstance(prob_bps.get("jam", {}).get(rig), dict):
+                for kind in kinds:
+                    if kind in prob_bps["jam"][rig]:
+                        prob_bps["jam"][rig][kind] = min(
+                            10_000, max(0, prob_bps["jam"][rig][kind] + jam_add)
+                        )
+            if isinstance(prob_bps.get("defect_auto", {}).get(rig), dict):
+                for kind in kinds:
+                    if kind in prob_bps["defect_auto"][rig]:
+                        prob_bps["defect_auto"][rig][kind] = min(
+                            10_000, max(0, prob_bps["defect_auto"][rig][kind] + def_add)
+                        )
+
+    if maintenance:
+        default_slowdown = 1 if "wear" not in q else 0
+        slowdown = int(wear_spec.get("maintenance_auto_slowdown_ticks", default_slowdown))
+        if slowdown and isinstance(w.get("time", {}).get("auto"), dict):
+            for rig in ("bare", "tray"):
+                if isinstance(w["time"]["auto"].get(rig), dict):
+                    for kind in kinds:
+                        if kind in w["time"]["auto"][rig]:
+                            w["time"]["auto"][rig][kind] = max(
+                                1, w["time"]["auto"][rig][kind] + slowdown
+                            )
+    return w
+
+
 def _resolve_week_world(world: World, week_report: Any, week_plan: Any, week_num: int) -> World:
-    """Resolve effective week World: (1) explicit week_report.world/week_world, (2) lazy quarterly.build_week_world, (3) base world."""
+    """Resolve effective week World: (1) explicit week_report.world/week_world, (2) lazy quarterly.build_week_world, (3) pure-dict fallback."""
     for attr in ("world", "week_world"):
         explicit = _field(week_report, attr, None)
         if isinstance(explicit, Mapping):
-            return _to_wire(explicit)
+            out = _to_wire(explicit)
+            if isinstance(out, dict):
+                out.pop("quarterly", None)
+            return out
     if isinstance(world, Mapping) and "quarterly" in world:
+        commissioning = bool(_field(week_report, "commissioning_active", False))
+        wear = int(_field(week_report, "wear_start", 0))
+        maintenance = bool(_field(week_plan, "maintenance", False))
         try:
             quarterly_mod = importlib.import_module("robotization_bench.quarterly")
         except ImportError:
@@ -938,11 +1173,8 @@ def _resolve_week_world(world: World, week_report: Any, week_plan: Any, week_num
             getattr(quarterly_mod, "build_week_world", None) if quarterly_mod is not None else None
         )
         if callable(build_fn):
-            commissioning = bool(_field(week_report, "commissioning_active", False))
-            wear = int(_field(week_report, "wear_start", 0))
-            maintenance = bool(_field(week_plan, "maintenance", False))
             try:
-                return _to_wire(
+                out = _to_wire(
                     build_fn(
                         world,
                         week_num,
@@ -951,9 +1183,22 @@ def _resolve_week_world(world: World, week_report: Any, week_plan: Any, week_num
                         maintenance=maintenance,
                     )
                 )
+                if isinstance(out, dict):
+                    out.pop("quarterly", None)
+                return out
             except (TypeError, KeyError, ValueError):
                 pass
-    return _to_wire(world)
+        return _build_week_world_fallback(
+            world,
+            week_num,
+            commissioning=commissioning,
+            wear=wear,
+            maintenance=maintenance,
+        )
+    out = _to_wire(world)
+    if isinstance(out, dict):
+        out.pop("quarterly", None)
+    return out
 
 
 def _extract_shift_plan_wire(week_report: Any, week_plan: Any) -> dict[str, Any]:
@@ -974,6 +1219,485 @@ def _extract_shift_plan_wire(week_report: Any, week_plan: Any) -> dict[str, Any]
     )
 
 
+def _ascii_english_text(value: Any) -> str:
+    text = " ".join(str(value).splitlines()).strip()
+    return _CYRILLIC_RE.sub(lambda m: f"\\u{ord(m.group(0)):04x}", text)
+
+
+def _format_bps_pct(num: int, den: int) -> str:
+    if den <= 0:
+        return "0.00%"
+    bps = (num * 10_000) // den
+    whole, frac = divmod(bps, 100)
+    return f"{whole}.{frac:02d}%"
+
+
+def build_quarter_diagnostics(
+    world: World,
+    quarter: Any,
+    plan: Any,
+    *,
+    evaluation: Evaluation | Mapping[str, Any] | None = None,
+) -> dict[str, Any]:
+    """Build week-by-week English operational mistake diagnostics for a 12-week rollout."""
+    quarter_weeks = list(_field(quarter, "weeks"))
+    plan_weeks = list(_field(plan, "weeks"))
+    if not quarter_weeks:
+        raise ValueError("QuarterReport.weeks must be non-empty")
+    if len(plan_weeks) != len(quarter_weeks):
+        raise ValueError(
+            f"Plan week count ({len(plan_weeks)}) does not match quarter week count ({len(quarter_weeks)})"
+        )
+
+    q_cfg = world.get("quarterly", {}) if isinstance(world, Mapping) else {}
+    if not isinstance(q_cfg, Mapping):
+        q_cfg = {}
+    thresh = q_cfg.get("threshold_bps", {})
+    if not isinstance(thresh, Mapping):
+        thresh = {}
+    good_week_min_bps = int(thresh["good_each_week"]) if "good_each_week" in thresh else 0
+    escaped_week_max_bps = (
+        int(thresh["escaped_each_week_max"]) if "escaped_each_week_max" in thresh else None
+    )
+    carryover_cap = int(q_cfg["carryover_cap"]) if "carryover_cap" in q_cfg else 80
+
+    total_weeks = len(quarter_weeks)
+    counts_by_category: dict[str, int] = {cat: 0 for cat in DIAGNOSTIC_CATEGORIES}
+    week_entries: list[dict[str, Any]] = []
+    flagged_weeks: list[int] = []
+    critical_weeks: list[int] = []
+    critical_issues = 0
+    warning_issues = 0
+
+    peak_wear = 0
+    peak_carryover_out = 0
+    total_jams = 0
+    total_overtime_ticks = 0
+    total_hiring_retraining_cost = 0
+
+    prev_workers: list[list[int]] | None = None
+    prev_robot_on = False
+
+    for idx, (week_report, week_plan) in enumerate(zip(quarter_weeks, plan_weeks, strict=True)):
+        week_num = int(_field(week_report, "week", idx))
+        if week_num != idx:
+            raise ValueError(f"Expected sequential week index {idx}, got {week_num}")
+
+        raw_label = _field(week_report, "label", f"week_{week_num:02d}")
+        label = _ascii_english_text(raw_label) or f"week_{week_num:02d}"
+
+        shift_plan_wire = _extract_shift_plan_wire(week_report, week_plan)
+        robot_on = bool(shift_plan_wire["robot"])
+        trays_on = bool(shift_plan_wire["trays"])
+        route = _ascii_english_text(shift_plan_wire["route"])
+        maintenance = bool(_field(week_plan, "maintenance", _field(week_report, "maintenance", False)))
+        workers_norm = [[int(z) for z in w_zones] for w_zones in shift_plan_wire["workers"]]
+        zone3_workers = sum(1 for w_zones in workers_norm if 3 in w_zones)
+
+        carryover_in = int(_field(week_report, "carryover_in", 0))
+        carryover_out = int(_field(week_report, "carryover_out", 0))
+        wear_start = int(_field(week_report, "wear_start", 0))
+        wear_end = int(_field(week_report, "wear_end", 0))
+        commissioning_active = bool(_field(week_report, "commissioning_active", False))
+        newly_activated_robot = robot_on and not prev_robot_on
+
+        raw_obj = _field(week_report, "raw")
+        total_orders = int(_field(raw_obj, "total"))
+        good_orders = int(_field(raw_obj, "good"))
+        on_time_orders = int(_field(raw_obj, "on_time"))
+        escaped_orders = int(_field(raw_obj, "escaped"))
+        scrap_orders = int(_field(raw_obj, "scrap"))
+        unfinished_orders = int(_field(raw_obj, "unfinished"))
+        pack_started = int(_field(raw_obj, "pack_started"))
+        pack_finished = int(_field(raw_obj, "pack_finished"))
+        auto_finished = int(_field(raw_obj, "auto_finished"))
+        labor_ticks_w = int(_field(raw_obj, "labor_ticks"))
+        raw_overtime = _field(raw_obj, "overtime_ticks", ())
+        overtime_ticks_w = (
+            int(raw_overtime)
+            if isinstance(raw_overtime, int)
+            else sum(int(x) for x in raw_overtime)
+        )
+
+        raw_events = _field(raw_obj, "events", ()) or ()
+        jam_events = sum(1 for ev in raw_events if _field(ev, "kind", "") == "jam")
+        assist_events = sum(1 for ev in raw_events if _field(ev, "kind", "") == "assist")
+        stalled_packs = max(0, pack_started - pack_finished)
+        jams_w = jam_events if len(raw_events) > 0 else (stalled_packs if robot_on else 0)
+
+        week_econ_obj = _field(
+            week_report,
+            "week_economy",
+            _field(week_report, "shift_economy", _field(week_report, "economy", None)),
+        )
+        econ_costs = _field(week_econ_obj, "costs", {}) if week_econ_obj is not None else {}
+        week_total_cost = int(_field(week_econ_obj, "total", 0)) if week_econ_obj is not None else 0
+        hiring_cost = int(econ_costs.get("hiring_retraining", 0)) if isinstance(econ_costs, Mapping) else 0
+
+        peak_wear = max(peak_wear, wear_start, wear_end)
+        peak_carryover_out = max(peak_carryover_out, carryover_out)
+        total_jams += jams_w
+        total_overtime_ticks += overtime_ticks_w
+        total_hiring_retraining_cost += hiring_cost
+
+        issues: list[dict[str, str]] = []
+
+        def add_issue(category: str, severity: str, code: str, message: str) -> None:
+            issues.append(
+                {
+                    "category": category,
+                    "severity": severity,
+                    "code": code,
+                    "message": _ascii_english_text(message),
+                }
+            )
+            counts_by_category[category] += 1
+
+        # 1. Commissioning jam spike / unassisted robot jam without Zone-3 helper coverage
+        if robot_on and jams_w > 0 and zone3_workers == 0:
+            add_issue(
+                "commissioning_jam_unassisted",
+                "critical",
+                "jam_deadlock_no_zone3",
+                (
+                    f"Robot jammed {jams_w} time(s) with 0 Zone-3 workers scheduled "
+                    f"(commissioning={commissioning_active}), stalling automated packing."
+                ),
+            )
+        elif (commissioning_active or newly_activated_robot) and robot_on and zone3_workers == 0:
+            add_issue(
+                "commissioning_jam_unassisted",
+                "warning",
+                "commissioning_no_zone3_helper",
+                "Robot commissioning active with 0 Zone-3 workers assigned to clear potential jams.",
+            )
+        elif (
+            (commissioning_active or newly_activated_robot)
+            and robot_on
+            and jams_w > 0
+            and (assist_events < jams_w or (jams_w >= 4 and zone3_workers <= 1))
+        ):
+            sev_jam = "critical" if (assist_events < jams_w and stalled_packs > 0) else "warning"
+            add_issue(
+                "commissioning_jam_unassisted",
+                sev_jam,
+                "commissioning_jam_spike_weak_assist",
+                (
+                    f"Commissioning jam spike ({jams_w} jam(s), {assist_events} assist(s)) "
+                    f"with only {zone3_workers} Zone-3 worker(s) assigned."
+                ),
+            )
+
+        # 2. route="all" or high cumulative wear buildup without preventive maintenance
+        wear_delta = wear_end - wear_start
+        if (
+            robot_on
+            and not maintenance
+            and ((route == "all" and wear_delta >= 3) or wear_start >= 6 or wear_end >= 8)
+        ):
+            sev_wear = "critical" if wear_end >= 9 else "warning"
+            add_issue(
+                "route_all_unmaintained_wear",
+                sev_wear,
+                "unmaintained_wear_buildup",
+                (
+                    f"Robot ran route={route!r} without preventive maintenance while wear rose "
+                    f"from {wear_start} to {wear_end} (delta +{wear_delta})."
+                ),
+            )
+
+        # 3. Hiring / layoffs / cross-zone retraining friction
+        crew_changed = prev_workers is not None and workers_norm != prev_workers
+        if hiring_cost > 0 or crew_changed:
+            prev_n = len(prev_workers) if prev_workers is not None else len(workers_norm)
+            sev_hire = "critical" if hiring_cost >= 100_000 else "warning"
+            add_issue(
+                "hiring_retraining_friction",
+                sev_hire,
+                "crew_churn_hiring_retraining",
+                (
+                    f"Crew roster changed ({prev_n} -> {len(workers_norm)} worker(s)), "
+                    f"incurring {_euros(hiring_cost)} in hiring/retraining friction."
+                ),
+            )
+
+        # 4. Overtime, late-delivery, unfulfilled, or escaped-defect SLA breaches
+        late_orders = max(0, good_orders - on_time_orders)
+        terminal_unfinished = unfinished_orders if idx == total_weeks - 1 else 0
+        good_sla_breach = (
+            good_week_min_bps > 0
+            and total_orders > 0
+            and good_orders * 10_000 < good_week_min_bps * total_orders
+        )
+        escaped_sla_breach = (
+            escaped_week_max_bps is not None
+            and total_orders > 0
+            and escaped_orders * 10_000 > escaped_week_max_bps * total_orders
+        )
+        sla_parts: list[str] = []
+        if good_sla_breach:
+            sla_parts.append(
+                f"good rate {_format_bps_pct(good_orders, total_orders)} ({good_orders}/{total_orders}) "
+                f"below {_format_bps_pct(good_week_min_bps, 10_000)} weekly floor"
+            )
+        if escaped_sla_breach:
+            assert escaped_week_max_bps is not None
+            sla_parts.append(
+                f"escaped rate {_format_bps_pct(escaped_orders, total_orders)} ({escaped_orders}/{total_orders}) "
+                f"above {_format_bps_pct(escaped_week_max_bps, 10_000)} weekly cap"
+            )
+        elif escaped_orders > 0:
+            sla_parts.append(f"{escaped_orders} escaped defect(s)")
+        if scrap_orders > 0:
+            sla_parts.append(f"{scrap_orders} scrapped order(s)")
+        if late_orders > 0:
+            sla_parts.append(f"{late_orders} late delivery(ies)")
+        if overtime_ticks_w > 0:
+            sla_parts.append(f"{overtime_ticks_w} overtime tick(s)")
+        if terminal_unfinished > 0:
+            sla_parts.append(f"{terminal_unfinished} terminal unfulfilled order(s) at quarter end")
+
+        if sla_parts:
+            sev_sla = (
+                "critical"
+                if (good_sla_breach or escaped_sla_breach or escaped_orders > 0 or terminal_unfinished > 0)
+                else "warning"
+            )
+            add_issue(
+                "sla_overtime_breach",
+                sev_sla,
+                "weekly_sla_or_overtime_breach",
+                "SLA/overtime pressure: " + "; ".join(sla_parts) + ".",
+            )
+
+        # 5. Backlog carryover surges
+        if carryover_in > 0 or carryover_out > 0:
+            sev_backlog = (
+                "critical"
+                if (carryover_out >= carryover_cap or carryover_out >= 20)
+                else "warning"
+            )
+            cap_note = " (hit carryover_cap)" if carryover_out >= carryover_cap else ""
+            add_issue(
+                "backlog_carryover_surge",
+                sev_backlog,
+                "carryover_backlog_surge",
+                (
+                    f"Backlog carryover_in={carryover_in}, carryover_out={carryover_out}{cap_note} "
+                    f"(shift unfinished={unfinished_orders})."
+                ),
+            )
+
+        week_crit = sum(1 for iss in issues if iss["severity"] == "critical")
+        week_warn = sum(1 for iss in issues if iss["severity"] == "warning")
+        critical_issues += week_crit
+        warning_issues += week_warn
+        if week_crit > 0:
+            status = "critical"
+            flagged_weeks.append(week_num)
+            critical_weeks.append(week_num)
+        elif week_warn > 0:
+            status = "warning"
+            flagged_weeks.append(week_num)
+        else:
+            status = "ok"
+
+        week_entries.append(
+            {
+                "week": week_num,
+                "label": label,
+                "status": status,
+                "metrics": {
+                    "robot": robot_on,
+                    "trays": trays_on,
+                    "route": route,
+                    "maintenance": maintenance,
+                    "headcount": len(workers_norm),
+                    "zone3_workers": zone3_workers,
+                    "commissioning_active": commissioning_active,
+                    "wear_start": wear_start,
+                    "wear_end": wear_end,
+                    "carryover_in": carryover_in,
+                    "carryover_out": carryover_out,
+                    "total_orders": total_orders,
+                    "good": good_orders,
+                    "on_time": on_time_orders,
+                    "escaped": escaped_orders,
+                    "scrap": scrap_orders,
+                    "unfinished": unfinished_orders,
+                    "auto_finished": auto_finished,
+                    "pack_finished": pack_finished,
+                    "jams": jams_w,
+                    "labor_ticks": labor_ticks_w,
+                    "overtime_ticks": overtime_ticks_w,
+                    "hiring_retraining_cost": hiring_cost,
+                    "week_total_cost": week_total_cost,
+                },
+                "issues": issues,
+            }
+        )
+
+        prev_workers = workers_norm
+        prev_robot_on = robot_on
+
+    total_issues = critical_issues + warning_issues
+    purchase = int(_field(quarter, "purchase"))
+    total_cost = int(_field(quarter, "total_cost"))
+    labor_ticks = int(_field(quarter, "labor_ticks"))
+
+    eval_feasible: bool | None = None
+    eval_win: bool | None = None
+    eval_reasons: list[str] = []
+    if evaluation is not None:
+        eval_feasible = bool(_field(evaluation, "feasible"))
+        eval_win = bool(_field(evaluation, "win"))
+        raw_reasons = _field(evaluation, "reasons", ()) or ()
+        if isinstance(raw_reasons, str):
+            raw_reasons = (raw_reasons,) if raw_reasons else ()
+        eval_reasons = [_ascii_english_text(r) for r in raw_reasons if str(r).strip()]
+
+    verdict_tag = (
+        "WIN"
+        if eval_win
+        else ("FEASIBLE (NO WIN)" if eval_feasible else ("INFEASIBLE" if eval_feasible is False else "UNGRADED"))
+    )
+    headline = (
+        f"Quarter seed {int(_field(quarter, 'seed'))} [{verdict_tag}]: "
+        f"{total_issues} operational issue(s) ({critical_issues} critical, {warning_issues} warning) "
+        f"across {len(flagged_weeks)}/{total_weeks} week(s); "
+        f"operating cost {_euros(total_cost)}, CapEx {_euros(purchase)}, peak wear {peak_wear}."
+    )
+
+    return {
+        "diagnostics_version": 1,
+        "seed": int(_field(quarter, "seed")),
+        "total_weeks": total_weeks,
+        "total_issues": total_issues,
+        "critical_issues": critical_issues,
+        "warning_issues": warning_issues,
+        "flagged_weeks": flagged_weeks,
+        "critical_weeks": critical_weeks,
+        "counts_by_category": counts_by_category,
+        "quarter_summary": {
+            "purchase": purchase,
+            "total_cost": total_cost,
+            "labor_ticks": labor_ticks,
+            "peak_wear": peak_wear,
+            "peak_carryover_out": peak_carryover_out,
+            "total_jams": total_jams,
+            "total_overtime_ticks": total_overtime_ticks,
+            "total_hiring_retraining_cost": total_hiring_retraining_cost,
+            "feasible": eval_feasible,
+            "win": eval_win,
+            "reasons": eval_reasons,
+            "headline": _ascii_english_text(headline),
+        },
+        "weeks": week_entries,
+    }
+
+
+_CATEGORY_TITLES: dict[str, str] = {
+    "commissioning_jam_unassisted": "Commissioning Jam / Unassisted Robot",
+    "route_all_unmaintained_wear": "Route='all' / Unmaintained Wear Buildup",
+    "hiring_retraining_friction": "Hiring / Retraining Crew Friction",
+    "sla_overtime_breach": "SLA / Overtime / Defect Breach",
+    "backlog_carryover_surge": "Backlog Carryover Surge",
+}
+
+
+def render_quarter_diagnostics_md(diagnostics: Mapping[str, Any]) -> str:
+    """Render structured quarter diagnostics as human-readable English GFM Markdown."""
+    seed = int(diagnostics["seed"])
+    total_weeks = int(diagnostics["total_weeks"])
+    total_issues = int(diagnostics["total_issues"])
+    crit = int(diagnostics["critical_issues"])
+    warn = int(diagnostics["warning_issues"])
+    qs = diagnostics["quarter_summary"]
+    counts = diagnostics["counts_by_category"]
+
+    lines: list[str] = [
+        f"# Quarterly Rollout Operational Diagnostics (Seed {seed})",
+        "",
+        f"**Summary:** {_ascii_english_text(qs['headline'])}",
+        "",
+        "## Quarter Totals & Category Counts",
+        "",
+        f"- **CapEx Purchase:** {_euros(int(qs['purchase']))}",
+        f"- **Total Operating Cost:** {_euros(int(qs['total_cost']))}",
+        f"- **Active Labor Ticks:** {int(qs['labor_ticks'])}",
+        f"- **Peak Equipment Wear:** {int(qs['peak_wear'])}",
+        f"- **Peak Backlog Carryover Out:** {int(qs['peak_carryover_out'])}",
+        f"- **Total Robot Jams:** {int(qs['total_jams'])}",
+        f"- **Total Overtime Ticks:** {int(qs['total_overtime_ticks'])}",
+        f"- **Hiring & Retraining Friction Cost:** {_euros(int(qs['total_hiring_retraining_cost']))}",
+    ]
+    if qs.get("reasons"):
+        reason_details = ", ".join(
+            _REASONS.get(str(r), _cell(_ascii_english_text(r))) for r in qs["reasons"]
+        )
+        lines.append(f"- **Evaluation Failure Reasons:** {reason_details}")
+
+    lines.extend(
+        [
+            "",
+            "| Mistake Category | Key | Issues Flagged |",
+            "|---|---|---:|",
+        ]
+    )
+    for cat in DIAGNOSTIC_CATEGORIES:
+        title = _CATEGORY_TITLES.get(cat, cat)
+        lines.append(f"| {_cell(title)} | `{cat}` | {int(counts.get(cat, 0))} |")
+
+    lines.extend(
+        [
+            "",
+            f"## Week-by-Week Telemetry ({total_weeks} Weeks, {total_issues} Issue(s): {crit} Critical, {warn} Warning)",
+            "",
+            "| Week | Label | Status | Route / Maint | Crew (Z3) | Wear | Carry In->Out | Good / Total | Jams | Overtime | Week Cost |",
+            "|---:|---|---|---|---|---|---:|---:|---:|---:|---:|",
+        ]
+    )
+    for wk in diagnostics["weeks"]:
+        m = wk["metrics"]
+        w_idx = int(wk["week"])
+        lbl = _cell(_ascii_english_text(wk["label"]))
+        status_str = str(wk["status"]).upper()
+        route_str = (
+            f"{_cell(_ascii_english_text(m['route']))}"
+            + (" + maint" if m["maintenance"] else "")
+            + (" (comm)" if m["commissioning_active"] else "")
+        )
+        crew_str = f"{int(m['headcount'])} ({int(m['zone3_workers'])} Z3)"
+        wear_str = f"{int(m['wear_start'])}->{int(m['wear_end'])}"
+        carry_str = f"{int(m['carryover_in'])}->{int(m['carryover_out'])}"
+        good_str = f"{int(m['good'])}/{int(m['total_orders'])}"
+        lines.append(
+            f"| {w_idx} | {lbl} | {status_str} | {route_str} | {crew_str} | "
+            f"{wear_str} | {carry_str} | {good_str} | {int(m['jams'])} | "
+            f"{int(m['overtime_ticks'])} | {_euros(int(m['week_total_cost']))} |"
+        )
+
+    lines.extend(["", "## Detailed Weekly Operational Findings", ""])
+    if total_issues == 0:
+        lines.append("No operational mistakes flagged across any week.")
+    else:
+        for wk in diagnostics["weeks"]:
+            if not wk["issues"]:
+                continue
+            w_idx = int(wk["week"])
+            lbl = _ascii_english_text(wk["label"])
+            lines.append(f"### Week {w_idx:02d} (`{lbl}`) — {str(wk['status']).upper()}")
+            for iss in wk["issues"]:
+                sev = str(iss["severity"]).upper()
+                cat = _ascii_english_text(iss["category"])
+                msg = _ascii_english_text(iss["message"])
+                lines.append(f"- **[{sev}] `{cat}`**: {msg}")
+            lines.append("")
+
+    rendered = "\n".join(lines).rstrip() + "\n"
+    return _CYRILLIC_RE.sub(lambda m: f"\\u{ord(m.group(0)):04x}", rendered)
+
+
 def export_quarter_pack(
     world: World,
     quarter: Any,
@@ -990,8 +1714,10 @@ def export_quarter_pack(
 
     weeks_root = out_dir / "weeks"
     quarter_manifest_path = out_dir / "quarter_manifest.json"
+    diagnostics_md_path = out_dir / "diagnostics.md"
     _ensure_not_symlink(weeks_root)
     _ensure_not_symlink(quarter_manifest_path)
+    _ensure_not_symlink(diagnostics_md_path)
 
     quarter_weeks = list(_field(quarter, "weeks"))
     plan_weeks = list(_field(plan, "weeks"))
@@ -1069,6 +1795,9 @@ def export_quarter_pack(
             )
         )
 
+    diagnostics = build_quarter_diagnostics(world, quarter, plan, evaluation=evaluation)
+    diagnostics_md = render_quarter_diagnostics_md(diagnostics)
+
     out_dir.mkdir(parents=True, exist_ok=True)
     _ensure_not_symlink(weeks_root)
     weeks_root.mkdir(parents=True, exist_ok=True)
@@ -1104,10 +1833,138 @@ def export_quarter_pack(
         "labor_ticks": int(_field(quarter, "labor_ticks")),
         "plan": _to_wire(plan),
         "evaluation": _to_wire(evaluation) if evaluation is not None else None,
+        "diagnostics_file": "diagnostics.md",
+        "diagnostics": diagnostics,
         "weeks": week_summaries,
     }
+    _atomic_write_text(diagnostics_md_path, diagnostics_md)
     _atomic_write_json(quarter_manifest_path, quarter_manifest)
     return out_dir
+
+
+def _validate_diagnostics_object(
+    diag: Any,
+    *,
+    expected_seed: int,
+    expected_weeks_count: int,
+    expected_purchase: int,
+    expected_total_cost: int,
+    expected_labor_ticks: int,
+) -> None:
+    if type(diag) is not dict:
+        raise ValueError("quarter_manifest.diagnostics must be a JSON object")
+    if not _is_strict_int(diag.get("diagnostics_version")) or diag["diagnostics_version"] != 1:
+        raise ValueError("quarter_manifest.diagnostics.diagnostics_version must be integer 1")
+    if not _is_strict_int(diag.get("seed")) or diag["seed"] != expected_seed:
+        raise ValueError("quarter_manifest.diagnostics.seed mismatch")
+    if not _is_strict_int(diag.get("total_weeks")) or diag["total_weeks"] != expected_weeks_count:
+        raise ValueError("quarter_manifest.diagnostics.total_weeks mismatch")
+    if _CYRILLIC_RE.search(json.dumps(diag, ensure_ascii=False)):
+        raise ValueError("quarter_manifest.diagnostics must not contain Cyrillic characters")
+
+    diag_weeks = diag.get("weeks")
+    if type(diag_weeks) is not list or len(diag_weeks) != expected_weeks_count:
+        raise ValueError("quarter_manifest.diagnostics.weeks length mismatch")
+
+    recomputed_cats: dict[str, int] = {cat: 0 for cat in DIAGNOSTIC_CATEGORIES}
+    recomputed_crit = 0
+    recomputed_warn = 0
+    recomputed_flagged: list[int] = []
+    recomputed_crit_weeks: list[int] = []
+
+    for idx, dw in enumerate(diag_weeks):
+        if type(dw) is not dict:
+            raise ValueError(f"diagnostics.weeks[{idx}] must be an object")
+        if not _is_strict_int(dw.get("week")) or dw["week"] != idx:
+            raise ValueError(f"diagnostics.weeks[{idx}].week must equal {idx}")
+        if type(dw.get("label")) is not str or not dw["label"]:
+            raise ValueError(f"diagnostics.weeks[{idx}].label must be a non-empty string")
+        if dw.get("status") not in {"ok", "warning", "critical"}:
+            raise ValueError(f"diagnostics.weeks[{idx}].status is invalid: {dw.get('status')!r}")
+        if type(dw.get("metrics")) is not dict:
+            raise ValueError(f"diagnostics.weeks[{idx}].metrics must be an object")
+        issues = dw.get("issues")
+        if type(issues) is not list:
+            raise ValueError(f"diagnostics.weeks[{idx}].issues must be a list")
+
+        wk_crit = 0
+        wk_warn = 0
+        for iss in issues:
+            if (
+                type(iss) is not dict
+                or iss.keys() != {"category", "severity", "code", "message"}
+                or iss["category"] not in DIAGNOSTIC_CATEGORIES
+                or iss["severity"] not in {"warning", "critical"}
+                or type(iss["code"]) is not str
+                or not iss["code"]
+                or type(iss["message"]) is not str
+                or not iss["message"]
+            ):
+                raise ValueError(f"diagnostics.weeks[{idx}] contains malformed issue: {iss!r}")
+            recomputed_cats[iss["category"]] += 1
+            if iss["severity"] == "critical":
+                wk_crit += 1
+            else:
+                wk_warn += 1
+
+        recomputed_crit += wk_crit
+        recomputed_warn += wk_warn
+        expected_status = "critical" if wk_crit > 0 else ("warning" if wk_warn > 0 else "ok")
+        if dw["status"] != expected_status:
+            raise ValueError(
+                f"diagnostics.weeks[{idx}].status ({dw['status']!r}) != {expected_status!r}"
+            )
+        if wk_crit > 0:
+            recomputed_flagged.append(idx)
+            recomputed_crit_weeks.append(idx)
+        elif wk_warn > 0:
+            recomputed_flagged.append(idx)
+
+    counts = diag.get("counts_by_category")
+    if (
+        type(counts) is not dict
+        or set(counts.keys()) != set(DIAGNOSTIC_CATEGORIES)
+        or any(not _is_strict_int(v) or v < 0 for v in counts.values())
+        or counts != recomputed_cats
+    ):
+        raise ValueError("quarter_manifest.diagnostics.counts_by_category mismatch")
+
+    for k, exp_v in (
+        ("critical_issues", recomputed_crit),
+        ("warning_issues", recomputed_warn),
+        ("total_issues", recomputed_crit + recomputed_warn),
+    ):
+        if not _is_strict_int(diag.get(k)) or diag[k] != exp_v:
+            raise ValueError(f"quarter_manifest.diagnostics.{k} mismatch")
+
+    if diag.get("flagged_weeks") != recomputed_flagged:
+        raise ValueError("quarter_manifest.diagnostics.flagged_weeks mismatch")
+    if diag.get("critical_weeks") != recomputed_crit_weeks:
+        raise ValueError("quarter_manifest.diagnostics.critical_weeks mismatch")
+
+    qs = diag.get("quarter_summary")
+    if type(qs) is not dict:
+        raise ValueError("quarter_manifest.diagnostics.quarter_summary must be an object")
+    if (
+        not _is_strict_int(qs.get("purchase"))
+        or qs["purchase"] != expected_purchase
+        or not _is_strict_int(qs.get("total_cost"))
+        or qs["total_cost"] != expected_total_cost
+        or not _is_strict_int(qs.get("labor_ticks"))
+        or qs["labor_ticks"] != expected_labor_ticks
+    ):
+        raise ValueError("quarter_manifest.diagnostics.quarter_summary totals mismatch")
+    for nonneg_key in (
+        "peak_wear",
+        "peak_carryover_out",
+        "total_jams",
+        "total_overtime_ticks",
+        "total_hiring_retraining_cost",
+    ):
+        if not _is_strict_int(qs.get(nonneg_key)) or qs[nonneg_key] < 0:
+            raise ValueError(f"quarter_manifest.diagnostics.quarter_summary.{nonneg_key} invalid")
+    if type(qs.get("headline")) is not str or not qs["headline"].strip():
+        raise ValueError("quarter_manifest.diagnostics.quarter_summary.headline must be non-empty")
 
 
 def validate_quarter_pack(
@@ -1121,13 +1978,11 @@ def validate_quarter_pack(
         raise ValueError(f"Quarter pack directory does not exist: {pack_dir}")
 
     qm_path = pack_dir / "quarter_manifest.json"
+    diag_md_path = pack_dir / "diagnostics.md"
     weeks_root = pack_dir / "weeks"
     _ensure_not_symlink(qm_path)
+    _ensure_not_symlink(diag_md_path)
     _ensure_not_symlink(weeks_root)
-    if not qm_path.is_file():
-        raise ValueError(f"Missing regular quarter_manifest.json in {pack_dir}")
-    if not weeks_root.is_dir():
-        raise ValueError(f"Missing weeks/ directory in {pack_dir}")
 
     for dirpath, dirnames, filenames in os.walk(pack_dir, followlinks=False):
         for name in (*dirnames, *filenames):
@@ -1135,21 +1990,71 @@ def validate_quarter_pack(
             if entry.is_symlink():
                 raise ValueError(f"Refusing symlink inside quarter pack: {entry}")
 
+    actual_root_entries = {p.name for p in pack_dir.iterdir()}
+    required_root_entries = {"quarter_manifest.json", "diagnostics.md", "weeks"}
+    optional_root_entries = {"diagnostics.json"}
+    if not required_root_entries.issubset(actual_root_entries) or not actual_root_entries.issubset(
+        required_root_entries | optional_root_entries
+    ):
+        raise ValueError(
+            f"Quarter pack root entries {sorted(actual_root_entries)!r} do not match expected {sorted(required_root_entries)!r}"
+        )
+
+    diag_json_path = pack_dir / "diagnostics.json"
+    if diag_json_path.exists():
+        _ensure_not_symlink(diag_json_path)
+        if not diag_json_path.is_file() or not stat.S_ISREG(os.lstat(diag_json_path).st_mode):
+            raise ValueError(f"Invalid diagnostics.json in {pack_dir}")
+        try:
+            diag_json_obj = _strict_json_loads(diag_json_path.read_text(encoding="utf-8"))
+        except UnicodeDecodeError as exc:
+            raise ValueError(f"diagnostics.json is not valid UTF-8: {exc}") from exc
+        if type(diag_json_obj) is not dict:
+            raise ValueError("diagnostics.json must be a JSON object")
+
+    if not qm_path.is_file() or not stat.S_ISREG(os.lstat(qm_path).st_mode):
+        raise ValueError(f"Missing regular quarter_manifest.json in {pack_dir}")
+    if not diag_md_path.is_file() or not stat.S_ISREG(os.lstat(diag_md_path).st_mode):
+        raise ValueError(f"Missing regular diagnostics.md in {pack_dir}")
+    if not weeks_root.is_dir():
+        raise ValueError(f"Missing weeks/ directory in {pack_dir}")
+
+    try:
+        diag_md_text = diag_md_path.read_text(encoding="utf-8")
+    except UnicodeDecodeError as exc:
+        raise ValueError(f"diagnostics.md is not valid UTF-8: {exc}") from exc
+    if not diag_md_text.strip():
+        raise ValueError("diagnostics.md must be non-empty")
+    if _CYRILLIC_RE.search(diag_md_text):
+        raise ValueError("diagnostics.md must be in English and contain no Cyrillic characters")
+
     qm = _strict_json_loads(qm_path.read_text(encoding="utf-8"))
     if type(qm) is not dict:
         raise ValueError("quarter_manifest.json must be a JSON object")
     if qm.get("replay_pack_format") != QUARTER_PACK_FORMAT_V1:
         raise ValueError(f"Unsupported replay_pack_format: {qm.get('replay_pack_format')!r}")
+    if not _is_strict_int(qm.get("schema_version")) or qm["schema_version"] != 2:
+        raise ValueError("quarter_manifest.schema_version must be integer 2")
     if not _is_strict_int(qm.get("seed")):
         raise ValueError("quarter_manifest.seed must be an integer")
     for int_key in ("purchase", "total_cost", "labor_ticks"):
         if not _is_strict_int(qm.get(int_key)) or qm[int_key] < 0:
             raise ValueError(f"quarter_manifest.{int_key} must be a non-negative integer")
+    if qm.get("diagnostics_file") != "diagnostics.md":
+        raise ValueError(
+            f"quarter_manifest.diagnostics_file must be 'diagnostics.md', got {qm.get('diagnostics_file')!r}"
+        )
 
     plan_obj = qm.get("plan")
     weeks_list = qm.get("weeks")
-    if type(plan_obj) is not dict or type(plan_obj.get("weeks")) is not list:
-        raise ValueError("quarter_manifest.plan must contain a weeks list")
+    if (
+        type(plan_obj) is not dict
+        or plan_obj.keys() != {"schema_version", "weeks"}
+        or not _is_strict_int(plan_obj.get("schema_version"))
+        or plan_obj["schema_version"] != 2
+        or type(plan_obj.get("weeks")) is not list
+    ):
+        raise ValueError("quarter_manifest.plan must be a schema_version=2 object with a weeks list")
     if type(weeks_list) is not list or not weeks_list:
         raise ValueError("quarter_manifest.weeks must be a non-empty list")
     if len(plan_obj["weeks"]) != len(weeks_list):
@@ -1157,6 +2062,16 @@ def validate_quarter_pack(
     if expected_weeks is not None and len(weeks_list) != expected_weeks:
         raise ValueError(f"Expected {expected_weeks} weeks, got {len(weeks_list)}")
 
+    actual_week_entries = sorted(p.name for p in weeks_root.iterdir())
+    expected_week_entries = [f"week-{i:02d}" for i in range(len(weeks_list))]
+    if actual_week_entries != expected_week_entries:
+        raise ValueError(
+            f"weeks/ directory entries {actual_week_entries!r} do not match expected {expected_week_entries!r}"
+        )
+
+    seen_robot = False
+    seen_trays = False
+    last_prices: dict[str, Any] | None = None
     week_audits: list[dict[str, Any]] = []
     for idx, week_entry in enumerate(weeks_list):
         if type(week_entry) is not dict:
@@ -1173,9 +2088,61 @@ def validate_quarter_pack(
         ):
             raise ValueError(f"Week entry #{idx} has inconsistent bundle metadata: {week_entry!r}")
 
+        wp = plan_obj["weeks"][idx]
+        if type(wp) is not dict or wp.keys() != {"robot", "trays", "route", "maintenance", "workers"}:
+            raise ValueError(f"quarter_manifest.plan.weeks[{idx}] has invalid keys")
+        if (
+            type(wp["robot"]) is not bool
+            or type(wp["trays"]) is not bool
+            or type(wp["maintenance"]) is not bool
+        ):
+            raise ValueError(f"quarter_manifest.plan.weeks[{idx}] flags must be booleans")
+        if (seen_robot and not wp["robot"]) or (seen_trays and not wp["trays"]):
+            raise ValueError(
+                f"Week {idx} violates irreversible CapEx monotonicity in quarter_manifest.plan"
+            )
+        seen_robot = seen_robot or wp["robot"]
+        seen_trays = seen_trays or wp["trays"]
+        if wp["maintenance"] and not wp["robot"]:
+            raise ValueError(f"Week {idx} has maintenance=True without robot=True")
+        if wp["route"] != "manual" and not wp["robot"]:
+            raise ValueError(f"Week {idx} has route={wp['route']!r} without robot=True")
+
+        expected_shift_plan = {
+            "schema_version": SCHEMA_VERSION,
+            "robot": wp["robot"],
+            "trays": wp["trays"],
+            "route": wp["route"],
+            "workers": wp["workers"],
+        }
+        if week_entry.get("shift_plan") != expected_shift_plan:
+            raise ValueError(
+                f"Week {idx} shift_plan in quarter_manifest mismatches plan.weeks[{idx}]"
+            )
+        if week_entry.get("maintenance") is not wp["maintenance"]:
+            raise ValueError(
+                f"Week {idx} maintenance flag in quarter_manifest mismatches plan.weeks[{idx}]"
+            )
+
+        we = week_entry.get("week_economy")
+        if (
+            type(we) is not dict
+            or we.keys() != {"purchase", "costs", "total"}
+            or not _is_strict_int(we["purchase"])
+            or we["purchase"] < 0
+            or not _is_strict_int(we["total"])
+            or we["total"] < 0
+            or type(we["costs"]) is not dict
+            or not we["costs"]
+            or any(not _is_strict_int(v) or v < 0 for v in we["costs"].values())
+            or we["total"] != sum(we["costs"].values())
+        ):
+            raise ValueError(f"Week {idx} week_economy in quarter_manifest is invalid")
+
         week_bundle_dir = pack_dir / expected_rel
         shift_audit = validate_shift_bundle(week_bundle_dir)
         shift_manifest = _strict_json_loads((week_bundle_dir / "manifest.json").read_text(encoding="utf-8"))
+        last_prices = shift_manifest["world"]["money"]
         if shift_manifest["raw"] != week_entry.get("raw"):
             raise ValueError(f"Week {idx} raw summary in quarter_manifest mismatches shift manifest")
         if shift_manifest["economy"] != week_entry.get("shift_economy"):
@@ -1192,11 +2159,41 @@ def validate_quarter_pack(
             }
         )
 
+    expected_labor_ticks = sum(w["raw"]["labor_ticks"] for w in weeks_list)
+    if qm["labor_ticks"] != expected_labor_ticks:
+        raise ValueError(
+            f"quarter_manifest.labor_ticks ({qm['labor_ticks']}) != sum of weekly labor_ticks ({expected_labor_ticks})"
+        )
+    expected_total_cost = sum(w["week_economy"]["total"] for w in weeks_list)
+    if qm["total_cost"] != expected_total_cost:
+        raise ValueError(
+            f"quarter_manifest.total_cost ({qm['total_cost']}) != sum of weekly week_economy.total ({expected_total_cost})"
+        )
+    if last_prices is not None:
+        expected_purchase = (last_prices["robot_purchase"] if seen_robot else 0) + (
+            last_prices["tray_purchase"] if seen_trays else 0
+        )
+        if qm["purchase"] != expected_purchase:
+            raise ValueError(
+                f"quarter_manifest.purchase ({qm['purchase']}) != expected CapEx purchase ({expected_purchase})"
+            )
+
+    _validate_diagnostics_object(
+        qm.get("diagnostics"),
+        expected_seed=qm["seed"],
+        expected_weeks_count=len(weeks_list),
+        expected_purchase=qm["purchase"],
+        expected_total_cost=qm["total_cost"],
+        expected_labor_ticks=qm["labor_ticks"],
+    )
+
     return {
         "ok": True,
         "pack_dir": str(pack_dir),
         "seed": qm["seed"],
         "weeks_count": len(week_audits),
+        "diagnostics_file": "diagnostics.md",
+        "total_issues": qm["diagnostics"]["total_issues"],
         "summary": {
             "purchase": qm["purchase"],
             "total_cost": qm["total_cost"],

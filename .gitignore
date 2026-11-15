@@ -4,6 +4,13 @@ __pycache__/
 .pytest_cache/
 artifacts/
 .worktrees/
+.env
+.env.*
 .DS_Store
+node_modules/
+studio/node_modules/
+studio/dist/
+studio/public/scene/
+/video/
 4_Horses_Environment_v02.zip
 4_Horses_Environment_v02/animations_frame_by_frame/

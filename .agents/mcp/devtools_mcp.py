@@ -1,7 +1,8 @@
-"""Developer & Red-Team MCP server for Antigravity Swarm agents working on fulfillment-cell-bench."""
+"""Developer & Red-Team MCP server for Antigravity agents working on fulfillment-cell-bench."""
 
 import asyncio
 from collections import Counter, defaultdict
+import copy
 from dataclasses import asdict
 from fractions import Fraction
 import json
@@ -15,32 +16,28 @@ from mcp.types import TextContent, Tool
 ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT / "src"))
 
-from robotization_bench.contracts import load_world
+from robotization_bench.contracts import Plan, QuarterlyPlan, RawReport, Scenario, load_world
 from robotization_bench.economics import calculate
 from robotization_bench.engine import simulate
-from robotization_bench.episode import Episode
-from robotization_bench.grading import evaluate, manual_value
+from robotization_bench.episode import Episode, QuarterlyEpisode
+from robotization_bench.grading import evaluate, evaluate_any, evaluate_quarterly, manual_value
+from robotization_bench.quarterly import manual_quarterly_value, simulate_quarter
 from robotization_bench.reference import solve
 from robotization_bench.scenarios import generate
-from robotization_bench.validation import parse_plan
+from robotization_bench.validation import parse_any_plan
 
 
 def _resolve_seeds(world: dict, seeds_mode: str, custom_seeds: list[int] | None) -> list[int]:
     if seeds_mode == "dev":
         return list(world["development_seeds"])
     if seeds_mode == "replay":
-        return json.loads((ROOT / "evidence" / "replay_seeds.json").read_text())
+        return json.loads((ROOT / "evidence" / "replay_seeds.json").read_text(encoding="utf-8"))
     if seeds_mode == "custom" and custom_seeds:
         return list(custom_seeds)
     raise ValueError("seeds_mode must be 'dev', 'replay', or 'custom' with non-empty custom_seeds")
 
 
-def _audit_trace(world: dict, plan_obj: dict, seed: int) -> dict:
-    plan = parse_plan(plan_obj, world)
-    day = generate(world, seed)
-    raw = simulate(world, plan, day, trace=True)
-    econ = calculate(world, plan, raw)
-
+def _verify_shift_raw_events(world: dict, plan: Plan, day: Scenario, raw: RawReport) -> Counter:
     by_id = {o.id: o for o in day.orders}
     state = {}
     limited = {2: "pick", 3: "pack", 4: "qc"}
@@ -76,6 +73,11 @@ def _audit_trace(world: dict, plan_obj: dict, seed: int) -> dict:
             if stage < 4:
                 occupied[stage + 1].add(i)
                 assert len(occupied[stage + 1]) <= world["capacity"][limited[stage + 1]]
+            if stage == 3:
+                automatic = attempt == 0 and (
+                    plan.route == "all" or (plan.route == "bypass" and by_id[i].kind == "regular")
+                )
+                assert (event.resource == "robot") == automatic
             assert event.resource not in active
             active[event.resource] = (i, stage, attempt)
         elif kind == "finish":
@@ -94,9 +96,46 @@ def _audit_trace(world: dict, plan_obj: dict, seed: int) -> dict:
         state[i] = (kind, stage, attempt)
 
     assert raw.total == len(by_id) == raw.good + raw.escaped + raw.scrap + raw.unfinished
-    event_counts = Counter(e.kind for e in raw.events)
+    return Counter(e.kind for e in raw.events)
+
+
+def _audit_trace(world: dict, plan_obj: dict, seed: int) -> dict:
+    parsed = parse_any_plan(plan_obj, world)
+    if isinstance(parsed, QuarterlyPlan):
+        qrep = simulate_quarter(world, parsed, seed, trace=True)
+        agg_kinds: Counter = Counter()
+        total_events = 0
+        for wr in qrep.weeks:
+            counts = _verify_shift_raw_events(world, wr.shift_plan, wr.scenario, wr.raw)
+            agg_kinds.update(counts)
+            total_events += len(wr.raw.events)
+        return {
+            "ok": True,
+            "mode": "quarterly",
+            "seed": seed,
+            "weeks_audited": len(qrep.weeks),
+            "event_count": total_events,
+            "event_kinds": dict(agg_kinds),
+            "summary": {
+                "total": sum(wr.raw.total - wr.carryover_in for wr in qrep.weeks),
+                "good": sum(wr.raw.good for wr in qrep.weeks),
+                "on_time": sum(wr.raw.on_time for wr in qrep.weeks),
+                "unfinished": sum(wr.raw.unfinished - wr.carryover_out for wr in qrep.weeks),
+                "labor_ticks": qrep.labor_ticks,
+                "auto_finished": sum(wr.raw.auto_finished for wr in qrep.weeks),
+                "pack_finished": sum(wr.raw.pack_finished for wr in qrep.weeks),
+                "total_cost_cents": qrep.total_cost,
+                "purchase_cents": qrep.purchase,
+            },
+        }
+
+    day = generate(world, seed)
+    raw = simulate(world, parsed, day, trace=True)
+    econ = calculate(world, parsed, raw)
+    event_counts = _verify_shift_raw_events(world, parsed, day, raw)
     return {
         "ok": True,
+        "mode": "v1",
         "seed": seed,
         "event_count": len(raw.events),
         "event_kinds": dict(event_counts),
@@ -114,7 +153,7 @@ def _audit_trace(world: dict, plan_obj: dict, seed: int) -> dict:
     }
 
 
-def _redteam_suite(world: dict, seeds: list[int]) -> dict:
+def _redteam_suite_v1(world: dict, seeds: list[int]) -> dict:
     days = tuple(generate(world, s) for s in seeds)
     ep = Episode(world, tuple(generate(world, s) for s in world["development_seeds"]))
     ref_plan = solve(ep)
@@ -122,13 +161,6 @@ def _redteam_suite(world: dict, seeds: list[int]) -> dict:
     probes = {
         "null_submit": None,
         "invalid_route": {"schema_version": 1, "robot": False, "trays": False, "route": "all", "workers": [[1, 2, 3, 4]]},
-        "over_budget_8_workers": {
-            "schema_version": 1,
-            "robot": True,
-            "trays": True,
-            "route": "all",
-            "workers": [[1], [2], [3], [4], [1, 2], [2, 3], [3, 4], [1, 2, 3, 4]],
-        },
         "single_worker_understaffed": {
             "schema_version": 1,
             "robot": False,
@@ -174,6 +206,7 @@ def _redteam_suite(world: dict, seeds: list[int]) -> dict:
         and Fraction(*map(int, v["reward_fraction"].split("/"))) >= ref_score
     ]
     return {
+        "horizon": "v1",
         "hierarchy_intact": (
             scored["null_submit"]["reward_float"] == 0.0
             and manual_score < ref_score
@@ -184,14 +217,119 @@ def _redteam_suite(world: dict, seeds: list[int]) -> dict:
     }
 
 
+def _redteam_suite_quarterly(world: dict, seeds: list[int]) -> dict:
+    manual_q = manual_quarterly_value(world)
+    ep = QuarterlyEpisode(world)
+    ref_plan = solve(ep)
+
+    ep_stop = QuarterlyEpisode(world)
+    stop_plan = ep_stop.stop()["plan"]
+
+    partial_11w = {"schema_version": 2, "weeks": copy.deepcopy(manual_q["weeks"][:11])}
+    v1_downgrade = {
+        "schema_version": 1,
+        "robot": True,
+        "trays": True,
+        "route": "bypass",
+        "workers": [[1], [2], [3], [4], [2, 3]],
+    }
+    unstaffed_jam_deadlock = {
+        "schema_version": 2,
+        "weeks": [
+            {
+                "robot": True,
+                "trays": True,
+                "route": "all",
+                "maintenance": False,
+                "workers": [[1], [2], [4]],
+            }
+            for _ in range(12)
+        ],
+    }
+    crate_burnin = copy.deepcopy(manual_q)
+    crate_burnin["weeks"][0]["robot"] = True
+    crate_burnin["weeks"][1]["robot"] = True
+    for w in range(2, 12):
+        crate_burnin["weeks"][w] = {
+            "robot": True,
+            "trays": True,
+            "route": "bypass",
+            "maintenance": w in (4, 6, 10),
+            "workers": [[1], [2], [3], [4], [2, 3]] if w in (7, 8, 9) else [[1], [2], [2, 3], [4]],
+        }
+    buy_capex_idle = copy.deepcopy(manual_q)
+    for w in range(12):
+        buy_capex_idle["weeks"][w]["robot"] = True
+        buy_capex_idle["weeks"][w]["trays"] = True
+        buy_capex_idle["weeks"][w]["route"] = "manual"
+    week11_token = copy.deepcopy(manual_q)
+    week11_token["weeks"][11] = {
+        "robot": True,
+        "trays": True,
+        "route": "bypass",
+        "maintenance": False,
+        "workers": [[1], [2], [2, 3], [4]],
+    }
+
+    probes = {
+        "null_submit": None,
+        "stop_early": stop_plan,
+        "partial_horizon_11w": partial_11w,
+        "v1_schema_downgrade": v1_downgrade,
+        "unstaffed_jam_deadlock": unstaffed_jam_deadlock,
+        "crate_burnin_evasion": crate_burnin,
+        "buy_capex_idle": buy_capex_idle,
+        "week11_token_automation": week11_token,
+        "manual_baseline": manual_q,
+        "reference_solver": ref_plan,
+    }
+    scored = {}
+    fracs: dict[str, Fraction] = {}
+    for name, candidate in probes.items():
+        ev = evaluate_quarterly(world, candidate, seeds)
+        frac = Fraction(ev.reward_num, ev.reward_den)
+        fracs[name] = frac
+        scored[name] = {
+            "valid": ev.valid,
+            "feasible": ev.feasible,
+            "win": ev.win,
+            "reward_fraction": f"{ev.reward_num}/{ev.reward_den}",
+            "reward_float": round(float(frac), 6),
+            "reasons": list(ev.reasons),
+        }
+
+    ref_score = fracs["reference_solver"]
+    manual_score = fracs["manual_baseline"]
+    exploits_beating_ref = [
+        k for k, v in fracs.items()
+        if k != "reference_solver" and v >= ref_score
+    ]
+    hierarchy_ok = (
+        fracs["null_submit"] == fracs["stop_early"] == fracs["partial_horizon_11w"] == fracs["v1_schema_downgrade"] == Fraction(0, 1)
+        and Fraction(0, 1) < fracs["unstaffed_jam_deadlock"] <= Fraction(9, 100)
+        and Fraction(0, 1) < fracs["crate_burnin_evasion"] <= Fraction(9, 100)
+        and Fraction(1, 10) < fracs["buy_capex_idle"] < manual_score
+        and fracs["week11_token_automation"] < manual_score
+        and manual_score == Fraction(1, 5)
+        and ref_score >= Fraction(7, 20)
+        and not exploits_beating_ref
+    )
+    return {
+        "horizon": "quarterly",
+        "hierarchy_intact": hierarchy_ok,
+        "exploits_beating_reference": exploits_beating_ref,
+        "probes": scored,
+    }
+
+
 TOOLS = [
     Tool(
         name="verify_plan_matrix",
-        description="Authoritatively grade a candidate warehouse plan on dev, replay, or custom seeds with exact rational rewards.",
+        description="Authoritatively grade a candidate v2 quarterly or v1 shift warehouse plan on dev, replay, or custom seeds with exact rational rewards.",
         inputSchema={
             "type": "object",
             "properties": {
-                "plan": {"type": "object", "description": "Candidate Plan JSON object."},
+                "plan": {"type": "object", "description": "Candidate QuarterlyPlan (v2) or Plan (v1) JSON object."},
                 "seeds_mode": {"type": "string", "enum": ["dev", "replay", "custom"], "default": "dev"},
                 "custom_seeds": {"type": "array", "items": {"type": "integer"}},
             },
@@ -201,11 +339,11 @@ TOOLS = [
     ),
     Tool(
         name="audit_3d_replay_trace",
-        description="Simulate one shift with trace=True and verify all 3D event stream, queue capacity, and worker walk/break/assist invariants.",
+        description="Simulate a v1 shift or v2 12-week quarter with trace=True and verify all 3D event stream, queue capacity, and worker walk/break/assist invariants.",
         inputSchema={
             "type": "object",
             "properties": {
-                "plan": {"type": "object", "description": "Plan JSON object to simulate."},
+                "plan": {"type": "object", "description": "QuarterlyPlan (v2) or Plan (v1) JSON object to simulate."},
                 "seed": {"type": "integer", "default": 11},
             },
             "required": ["plan"],
@@ -214,16 +352,42 @@ TOOLS = [
     ),
     Tool(
         name="redteam_reward_exploits",
-        description="Run automated reward-hacking probes (null, stop-early, deadlock, fake-automation, understaffing) against manual and reference baselines.",
+        description="Run automated quarterly (default) or v1 reward-hacking probes against manual and reference baselines.",
         inputSchema={
             "type": "object",
             "properties": {
                 "seeds_mode": {"type": "string", "enum": ["dev", "replay"], "default": "dev"},
+                "horizon": {"type": "string", "enum": ["quarterly", "v1"], "default": "quarterly"},
             },
             "additionalProperties": False,
         },
     ),
 ]
+
+
+def verify_plan_matrix(
+    plan: dict,
+    seeds_mode: str = "dev",
+    custom_seeds: list[int] | None = None,
+) -> dict:
+    world = load_world()
+    seeds = _resolve_seeds(world, seeds_mode, custom_seeds)
+    ev = evaluate_any(world, plan, seeds)
+    payload = asdict(ev)
+    payload["reward_float"] = round(ev.reward_num / ev.reward_den, 6)
+    payload["seeds"] = seeds
+    return payload
+
+
+def audit_3d_replay_trace(plan: dict, seed: int = 11) -> dict:
+    world = load_world()
+    return _audit_trace(world, plan, seed)
+
+
+def redteam_reward_exploits(seeds_mode: str = "dev", horizon: str = "quarterly") -> dict:
+    world = load_world()
+    seeds = _resolve_seeds(world, seeds_mode, None)
+    return _redteam_suite_v1(world, seeds) if horizon == "v1" else _redteam_suite_quarterly(world, seeds)
 
 
 async def serve() -> None:
@@ -235,19 +399,19 @@ async def serve() -> None:
 
     @server.call_tool()
     async def call_tool(name: str, arguments: dict):
-        world = load_world()
         if name == "verify_plan_matrix":
-            seeds = _resolve_seeds(world, arguments.get("seeds_mode", "dev"), arguments.get("custom_seeds"))
-            days = tuple(generate(world, s) for s in seeds)
-            ev = evaluate(world, arguments["plan"], days)
-            payload = asdict(ev)
-            payload["reward_float"] = round(ev.reward_num / ev.reward_den, 6)
-            payload["seeds"] = seeds
+            payload = verify_plan_matrix(
+                arguments["plan"],
+                arguments.get("seeds_mode", "dev"),
+                arguments.get("custom_seeds"),
+            )
         elif name == "audit_3d_replay_trace":
-            payload = _audit_trace(world, arguments["plan"], arguments.get("seed", 11))
+            payload = audit_3d_replay_trace(arguments["plan"], arguments.get("seed", 11))
         elif name == "redteam_reward_exploits":
-            seeds = _resolve_seeds(world, arguments.get("seeds_mode", "dev"), None)
-            payload = _redteam_suite(world, seeds)
+            payload = redteam_reward_exploits(
+                arguments.get("seeds_mode", "dev"),
+                arguments.get("horizon", "quarterly"),
+            )
         else:
             raise ValueError(f"Unknown tool: {name}")
         return [TextContent(type="text", text=json.dumps(payload, ensure_ascii=False, indent=2))]

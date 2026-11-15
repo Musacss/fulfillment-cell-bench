@@ -75,3 +75,18 @@ def test_unused_robot_never_counts_as_automation():
     day=Scenario(1,2,(Order(0,"regular",0,100),))
     s=evaluate(w, dict(manual_value(),robot=True), (day,))
     assert s.feasible and not s.win and s.metrics["auto_finished"]==0 and "automation" in s.reasons
+
+
+def test_quarterly_negative_budget_and_threshold_guards():
+    from robotization_bench.grading import evaluate_quarterly
+    from robotization_bench.quarterly import manual_quarterly_value
+
+    w = load_world()
+    q_manual = manual_quarterly_value(w)
+    w["quarterly"]["money"]["budget"] = 0
+    with pytest.raises(ValueError):
+        evaluate_quarterly(w, q_manual, [11])
+    w2 = load_world()
+    w2["quarterly"]["threshold_bps"]["escaped_each_week_max"] = -1
+    with pytest.raises(ValueError):
+        evaluate_quarterly(w2, q_manual, [11])
