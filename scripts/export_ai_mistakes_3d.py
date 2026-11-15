@@ -534,9 +534,30 @@ def main(argv: Sequence[str] | None = None) -> int:
         action="append",
         default=[],
         metavar="SLUG=LABEL=PATH",
-        help="AI submission JSON to export alongside manual & reference (repeatable)",
+        help="AI submission JSON to export alongside manual & reference (repeatable; defaults to docs/ru/examples/*.json)",
+    )
+    ap.add_argument(
+        "--no-default-examples",
+        action="store_true",
+        help="Do not auto-include bundled docs/ru/examples/*.json runs when --submission is omitted",
     )
     args = ap.parse_args(list(argv) if argv is not None else None)
+
+    submission_specs = list(args.submissions)
+    if not submission_specs and not args.no_default_examples:
+        examples_dir = ROOT / "docs" / "ru" / "examples"
+        default_catalog = (
+            ("claude_fable52", "Claude Fable 5.2 (Frontier)", "claude_fable52_frontier.json"),
+            ("claude_opus55", "Claude Opus 5.5 (Frontier)", "claude_opus55_frontier.json"),
+            ("gemini31_pro", "Gemini 3.1 Pro (Frontier)", "gemini31_pro_frontier.json"),
+            ("qwen_grpo", "Qwen 3.5-9B GRPO (Trained)", "qwen35_grpo_win.json"),
+            ("qwen_base", "Qwen 3.5-9B Base (Untrained)", "qwen35_base_untrained.json"),
+            ("naive_ai", "Naive AI (Wear Blowout)", "naive_ai_wear_fail.json"),
+        )
+        for slug, label, fname in default_catalog:
+            candidate = examples_dir / fname
+            if candidate.is_file():
+                submission_specs.append(f"{slug}={label}={candidate}")
 
     seed_ops: list[tuple[str, Any]] = getattr(args, "seed_ops", None) or []
     collected: list[int] = []
@@ -563,7 +584,7 @@ def main(argv: Sequence[str] | None = None) -> int:
             collected = [11]
         seeds = _validate_seeds(collected)
         index = export_ai_mistakes_pack(
-            args.out, seeds=seeds, submission_specs=args.submissions
+            args.out, seeds=seeds, submission_specs=submission_specs
         )
     except (ValueError, OSError) as exc:
         ap.error(str(exc))

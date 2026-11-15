@@ -6,13 +6,19 @@
 
 ## 1. Быстрый запуск экспорта и CORS-сервера (RU)
 
-1. **Экспортировать мультимодельный 3D-пакет с диагностикой ошибок ИИ:**
+1. **За одну команду экспортировать готовый 8-модельный 3D-пакет (`Manual`, `Reference`, `Claude Fable 5.2`, `Claude Opus 5.5`, `Gemini 3.1 Pro`, `Qwen 3.5-9B GRPO`, `Qwen 3.5-9B Base`, `Naive AI`):**
+   ```sh
+   PYTHONPATH=src python3 scripts/export_ai_mistakes_3d.py
+   ```
+   *(Если не передавать `--submission`, скрипт автоматически подхватывает все реальные прогоны из `docs/ru/examples/*.json` и пишет пакет в `artifacts/3d-ai-mistakes`.)*
+
+   Либо передать свои JSON-планы явно:
    ```sh
    PYTHONPATH=src .venv/bin/python scripts/export_ai_mistakes_3d.py \
      --out artifacts/3d-ai-mistakes \
      --seeds 11 29 47 \
-     --submission gpt54="GPT-5.4 (Frontier)"=submissions/gpt54.json \
-     --submission qwen_grpo="Qwen-7B GRPO (Trained)"=submissions/qwen_grpo.json
+     --submission claude_opus55="Claude Opus 5.5 (Frontier)"=docs/ru/examples/claude_opus55_frontier.json \
+     --submission qwen_grpo="Qwen 3.5-9B GRPO (Trained)"=docs/ru/examples/qwen35_grpo_win.json
    ```
    Экспортёр автоматически добавляет эталоны `manual` и `reference`, прогоняет 12 недель с `trace=True`, валидирует все сменные пакеты через `validate_quarter_pack(...)` и записывает `diagnostics.json` в каждую папку `quarterly-<slug>-seed<S>/`.
 
