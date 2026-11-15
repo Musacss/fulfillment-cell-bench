@@ -50,6 +50,30 @@ export function validateQuarter(quarter,file){
   });
   return quarter;
 }
+const isJsonPath=p=>typeof p==='string'&&/\.json(?:$|[?#])/i.test(p);
+export function normalizeDiagnostics(diag,evaluation=null){
+  if(!diag||typeof diag!=='object')return null;
+  if(diag.overall&&Array.isArray(diag.timeline_weeks)&&Array.isArray(diag.key_mistakes))return diag;
+  const qs=diag.overall||diag.quarter_summary||{},ev=evaluation||{};
+  const hasFrac=Number.isInteger(ev.reward_num)&&Number.isInteger(ev.reward_den)&&ev.reward_den>0;
+  const overall=diag.overall||{
+    valid:qs.valid??ev.valid??true,
+    feasible:Boolean(qs.feasible??ev.feasible),
+    win:Boolean(qs.win??ev.win),
+    ...(qs.reward_fraction?{reward_fraction:qs.reward_fraction,reward_float:qs.reward_float??0}:hasFrac?{reward_fraction:`${ev.reward_num}/${ev.reward_den}`,reward_float:ev.reward_num/ev.reward_den}:{}),
+    failure_reasons:qs.failure_reasons||qs.reasons||ev.reasons||[],
+    headline_summary:qs.headline_summary||qs.headline||'',
+  };
+  const rawWeeks=Array.isArray(diag.timeline_weeks)?diag.timeline_weeks:Array.isArray(diag.weeks)?diag.weeks:[];
+  const timeline_weeks=rawWeeks.map((w,idx)=>({
+    ...w,
+    week:Number.isInteger(w?.week)?w.week:idx,
+    active_mistakes:Array.isArray(w?.active_mistakes)?w.active_mistakes:Array.isArray(w?.issues)?w.issues.map(i=>i?.message).filter(Boolean):[],
+    highlight_ticks:Array.isArray(w?.highlight_ticks)?w.highlight_ticks:[],
+  }));
+  const key_mistakes=Array.isArray(diag.key_mistakes)?diag.key_mistakes:[];
+  return {...diag,overall,key_mistakes,timeline_weeks};
+}
 
 async function openSource(entry,read,label){
   const document=parseDocument(await read(entry),entry);
@@ -64,21 +88,33 @@ async function openSource(entry,read,label){
   }else throw new DataError(entry,'unknown document: expected index.json, manifest.json, or quarter_manifest.json');
   const standalone=!document.pack_format;
   const pathFor=p=>standalone&&p===entry?p:relative(entry,p);
-  const cache=new Map();
+  const cache=new Map(),diagCache=new Map();
   async function json(path){return parseDocument(await read(path),path);}
   async function loadRun(run,{week=0}={}){
     if(typeof run==='string')run=index.runs.find(r=>r.id===run);
     if(!run)throw new DataError(label,'run not found');
     const key=run.id+':'+week;
     if(cache.has(key))return cache.get(key);
-    let manifestPath,quarter=null,weekSummary=null;
-    if(run.mode==='v1')manifestPath=pathFor(run.manifest);
-    else{
+    let manifestPath,quarter=null,weekSummary=null,diagnostics=null;
+    if(run.mode==='v1'){
+      manifestPath=pathFor(run.manifest);
+      if(isJsonPath(run.diagnostics)){
+        try{diagnostics=await json(pathFor(run.diagnostics));}catch(err){if(err?.name==='AbortError')throw err;}
+      }
+    }else{
       const quarterPath=pathFor(run.quarter_manifest);
       quarter=validateQuarter(await json(quarterPath),quarterPath);
       if(!Number.isInteger(week)||week<0||week>=quarter.weeks.length)throw new DataError(quarterPath,`missing week ${week}`);
       weekSummary=quarter.weeks[week];
       manifestPath=relative(quarterPath,(weekSummary.bundle_dir||`weeks/week-${String(week).padStart(2,'0')}`)+'/manifest.json');
+      const diagPath=isJsonPath(run.diagnostics)?pathFor(run.diagnostics):isJsonPath(quarter.diagnostics_file)?relative(quarterPath,quarter.diagnostics_file):relative(quarterPath,'diagnostics.json');
+      if(diagCache.has(diagPath))diagnostics=diagCache.get(diagPath);
+      else{
+        try{diagnostics=await json(diagPath);diagCache.set(diagPath,diagnostics);}
+        catch(err){if(err?.name==='AbortError')throw err;diagCache.set(diagPath,null);}
+      }
+      if(!diagnostics)diagnostics=quarter.ai_mistakes_overlay||quarter.diagnostics||null;
+      diagnostics=normalizeDiagnostics(diagnostics,run.evaluation||quarter?.evaluation||null);
     }
     const manifest=await json(manifestPath);
     if(manifest.replay_format!==SHIFT)throw new DataError(manifestPath,`unknown replay_format: ${manifest.replay_format}`);
@@ -86,11 +122,9 @@ async function openSource(entry,read,label){
     const replay=createReplay(manifest,await read(eventsPath),{runId:run.id+(quarter?`:week-${week}`:'')});
     const expectedSeed=quarter?(weekSummary.week_seed??manifest.scenario.seed):run.seed;
     if(manifest.scenario.seed!==expectedSeed)throw new DataError(manifestPath,'shift seed does not match catalog');
-    let diagnostics=null;
-    if(run.diagnostics){
-      try{diagnostics=await json(pathFor(run.diagnostics));}catch{}
-    }
-    const result={replay,run,quarter,weekSummary,week,diagnostics,evaluation:run.evaluation||quarter?.evaluation||null,evaluationSeeds:run.evaluation_seeds||index.evaluation_seeds||quarter?.evaluation_seeds||[]};
+    const weekList=diagnostics?.timeline_weeks||diagnostics?.weeks||[];
+    const weekDiagnostics=weekList.find(w=>w?.week===week)||(weekList[week]?.week===undefined?weekList[week]:null)||null;
+    const result={replay,run,quarter,weekSummary,week,diagnostics,weekDiagnostics,evaluation:run.evaluation||quarter?.evaluation||null,evaluationSeeds:run.evaluation_seeds||index.evaluation_seeds||quarter?.evaluation_seeds||[]};
     cache.set(key,result);return result;
   }
   async function loadComparison(pair,{week=0}={}){

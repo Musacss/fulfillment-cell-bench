@@ -174,6 +174,35 @@ if ! command -v "$HARBOR_BIN" >/dev/null 2>&1; then
   exit 1
 fi
 
+if [[ "$CONTROLS_ONLY" -eq 0 ]]; then
+  case "$MODEL" in
+    gemini/*)
+      if [[ -z "${GEMINI_API_KEY:-}" && -z "${GOOGLE_GENERATIVE_AI_API_KEY:-}" ]]; then
+        echo "Error: GEMINI_API_KEY (or GOOGLE_GENERATIVE_AI_API_KEY) must be set and non-empty for model '$MODEL' (or pass --controls-only)." >&2
+        exit 1
+      fi
+      ;;
+    anthropic/*)
+      if [[ -z "${ANTHROPIC_API_KEY:-}" ]]; then
+        echo "Error: ANTHROPIC_API_KEY must be set and non-empty for model '$MODEL' (or pass --controls-only)." >&2
+        exit 1
+      fi
+      ;;
+    openai/*)
+      if [[ -z "${OPENAI_API_KEY:-}" ]]; then
+        echo "Error: OPENAI_API_KEY must be set and non-empty for model '$MODEL' (or pass --controls-only)." >&2
+        exit 1
+      fi
+      ;;
+    openrouter/*)
+      if [[ -z "${OPENROUTER_API_KEY:-}" ]]; then
+        echo "Error: OPENROUTER_API_KEY must be set and non-empty for model '$MODEL' (or pass --controls-only)." >&2
+        exit 1
+      fi
+      ;;
+  esac
+fi
+
 if [[ -n "$PYTHON_BIN" ]]; then
   PY_CMD=("$PYTHON_BIN")
 elif command -v uv >/dev/null 2>&1; then
