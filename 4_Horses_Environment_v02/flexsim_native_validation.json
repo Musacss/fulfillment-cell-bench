@@ -12,8 +12,8 @@
       "passed": true,
       "mandatory": true,
       "details": {
-        "actual_sha256": "28e9760eff5a1389a3315f0d27490b5851b4a10d92056bcf181db4f18827e792",
-        "reference_sha256": "28e9760eff5a1389a3315f0d27490b5851b4a10d92056bcf181db4f18827e792"
+        "actual_sha256": "a96d46309f52f1b28ee9cf35dd4b316050f1fe7412492d7c6a70bd2892e82374",
+        "reference_sha256": "a96d46309f52f1b28ee9cf35dd4b316050f1fe7412492d7c6a70bd2892e82374"
       }
     },
     "fixed_anchors_and_42_queue_slots": {
@@ -347,6 +347,22 @@
         "missing": []
       }
     },
+    "unobstructed_ceiling_and_native_lights": {
+      "passed": true,
+      "mandatory": true,
+      "details": {
+        "env_overhead_exists": true,
+        "env_overhead_type": "EMPTY",
+        "overhead_mesh_children": [],
+        "forbidden_overhead_objects": [],
+        "native_light_count": 3,
+        "native_lights": [
+          "Edge fill",
+          "Large softbox",
+          "Rear fill"
+        ]
+      }
+    },
     "dispatch_pallet_alignment_and_empty_tick_zero": {
       "passed": true,
       "mandatory": true,
@@ -373,7 +389,7 @@
       "passed": true,
       "mandatory": true,
       "details": {
-        "unique_meshes": 1056,
+        "unique_meshes": 1221,
         "invalid_vertex_objects": [],
         "degenerate_triangle_objects": [],
         "area_threshold_m2": 1e-12
@@ -383,8 +399,8 @@
       "passed": true,
       "mandatory": false,
       "details": {
-        "closed_meshes": 928,
-        "open_meshes": 128,
+        "closed_meshes": 1078,
+        "open_meshes": 143,
         "negative_closed_meshes": [],
         "scope": "Signed volume of closed mesh datablocks only. Open lettering/paint and local face consistency are not certified by this test."
       }
@@ -395,7 +411,9 @@
       "anchor": "VIS_STAGE_1_WORK",
       "diameter_m": 0.55,
       "contact_meshes": [
-        "VIS_Bench_top.001"
+        "VIS_Bench_top.001",
+        "Stage1 prep front apron",
+        "Stage1 prep worktop"
       ]
     },
     {
@@ -426,7 +444,8 @@
       "anchor": "VIS_ROBOT_WORK",
       "diameter_m": 0.55,
       "contact_meshes": [
-        "VIS_Bench_top_robot_chamfer"
+        "VIS_Bench_top_robot_chamfer",
+        "Robot pack worktop"
       ]
     }
   ],

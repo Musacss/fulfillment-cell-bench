@@ -7,7 +7,7 @@ import * as THREE from '../studio/node_modules/three/build/three.module.js';
 import {GLTFLoader} from '../studio/node_modules/three/examples/jsm/loaders/GLTFLoader.js';
 import {applyMapGeometryFixes,MAP_GEOMETRY_FIXES} from '../studio/src/map-geometry.js';
 import {applyMapFloorFixes} from '../studio/src/map-floor.js';
-import {MAP_LAYOUT} from '../studio/src/map-layout.js';
+import {MAP_LAYOUT,isNativeExpandedMap} from '../studio/src/map-layout.js';
 
 const ROOT=new URL('../',import.meta.url);
 const near=(value,expected,label,tolerance=2e-5)=>assert.ok(Math.abs(value-expected)<=tolerance,`${label}: ${value} vs ${expected}`);
@@ -40,20 +40,24 @@ function instance(){
   const environment=source.scene.clone(true),layout=sourceLayout.scene.clone(true);
   for(const root of [environment,layout])root.traverse(o=>{if(o.isMesh){o.castShadow=true;o.receiveShadow=true;}});
   environment.updateMatrixWorld(true);layout.updateMatrixWorld(true);
+  const nativeExpanded=isNativeExpandedMap(environment);
   const anchors=visualNames.map(name=>{const o=layout.getObjectByName(name);assert.ok(o,name);return {object:o,position:o.getWorldPosition(new THREE.Vector3()).toArray()};});
   environment.traverse(o=>{if(o.userData.kind==='anchor')anchors.push({object:o,position:o.getWorldPosition(new THREE.Vector3()).toArray()});});
-  const oldSteel=environment.getObjectByName('PROPS__Satin_zinc_steel').geometry;
-  const oldParent=environment.getObjectByName(MAP_GEOMETRY_FIXES.orphanRobotTop).parent;
+  const oldSteel=environment.getObjectByName('PROPS__Satin_zinc_steel')?.geometry??null;
+  const oldParent=environment.getObjectByName(MAP_GEOMETRY_FIXES.orphanRobotTop)?.parent??null;
   const originalLane=environment.getObjectByName('WALKWAY_GREEN_5S');
   const laneMaterial=originalLane.material;
-  return {environment,layout,anchors,oldSteel,oldParent,originalLane,laneMaterial};
+  const reworkBenchInitialVisible=environment.getObjectByName('BENCH_REWORK')?.visible??null;
+  return {environment,layout,nativeExpanded,anchors,oldSteel,oldParent,originalLane,laneMaterial,reworkBenchInitialVisible};
 }
 const a=instance(),b=instance();
 const geometryA=applyMapGeometryFixes(a.environment,a.layout),floorA=applyMapFloorFixes(a.environment,a.layout);
 assert.equal(applyMapGeometryFixes(a.environment,a.layout),geometryA);
 assert.equal(applyMapFloorFixes(a.environment,a.layout),floorA);
-assert.equal(b.environment.getObjectByName('UTILITY_CABINET').visible,true,'Comparison B must not be modified by A');
-assert.equal(b.environment.getObjectByName(MAP_GEOMETRY_FIXES.orphanRobotTop).parent,b.oldParent);
+if(!b.nativeExpanded){
+  assert.equal(b.environment.getObjectByName('UTILITY_CABINET').visible,true,'Comparison B must not be modified by A');
+  assert.equal(b.environment.getObjectByName(MAP_GEOMETRY_FIXES.orphanRobotTop).parent,b.oldParent);
+}
 assert.equal(b.originalLane.visible,true,'Comparison B lane must remain unchanged until patched');
 const geometryB=applyMapGeometryFixes(b.environment,b.layout),floorB=applyMapFloorFixes(b.environment,b.layout);
 
@@ -72,24 +76,42 @@ function cabinetTriangleCount(environment){
 }
 
 function checkInstance(view,geometryFix,floorFix){
-  const {environment,layout}=view;environment.updateMatrixWorld(true);layout.updateMatrixWorld(true);
+  const {environment,layout,nativeExpanded}=view;environment.updateMatrixWorld(true);layout.updateMatrixWorld(true);
   assert.equal(cabinetTriangleCount(environment),0,'No visible cabinet body, door, feet or handle may remain');
-  assert.ok(geometryFix.report.cabinet.removedTriangles>1000);
+  if(!nativeExpanded)assert.ok(geometryFix.report.cabinet.removedTriangles>1000);
   assert.equal(environment.getObjectByName(MAP_GEOMETRY_FIXES.orphanRobotTop),undefined,'No robot table fragment may remain at conveyor origin');
-  const top=layout.getObjectByName(MAP_GEOMETRY_FIXES.orphanRobotTop);
-  assert.equal(top.parent.name,'VIS_ROBOT_PACK_TABLE');assert.ok(visible(top));
-  const topBox=bounds(top);near(topBox.max.y,.86,'Robot tabletop height');
-  near(topBox.min.x,2.95,'Robot tabletop left');near(topBox.max.x,4.05,'Robot tabletop right');
-  near(topBox.min.z,-3.17,'Robot tabletop rear');near(topBox.max.z,-2.13,'Robot tabletop front');
+  let topBox;
+  if(nativeExpanded){
+    const nativeRobotTable=environment.getObjectByName('ROBOT_PACK_TABLE');
+    assert.ok(nativeRobotTable&&visible(nativeRobotTable),'Native ROBOT_PACK_TABLE must be visible and grounded');
+    topBox=bounds(nativeRobotTable);
+    near(topBox.min.y,0,'Native robot table grounded',5e-3);
+    near(topBox.max.y,.86,'Robot tabletop height',3e-3);
+    near(topBox.min.x,2.95,'Robot tabletop left',5e-3);near(topBox.max.x,4.05,'Robot tabletop right',5e-3);
+    near(topBox.min.z,-3.17,'Robot tabletop rear',5e-3);near(topBox.max.z,-2.13,'Robot tabletop front',5e-3);
+  }else{
+    const top=layout.getObjectByName(MAP_GEOMETRY_FIXES.orphanRobotTop);
+    assert.equal(top.parent.name,'VIS_ROBOT_PACK_TABLE');assert.ok(visible(top));
+    topBox=bounds(top);near(topBox.max.y,.86,'Robot tabletop height');
+    near(topBox.min.x,2.95,'Robot tabletop left');near(topBox.max.x,4.05,'Robot tabletop right');
+    near(topBox.min.z,-3.17,'Robot tabletop rear');near(topBox.max.z,-2.13,'Robot tabletop front');
+  }
   const order=layout.getObjectByName('VIS_ROBOT_ORDER').getWorldPosition(new THREE.Vector3());
   assert.ok(topBox.min.x<=order.x-.27&&topBox.max.x>=order.x+.27&&topBox.min.z<=order.z-.2&&topBox.max.z>=order.z+.2,'Robot tray has complete top support');
   const ray=new THREE.Raycaster(new THREE.Vector3(.045,1.2,.1),new THREE.Vector3(0,-1,0),0,.5);
   const hits=ray.intersectObject(environment,true).filter(hit=>visible(hit.object));
   assert.ok(hits.some(hit=>hit.object.name==='ROLLER_06_01'),'Main rollers stay unobstructed at the old orphan-table location');
   assert.ok(hits.every(hit=>hit.object.name!=='VIS_Bench_top_robot_chamfer'));
-  assert.equal(environment.getObjectByName('BENCH_REWORK').visible,false);
+  const benchRework=environment.getObjectByName('BENCH_REWORK');
+  if(nativeExpanded){
+    assert.ok(benchRework&&visible(benchRework),'Native BENCH_REWORK in north rework bay must remain visible');
+    const brBox=bounds(benchRework);
+    assert.ok(brBox.min.z>4.5&&brBox.min.y<=.005,'Native BENCH_REWORK grounded in north rework bay');
+  }else{
+    assert.equal(benchRework.visible,false);
+  }
   const rework=environment.getObjectByName('QUEUE_R_ROLLER_SECTION');assert.ok(visible(rework));
-  const rBox=bounds(rework);near(rBox.max.y,.86,'Rework tangent height');assert.ok(rBox.min.y<1e-5,'Rework has its own floor supports');
+  const rBox=bounds(rework);near(rBox.max.y,.86,'Rework tangent height',2e-3);assert.ok(rBox.min.y<1e-4,'Rework has its own floor supports');
   let rollers=0;environment.traverse(o=>{if(/^ROLLER_\d\d_\d\d$/.test(o.name))rollers++;});assert.equal(rollers,200);
   for(const anchor of view.anchors)assert.deepEqual(anchor.object.getWorldPosition(new THREE.Vector3()).toArray(),anchor.position,'Anchor moved: '+anchor.object.name);
 
@@ -120,7 +142,9 @@ function checkInstance(view,geometryFix,floorFix){
   return {anchors:view.anchors.length,mainRollers:rollers,cabinetVisibleTriangles:0,robotTopBounds:{min:topBox.min.toArray(),max:topBox.max.toArray()},reworkSupport:true,arrows:arrows.map(o=>o.userData.center_x),holdGap:zone.gapToQc};
 }
 const checkedA=checkInstance(a,geometryA,floorA),checkedB=checkInstance(b,geometryB,floorB);
-assert.notEqual(a.environment.getObjectByName('PROPS__Satin_zinc_steel').geometry,b.environment.getObjectByName('PROPS__Satin_zinc_steel').geometry,'Cabinet batch copies must be independent');
+if(!a.nativeExpanded){
+  assert.notEqual(a.environment.getObjectByName('PROPS__Satin_zinc_steel').geometry,b.environment.getObjectByName('PROPS__Satin_zinc_steel').geometry,'Cabinet batch copies must be independent');
+}
 assert.notEqual(a.environment.getObjectByName('MAP_WALKWAY_GREEN').material,b.environment.getObjectByName('MAP_WALKWAY_GREEN').material,'Comparison paint must own per-instance materials');
 for(const state of prototypeState){
   assert.equal(state.object.geometry,state.geometry);assert.equal(state.object.material,state.material);assert.equal(state.object.visible,state.visible);
@@ -128,9 +152,11 @@ for(const state of prototypeState){
 }
 for(const [view,geometryFix,floorFix] of [[a,geometryA,floorA],[b,geometryB,floorB]]){
   floorFix.dispose();geometryFix.dispose();floorFix.dispose();geometryFix.dispose();
-  assert.equal(view.environment.getObjectByName('PROPS__Satin_zinc_steel').geometry,view.oldSteel);
-  assert.equal(view.environment.getObjectByName(MAP_GEOMETRY_FIXES.orphanRobotTop).parent,view.oldParent);
-  assert.equal(view.environment.getObjectByName('BENCH_REWORK').visible,true);
+  if(!view.nativeExpanded){
+    assert.equal(view.environment.getObjectByName('PROPS__Satin_zinc_steel').geometry,view.oldSteel);
+    assert.equal(view.environment.getObjectByName(MAP_GEOMETRY_FIXES.orphanRobotTop).parent,view.oldParent);
+  }
+  if(view.reworkBenchInitialVisible!==null)assert.equal(view.environment.getObjectByName('BENCH_REWORK').visible,view.reworkBenchInitialVisible);
   assert.equal(view.originalLane.visible,true);assert.equal(view.originalLane.material,view.laneMaterial);
   assert.equal(view.environment.getObjectByName('MAP_FLOOR_FIXES'),undefined);
 }

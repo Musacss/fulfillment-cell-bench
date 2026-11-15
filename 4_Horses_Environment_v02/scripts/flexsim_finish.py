@@ -10,6 +10,8 @@ from mathutils import Vector
 P=argparse.ArgumentParser()
 P.add_argument('--output',required=True); P.add_argument('--source',required=True)
 P.add_argument('--render',action='store_true'); P.add_argument('--render-only',action='store_true')
+P.add_argument('--skip-characters',action='store_true')
+P.add_argument('--write-animation-report',action='store_true')
 opt=P.parse_args(sys.argv[sys.argv.index('--')+1:])
 OUT=Path(opt.output).resolve(); ROOT=Path(__file__).resolve().parent.parent
 sys.path.insert(0,str(ROOT/'scripts'))
@@ -64,6 +66,11 @@ def palette():
       'walk':('FlexSim / Pedestrian green','2e7d32',0,.56),
       'grid':('FlexSim / CAD grid minor','b8c1ca',0,.8),
       'gridMajor':('FlexSim / CAD grid major','8d99a6',0,.8),
+      'zoneFillTeal':('FlexSim / Zone fill slate','cbd6e0',0,.72),
+      'zoneFillInbound':('FlexSim / Zone fill inbound','cad7e2',0,.72),
+      'zoneFillGreen':('FlexSim / Zone fill shipping','cbdcd0',0,.72),
+      'zoneFillAmber':('FlexSim / Zone fill hold','dfd7c5',0,.72),
+      'zoneFillRed':('FlexSim / Zone fill scrap','dfcaca',0,.72),
     }
     return {k:material(name,h,me,ro,.25 if k in ('green','amber','blue') else 0)
             for k,(name,h,me,ro) in specs.items()}
@@ -80,45 +87,101 @@ def move_to_layer(obj,root,col):
     col.objects.link(obj)
 
 def floor_and_grid(api):
-    M=api['M'];box=api['box'];text=api['text'];beam=api['beam']
+    M=api['M'];box=api['box'];text=api['text'];beam=api['beam'];group=api['group']
     root,col=layer(api,'ENV_FLOOR_AND_GRID')
     for o in list(bpy.data.objects):
-        if o.name.startswith(('Concrete control joint','Walkway ','Floor zone ','Service lane text','Inbound paint','Outbound paint','Inbound legend','Outbound legend')):
+        uname=o.name.upper()
+        if (o.name.startswith(('Concrete control joint','Walkway ','WALKWAY_DIRECTION','Floor zone ','Service lane text','Inbound paint','Outbound paint','Inbound legend','Outbound legend','INBOUND_TRANSFER','DISPATCH_TRANSFER','REWORK_RETURN','SCRAP_TRANSFER','SPUR_TRANSFER','SPUR_GUIDE'))
+                or (('CHEVRON' in uname or 'ARROW' in uname or '_DASH' in uname or '_LANE' in uname) and not o.get('integration_visual'))):
             bpy.data.objects.remove(o,do_unlink=True)
-        elif o.name.startswith(('Raised concrete slab','Lower reveal')):move_to_layer(o,root,col)
-    # Grid runs 5 m beyond the 36 x 18 slab. Mesh geometry, compatible with glTF.
-    for x in range(-23,24):
-        major=x%5==0
-        box('CAD_GRID_X_%+03d'%x,(.014 if major else .006,28,.0003),(x,0,.00045),M['gridMajor' if major else 'grid'],root,0)
-    for y in range(-14,15):
-        major=y%5==0
-        box('CAD_GRID_Y_%+03d'%y,(46,.014 if major else .006,.0003),(0,y,.00045),M['gridMajor' if major else 'grid'],root,0)
-    # Bottom surface of every broad 5S paint film is 1.5 mm above the slab.
-    def paint(name,w,d,x,y,ma,z=.00165):
-        return box(name,(w,d,.0003),(x,y,z),ma,root,0)
-    paint('WALKWAY_GREEN_5S',35.4,1.5,0,-5.15,M['walk'])
-    for y in [-5.88,-4.42]:paint('WALKWAY_WHITE_BORDER',35.4,.045,0,y,M['label'],.00205)
-    for x in [-17.7,17.7]:paint('WALKWAY_END',.045,1.5,x,-5.15,M['label'],.00205)
-    for x in [-11.8,0,11.8]:
-        o=api['floor_arrow']('WALKWAY_DIRECTION',x,-5.15,root);o.location.z=.00235
-    def outline(name,label,x,y,w,d,ma,caption=True,label_size=.235):
-        for xx,yy,ww,dd in [(x,y-d/2,w,.036),(x,y+d/2,w,.036),(x-w/2,y,.036,d),(x+w/2,y,.036,d)]:paint(name,ww,dd,xx,yy,ma)
+        elif o.name.startswith(('Raised concrete slab','Lower reveal')):
+            o['dynamic']=True
+            move_to_layer(o,root,col)
+    # 5-tier vertical Z-separation (>= 1.1 mm between overlapping tiers) for zero raw-GLB shimmer:
+    # Tier 1: FLOOR_ZONE_*_FILL (0.0010..0.0012 m)
+    # Tier 2: CAD_GRID_* / CAD_DRAWING_BORDER (0.0023..0.0026 m)
+    # Tier 3: FLOOR_ZONE_*_BORDER / *_DASH / SHIPPING_BAY_*_LINE / ROBOT_HAZARD_YELLOW (0.0037..0.0040 m)
+    # Tier 4: WALKWAY_GREEN_5S / GRID_REF_*_BADGE / ROBOT_HAZARD_STRIPE (0.0050..0.0054 m)
+    # Tier 5: *_CORNER / WALKWAY_DIRECTION_ARROW_01..03 / WALKWAY_WHITE_BORDER / *_LABEL (0.0063..0.0068 m)
+    for x in range(-17,18):
+        major=(x%4==0)
+        box('CAD_GRID_X_%+03d'%x,(.016 if major else .006,17.56,.0003),(x,0,.00245),M['gridMajor' if major else 'grid'],root,0)
+    for y in range(-8,9):
+        major=(y%3==0)
+        box('CAD_GRID_Y_%+03d'%y,(35.56,.016 if major else .006,.0003),(0,y,.00245),M['gridMajor' if major else 'grid'],root,0)
+    for bx,by,bw,bd in [(0,-8.78,35.56,.024),(0,8.78,35.56,.024),(-17.78,0,.024,17.56),(17.78,0,.024,17.56)]:
+        box('CAD_DRAWING_BORDER',(bw,bd,.0003),(bx,by,.00245),M['gridMajor'],root,0)
+
+    # Structural column grid reference markers (GRID_REF_A..I along X, GRID_REF_1..3 along Y; NEVER AXIS_*)
+    grid_refs=group('GRID_REF_MARKERS',(0,0,0),root,dynamic=True)
+    for col_letter,gx in zip('ABCDEFGHI',range(-16,17,4)):
+        tag='GRID_REF_'+col_letter
+        box(tag+'_BADGE',(.34,.28,.0003),(gx,-8.38,.00515),M['dark'],grid_refs,0)
+        box(tag+'_TICK',(.024,.30,.0003),(gx,-8.63,.00515),M['dark'],grid_refs,0)
+        text(tag,col_letter,.165,(gx,-8.46,.00655),M['label'],grid_refs,align='CENTER')
+    for row_num,gy in [('1',-6.35),('2',0.0),('3',6.0)]:
+        tag='GRID_REF_'+row_num
+        box(tag+'_BADGE',(.32,.32,.0003),(-17.44,gy,.00515),M['dark'],grid_refs,0)
+        box(tag+'_TICK',(.26,.024,.0003),(-17.68,gy,.00515),M['dark'],grid_refs,0)
+        text(tag,row_num,.165,(-17.44,gy-.075,.00655),M['label'],grid_refs,align='CENTER')
+
+    def paint(name,w,d,x,y,ma,z=.00385,parent=root,dynamic=False):
+        return box(name,(w,d,.0003),(x,y,z),ma,parent,0,dynamic=dynamic)
+    paint('WALKWAY_GREEN_5S',35.4,1.5,0,-5.15,M['walk'],.00515,dynamic=True)
+    for y in [-5.88,-4.42]:paint('WALKWAY_WHITE_BORDER',35.4,.055,0,y,M['label'],.00650)
+    for x in [-17.7,17.7]:paint('WALKWAY_END',.055,1.5,x,-5.15,M['label'],.00650)
+    # 03:14:54Z User Override: ONLY directional arrows ON the green 5S walkway exist in the scene.
+    for idx,x in enumerate([-11.8,0.0,11.8],1):
+        o=api['floor_arrow'](f'WALKWAY_DIRECTION_ARROW_{idx:02d}',x,-5.15,root)
+        o.data=o.data.copy();o.data.materials.clear();o.data.materials.append(M['label'])
+        o.location=(x,-5.15,.00655);o.rotation_euler=(0,0,0)
+        o['dynamic']=True
+
+    # 8-12% saturation matte zone surface fills at Tier 1 (0.0010..0.0012 m) + 0.085 m Tier 3 borders + Tier 5 corners/labels.
+    bw=.085
+    boff=.0225  # inner border edge at w/2 - 0.020 m (keeps ROBOT_PLC_CABINET X<=5.075 inside 5.080)
+    def outline(name,label,x,y,w,d,ma,fill_ma=None,caption=True,label_size=.225):
+        zgrp=group(name,(x,y,0),root,dynamic=True)
+        zgrp['zone_bounds_blender_m']=[x-w/2,x+w/2,y-d/2,y+d/2]
+        if fill_ma is not None:
+            box(name+'_FILL',(max(.1,w-.04),max(.1,d-.04),.0002),(0,0,.00110),fill_ma,zgrp,0)
+        span_w=w+2*boff+bw;span_d=d+2*boff+bw
+        for xx,yy,ww,dd in [(0,-(d/2+boff),span_w,bw),(0,(d/2+boff),span_w,bw),
+                            (-(w/2+boff),0,bw,span_d),((w/2+boff),0,bw,span_d)]:
+            paint(name+'_BORDER',ww,dd,xx,yy,ma,.00385,parent=zgrp)
         for sx in [-1,1]:
             for sy in [-1,1]:
-                paint(name+'_CORNER',.25,.065,x+sx*(w/2-.125),y+sy*d/2,ma,.002)
-                paint(name+'_CORNER',.065,.25,x+sx*w/2,y+sy*(d/2-.125),ma,.002)
-        if caption:text(name+'_LABEL',label,label_size,(x-w/2+.15,y-d/2+.15,.0024),ma,root)
-    for args in [
-       ('FLOOR_ZONE_01','01 PREP',-10.475,2.775,3.85,4.25),
-       ('FLOOR_ZONE_02','02 PICK',-6.05,2.775,4.2,4.25),
-       ('FLOOR_ZONE_03','03 PACK + ROBOT',.775,2.775,8.65,4.25),
-       ('FLOOR_ZONE_04','04 QC',7.0875,2.775,3.375,4.25),
-       ('FLOOR_ZONE_R','R REWORK',4.36,-7.23,2.8,1.55)]:outline(*args,M['teal'])
-    for state,x,y,w,d,ma in [('GOOD',10,2.2,1.8,1.25,M['green']),('ESCAPED / HOLD',10,4.4,2.0,1.35,M['amber']),('SCRAP',7.2,-7,1.65,1.5,M['red'])]:
-        outline('OUTCOME_FLOOR_'+state.split()[0],state,x,y,w,d,ma,label_size=.18 if state.startswith('ESCAPED') else .235)
+                paint(name+'_CORNER',.30,.10,sx*(w/2+boff-.10),sy*(d/2+boff),ma,.00650,parent=zgrp)
+                paint(name+'_CORNER',.10,.30,sx*(w/2+boff),sy*(d/2+boff-.10),ma,.00650,parent=zgrp)
+        if caption:text(name+'_LABEL',label,label_size,(-w/2+.16,-d/2+.16,.00655),ma,zgrp)
+
+    for name,label,x,y,w,d,lsize in [
+       ('FLOOR_ZONE_01','01 PREP',-10.95,2.775,4.80,4.25,.235),
+       ('FLOOR_ZONE_02','02 PICK',-6.05,2.775,4.20,4.25,.235),
+       ('FLOOR_ZONE_03','03 / PACK (MANUAL + AUTO SLOT)',.775,2.775,8.65,4.25,.205),
+       ('FLOOR_ZONE_04','04 QC',7.0875,2.775,3.375,4.25,.235),
+       ('FLOOR_ZONE_R','R REWORK',3.34,-7.00,4.84,2.04,.215)]:
+        outline(name,label,x,y,w,d,M['teal'],fill_ma=M['zoneFillAmber' if name=='FLOOR_ZONE_R' else 'zoneFillTeal'],label_size=lsize)
+
+    for state,x,y,w,d,ma,fma in [
+       ('GOOD',10,2.2,1.8,1.25,M['green'],M['zoneFillGreen']),
+       ('ESCAPED / HOLD',10,4.4,2.0,1.35,M['amber'],M['zoneFillAmber']),
+       ('SCRAP',7.94,-6.89,2.98,1.82,M['red'],M['zoneFillRed'])]:
+        outline('OUTCOME_FLOOR_'+state.split()[0],state,x,y,w,d,ma,fill_ma=fma,label_size=.18 if state.startswith('ESCAPED') else .225)
+
+    outline('FLOOR_ZONE_INBOUND_STAGING','INBOUND STAGING',-16.15,3.35,2.25,9.20,M['blue'],fill_ma=M['zoneFillInbound'],label_size=.175)
+    outline('FLOOR_ZONE_BREAK','BREAK / SHIFT KPI',8.95,7.78,3.30,1.86,M['teal'],fill_ma=M['zoneFillTeal'],label_size=.175)
+    group('INBOUND_TRANSFER_LANE',(-13.85,2.75,0),root,dynamic=True)
+    group('DISPATCH_TRANSFER_LANE',(11.45,2.15,0),root,dynamic=True)
+    ship_zone=group('FLOOR_ZONE_SHIPPING_STAGING',(0,0,0),root,dynamic=True)
+    outline('FLOOR_ZONE_SHIPPING','SHIPPING STAGING',15.10,2.15,4.40,9.90,M['green'],fill_ma=M['zoneFillGreen'],label_size=.185)
+    for idx,(sx,sy) in enumerate([(14.30,1.50),(16.25,1.50),(14.30,3.65),(16.25,3.65),(14.30,5.80),(16.25,5.80)],1):
+        for dy in (-.48,.48):paint(f'SHIPPING_BAY_S{idx}_LINE',1.36,.045,sx,sy+dy,M['green'],.00385,parent=ship_zone)
+        text(f'SHIPPING_BAY_S{idx}_LABEL',f'SHIPPING S{idx}',.115,(sx-.58,sy-.66,.00655),M['green'],ship_zone)
+
     # Yellow/black clipped diagonal border; front service opening remains clear.
     def hatch(x,y,w,d):
-        paint('ROBOT_HAZARD_YELLOW',w,d,x,y,M['yellow'],.0018)
+        paint('ROBOT_HAZARD_YELLOW',w,d,x,y,M['yellow'],.00385)
         # Clip parallelograms to rectangular strip in 2D.
         def clip(poly,axis,bound,keep_greater):
             out=[]
@@ -135,10 +198,10 @@ def floor_and_grid(api):
             for axis,bound,greater in [(0,-w/2,True),(0,w/2,False),(1,-d/2,True),(1,d/2,False)]:
                 if pts:pts=clip(pts,axis,bound,greater)
             if len(pts)>2:
-                me=bpy.data.meshes.new('Hazard stripe mesh');me.from_pydata([(px+x,py+y,.0022) for px,py in pts],[],[tuple(range(len(pts)))]);me.materials.append(M['black'])
+                me=bpy.data.meshes.new('Hazard stripe mesh');me.from_pydata([(px+x,py+y,.00515) for px,py in pts],[],[tuple(range(len(pts)))]);me.materials.append(M['black'])
                 o=bpy.data.objects.new('ROBOT_HAZARD_STRIPE',me);sc.collection.objects.link(o);o.parent=root
-    hatch(3.65,4.4,2.5,.13);hatch(4.87,2.9,.13,3.0)
-    hatch(2.46,3.7,.13,1.4);hatch(4.25,1.40,1.25,.13)
+    hatch(3.41,4.40,2.02,.13);hatch(4.47,2.71,.13,2.42)
+    hatch(2.46,3.70,.13,1.40);hatch(3.98,1.50,1.11,.13)
     for o in root.children_recursive:
         if col not in o.users_collection:
             for c in list(o.users_collection):c.objects.unlink(o)
@@ -146,7 +209,8 @@ def floor_and_grid(api):
 
 def recolor_equipment(api):
     M=api['M']
-    ports=[(-6.46,.64),(.42,.64),(6.44,.64)]
+    south_ports=[(-6.46,.64),(.42,.64),(6.44,.64)]
+    north_ports=[(-4.27,.50),(.99,.50),(4.08,.44),(6.69,.50)]
     for o in bpy.data.objects:
         if o.type!='MESH':continue
         p=o
@@ -162,32 +226,33 @@ def recolor_equipment(api):
         if ma:
             # Linked geometry may have other uses: isolate only when replacing.
             o.data=o.data.copy();o.data.materials.clear();o.data.materials.append(ma)
-    # Open the front guide at each physical buffer transfer. Preserve the ten
+    # Open the south & north guides at each physical buffer/spur transfer. Preserve the ten
     # module roots and all 200 individual animated rollers.
     for i in range(1,11):
         g=bpy.data.objects['CONVEYOR_%02d'%i];gx=g.location.x
-        for o in list(g.children):
-            if o.name.startswith('Guard rail') and o.location.y<0:
-                bpy.data.objects.remove(o,do_unlink=True)
-            elif o.name.startswith(('Guide stanchion','Guide fastener')) and o.location.y<0:
-                if any(abs(gx+o.location.x-c)<w/2+.025 for c,w in ports):bpy.data.objects.remove(o,do_unlink=True)
-        intervals=[(-.9,.9)]
-        for c,w in ports:
-            a,b=c-w/2-gx,c+w/2-gx
-            rest=[]
-            for lo,hi in intervals:
-                if b<=lo or a>=hi:rest.append((lo,hi));continue
-                if a>lo:rest.append((lo,min(a,hi)))
-                if b<hi:rest.append((max(b,lo),hi))
-            intervals=rest
-        for a,b in intervals:
-            if b-a>.005:api['box']('Guard rail transfer opening',(b-a,.018,.025),((a+b)/2,-.33,.928),M['dark'],g,.002)
+        for y_sign,ports,rail_y in [(-1,south_ports,-.33),(1,north_ports,.33)]:
+            for o in list(g.children):
+                if o.name.startswith('Guard rail') and (o.location.y*y_sign)>0:
+                    bpy.data.objects.remove(o,do_unlink=True)
+                elif o.name.startswith(('Guide stanchion','Guide fastener')) and (o.location.y*y_sign)>0:
+                    if any(abs(gx+o.location.x-c)<w/2+.025 for c,w in ports):bpy.data.objects.remove(o,do_unlink=True)
+            intervals=[(-.9,.9)]
+            for c,w in ports:
+                a,b=c-w/2-gx,c+w/2-gx
+                rest=[]
+                for lo,hi in intervals:
+                    if b<=lo or a>=hi:rest.append((lo,hi));continue
+                    if a>lo:rest.append((lo,min(a,hi)))
+                    if b<hi:rest.append((max(b,lo),hi))
+                intervals=rest
+            for a,b in intervals:
+                if b-a>.005:api['box']('Guard rail transfer opening',(b-a,.018,.025),((a+b)/2,rail_y,.928),M['dark'],g,.002)
     for i in range(1,11):
         g=bpy.data.objects['CONVEYOR_%02d'%i]
-        for side,y in [('L',-.405),('R',.405)]:
+        for side,y,ports in [('L',-.405,south_ports),('R',.405,north_ports)]:
             sx=-.42
-            if side=='L' and any(abs(g.location.x+sx-c)<w/2+.05 for c,w in ports):
-                sx=next(v for v in [-.8,.8] if all(abs(g.location.x+v-c)>w/2+.06 for c,w in ports))
+            if any(abs(g.location.x+sx-c)<w/2+.05 for c,w in ports):
+                sx=next(v for v in [-.8,.8,0.0] if all(abs(g.location.x+v-c)>w/2+.06 for c,w in ports))
             p=api['group']('PHOTOEYE_%02d_%s'%(i,side),(sx,y,.96),g)
             p['animation_role']='photoeye';p['line_module']=i
             api['box']('PHOTOEYE_BODY',(.062,.038,.07),(0,0,0),M['dark'],p,.004)
@@ -237,8 +302,9 @@ def configure_lighting():
             o.data.energy={'Large softbox':5280,'Rear fill':2970,'Edge fill':1815}[o.name]
     sc.render.resolution_x=1800;sc.render.resolution_y=1200;sc.render.resolution_percentage=100
     sc.render.image_settings.file_format='PNG'
-    camera=bpy.data.objects['CAMERA_OVERVIEW'];camera.data.ortho_scale=44
-    camera.location=(22,-30,27);camera.rotation_euler=(Vector((0,.3,.1))-camera.location).to_track_quat('-Z','Y').to_euler();sc.camera=camera
+    camera=bpy.data.objects['CAMERA_OVERVIEW'];camera.data.type='PERSP'
+    camera.data.sensor_fit='HORIZONTAL';camera.data.sensor_width=36.0;camera.data.lens=28.0
+    camera.location=(0.0,-32.0,25.0);camera.rotation_euler=(Vector((0.0,0.0,0.85))-camera.location).to_track_quat('-Z','Y').to_euler();sc.camera=camera
     for screen in bpy.data.screens:
         for area in screen.areas:
             if area.type=='VIEW_3D':
@@ -270,10 +336,10 @@ def snapshot_actions():
 
 if not opt.render_only:
     append_characters();before=snapshot_actions()
-    # Support script keeps its normal CLI contract and saves/export its own modules.
+    # Support script populates visual templates/anchors/bindings in-memory without duplicate saves/exports.
     import runpy
     original_argv=sys.argv[:]
-    sys.argv=[str(ROOT/'scripts/build_visual_support.py'),'--','--output',str(OUT)]
+    sys.argv=[str(ROOT/'scripts/build_visual_support.py'),'--','--output',str(OUT),'--skip-export-and-save']
     runpy.run_path(str(ROOT/'scripts/build_visual_support.py'),run_name='__main__')
     sys.argv=original_argv
     api=api_functions();api['M']=palette()
@@ -299,19 +365,50 @@ if not opt.render_only:
     bpy.data.collections['INTEGRATION / Visual templates'].hide_viewport=True
     configure_lighting()
     after=snapshot_actions();assert before==after,'Character animation data changed'
-    (OUT/'animation_preservation.json').write_text(json.dumps({'passed':True,'actions':before,'worker_clips':len([k for k in before if k.startswith('Worker_')]),'robot_clips':len([k for k in before if k.startswith('Robot_')])},indent=2))
-    # Default native overview omits the overhead for a clean cutaway; UI can toggle it.
+    if opt.write_animation_report:
+        (OUT/'animation_preservation.json').write_text(json.dumps({'passed':True,'actions':before,'worker_clips':len([k for k in before if k.startswith('Worker_')]),'robot_clips':len([k for k in before if k.startswith('Robot_')])},indent=2))
+    # Unobstructed ceiling contract: ENV_OVERHEAD stays as an empty container (0 mesh descendants).
     overhead=bpy.data.objects.get('ENV_OVERHEAD')
     if overhead:
-        for o in [overhead]+list(overhead.children_recursive):o.hide_render=True
-    bpy.ops.wm.save_as_mainfile(filepath=str(OUT/'warehouse_environment.blend'))
-    sys.argv=[str(ROOT/'scripts/export_characters.py'),'--','--output',str(OUT)]
-    runpy.run_path(str(ROOT/'scripts/export_characters.py'),run_name='__main__')
-    sys.argv=original_argv
+        for o in reversed(list(overhead.children_recursive)):
+            if o.type!='LIGHT':bpy.data.objects.remove(o,do_unlink=True)
+        overhead['default_visible']=False
+        overhead.hide_render=True
+    allowed_arrows={'WALKWAY_DIRECTION_ARROW_01','WALKWAY_DIRECTION_ARROW_02','WALKWAY_DIRECTION_ARROW_03'}
+    allowed_empty_lanes={'INBOUND_TRANSFER_LANE','DISPATCH_TRANSFER_LANE'}
+    for o in list(bpy.data.objects):
+        if o.type=='LIGHT' or (o.type=='EMPTY' and o.name in allowed_empty_lanes):continue
+        uname=o.name.upper()
+        if ((o.name.startswith(('Walkway arrow','SPUR_TRANSFER_GUIDES','SPUR_GUIDE','SPUR_TRANSFER','INBOUND_TRANSFER','DISPATCH_TRANSFER','REWORK_RETURN','SCRAP_TRANSFER'))
+                or 'CHEVRON' in uname or 'ARROW' in uname or '_DASH' in uname
+                or 'TRANSFER_LANE' in uname or 'RETURN_LANE' in uname
+                or ('BREAK' in uname and ('LANE' in uname or 'ARROW' in uname or 'DASH' in uname))
+                or ('FLOW' in uname and not o.get('integration_visual')))
+                and o.name not in allowed_arrows):
+            bpy.data.objects.remove(o,do_unlink=True)
+    for aname in allowed_arrows:
+        ao=bpy.data.objects.get(aname)
+        if ao and ao.type=='MESH':
+            ao['dynamic']=True
+            bm=bmesh.new();bm.from_mesh(ao.data)
+            for f in bm.faces:
+                f.normal_update()
+                if f.normal.z<0:f.normal_flip()
+            bm.to_mesh(ao.data);bm.free();ao.data.update()
+    if OUT!=ROOT and (ROOT/'anchors.json').exists():
+        (OUT/'anchors.json').write_text((ROOT/'anchors.json').read_text())
     for prefix,anchor in [('WORKER','VIS_STAGE_2_WORK'),('ROBOT','VIS_ROBOT_WORK')]:
         rig=bpy.data.objects[prefix+'_Rig'];rig.location=bpy.data.objects[anchor].matrix_world.translation
         rig.rotation_euler.z=math.pi
     bpy.ops.wm.save_as_mainfile(filepath=str(OUT/'warehouse_environment.blend'))
+    if not opt.skip_characters:
+        sys.argv=[str(ROOT/'scripts/export_characters.py'),'--','--output',str(OUT)]
+        runpy.run_path(str(ROOT/'scripts/export_characters.py'),run_name='__main__')
+        sys.argv=original_argv
+        for prefix,anchor in [('WORKER','VIS_STAGE_2_WORK'),('ROBOT','VIS_ROBOT_WORK')]:
+            rig=bpy.data.objects[prefix+'_Rig'];rig.location=bpy.data.objects[anchor].matrix_world.translation
+            rig.rotation_euler.z=math.pi
+        bpy.ops.wm.save_as_mainfile(filepath=str(OUT/'warehouse_environment.blend'))
     from validate_flexsim_native import validate_native
     validate_native(OUT)
     # Remove characters/overlay from transient export scene; native source already saved.
@@ -321,7 +418,7 @@ if not opt.render_only:
             excluded.add(o);excluded.update(o.children_recursive)
     # Snapshot the full excluded hierarchy before removing parents. A newly
     # authored child may lack its parent's integration_visual custom property.
-    for o in excluded:bpy.data.objects.remove(o,do_unlink=True)
+    if excluded:bpy.data.batch_remove(excluded)
     # The optimized GLB keeps the requested root groups and all independent movers.
     from optimize_export import export_optimized
     export_optimized(OUT)

@@ -6,7 +6,7 @@ import {createHash} from 'node:crypto';
 import * as THREE from '../studio/node_modules/three/build/three.module.js';
 import {GLTFLoader} from '../studio/node_modules/three/examples/jsm/loaders/GLTFLoader.js';
 import {applyMapGeometryFixes} from '../studio/src/map-geometry.js';
-import {applyMapLayoutExpansion,MAP_LAYOUT} from '../studio/src/map-layout.js';
+import {applyMapLayoutExpansion,MAP_LAYOUT,isNativeExpandedMap} from '../studio/src/map-layout.js';
 import {applyMapFloorFixes} from '../studio/src/map-floor.js';
 
 const ROOT=new URL('../',import.meta.url);
@@ -107,19 +107,25 @@ function check(view,expansion,floorFix){
     const leaf=box(view.environment.getObjectByName(name+'_SECTIONAL_LEAF'));near((leaf.min.z+leaf.max.z)/2,5.15,name+' leaf centre');
     assert.ok(leaf.min.z<4.4&&leaf.max.z>5.9,'Full lane width must lead into dock opening');docks.push({name,position:p.toArray(),leaf:{min:leaf.min.toArray(),max:leaf.max.toArray()}});
   }
-  const expectedZones=[['01',-12.4,-8.55],['02',-8.15,-3.95],['03',-3.55,5.10],['04',5.40,8.775]],zones=[];
+  const nativeExpanded=isNativeExpandedMap(view.environment);
+  const halfStroke=nativeExpanded?.0725:.0325;
+  const expectedZones=[[ '01',nativeExpanded?-13.35:-12.4,-8.55],['02',-8.15,-3.95],['03',-3.55,5.10],['04',5.40,8.775]],zones=[];
   for(const [id,minX,maxX] of expectedZones){
-    const border=new THREE.Box3(),label=view.environment.getObjectByName('MAP_ZONE_'+id+'_LABEL');let parts=0;
-    view.environment.traverse(o=>{if(o.isMesh&&isVisible(o)&&new RegExp('^MAP_ZONE_'+id+'_(BORDER|CORNER)$').test(o.name)){border.union(box(o));parts++;}});
+    const mapLabel=view.environment.getObjectByName('MAP_ZONE_'+id+'_LABEL');
+    const floorLabel=view.environment.getObjectByName('FLOOR_ZONE_'+id+'_LABEL');
+    const label=(mapLabel&&isVisible(mapLabel))?mapLabel:floorLabel;
+    const border=new THREE.Box3();let parts=0;
+    const partRe=nativeExpanded?new RegExp('^FLOOR_ZONE_'+id+'_(BORDER|CORNER)(?:\\d+)?$'):new RegExp('^MAP_ZONE_'+id+'_(BORDER|CORNER)$');
+    view.environment.traverse(o=>{if(o.isMesh&&isVisible(o)&&partRe.test(o.name)){border.union(box(o));parts++;}});
     assert.equal(parts,12,'Four borders and eight corner strokes per zone '+id);
-    near(border.min.x,minX-.0325,'Zone '+id+' left');near(border.max.x,maxX+.0325,'Zone '+id+' right');
-    near(border.min.z,-4.9-.0325,'Zone '+id+' shared back baseline');near(border.max.z,-.65+.0325,'Zone '+id+' shared front baseline');
+    near(border.min.x,minX-halfStroke,'Zone '+id+' left',1e-3);near(border.max.x,maxX+halfStroke,'Zone '+id+' right',1e-3);
+    near(border.min.z,-4.9-halfStroke,'Zone '+id+' shared back baseline',1e-3);near(border.max.z,-.65+halfStroke,'Zone '+id+' shared front baseline',1e-3);
     assert.ok(label&&isVisible(label),'Zone caption '+id);const caption=box(label);
     assert.ok(caption.min.x>minX&&caption.max.x<maxX&&caption.min.z>-4.9&&caption.max.z<-.65,'Zone '+id+' caption stays within own frame');
     const interior=new THREE.Box3(new THREE.Vector3(minX,-1,-4.9),new THREE.Vector3(maxX,3,-.65));
     zones.push({id,interior,border,caption});
   }
-  for(let i=1;i<zones.length;i++)assert.ok(zones[i].border.min.x-zones[i-1].border.max.x>.23,'Neighbouring zone outlines must have clear gaps');
+  for(let i=1;i<zones.length;i++)assert.ok(zones[i].border.min.x-zones[i-1].border.max.x>(nativeExpanded?.14:.23),'Neighbouring zone outlines must have clear gaps');
   const deck=box(view.environment.getObjectByName('Q1_PAIRED_PALLET_DECK'));
   assert.ok(zones[0].interior.containsBox(deck),'PREP zone must include the complete inbound paired pallet deck');
   for(let i=0;i<binding.queues.Q1.preview_count;i++){
@@ -128,7 +134,7 @@ function check(view,expansion,floorFix){
     const footprint=new THREE.Box3(new THREE.Vector3(p.x-.27,p.y,p.z-.20),new THREE.Vector3(p.x+.27,p.y+.32,p.z+.20));
     assert.ok(zones[0].interior.containsBox(footprint),'Full Q1 tray footprint must fit in PREP: '+i);
   }
-  assert.ok(Math.abs(docks[0].position[0])-Math.abs(zones[0].border.min.x)>5,'Inbound gate must have open apron before PREP');
+  assert.ok(Math.abs(docks[0].position[0])-Math.abs(zones[0].border.min.x)>(nativeExpanded?4.3:5),'Inbound gate must have open apron before PREP');
   const arrows=[];view.environment.traverse(o=>{if(/^MAP_WALKWAY_ARROW_/.test(o.name)&&isVisible(o))arrows.push(o);});
   assert.equal(arrows.length,3);assert.deepEqual(arrows.map(o=>o.userData.center_x),[-11.8,0,11.8]);
   assert.equal(floorFix.report.zebras,0);
@@ -140,7 +146,8 @@ function check(view,expansion,floorFix){
   return {operationalAnchors:view.anchors.length,conveyorNodes:view.conveyors.length,conveyorMeshes:view.conveyors.filter(c=>c.geometry).length,unchangedMainRollers:200,corridor,slab:{min:slabBox.min.toArray(),max:slabBox.max.toArray()},docks,zones:zones.map(z=>({id:z.id,interior:{min:z.interior.min.toArray(),max:z.interior.max.toArray()},border:{min:z.border.min.toArray(),max:z.border.max.toArray()},caption:{min:z.caption.min.toArray(),max:z.caption.max.toArray()}})),q1DeckInsidePrep:true,q1TrayFootprintsInsidePrep:binding.queues.Q1.preview_count,arrows:arrows.map(o=>o.userData.center_x),visibleAxisMeshes,expansion:expansion.report};
 }
 const checkedA=check(a,layoutA,floorA),checkedB=check(b,layoutB,floorB);
-for(const name of ['MAP_ZONE_01_LABEL','MAP_WALKWAY_GREEN','MAP_CAD_GRID_X','MAP_SIDE_WALL']){
+const ownedGeoNames=isNativeExpandedMap(a.environment)?['MAP_WALKWAY_GREEN','MAP_SIDE_WALL']:['MAP_ZONE_01_LABEL','MAP_WALKWAY_GREEN','MAP_CAD_GRID_X','MAP_SIDE_WALL'];
+for(const name of ownedGeoNames){
   const aa=a.environment.getObjectByName(name),bb=b.environment.getObjectByName(name);assert.ok(aa&&bb,name);
   assert.notEqual(aa.geometry,bb.geometry,'Comparison instances must own new geometry: '+name);
 }

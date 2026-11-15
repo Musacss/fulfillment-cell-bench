@@ -219,27 +219,9 @@
       "role": "work_surface"
     },
     {
-      "id": "ANCHOR_BENCH_REWORK_APPROACH",
-      "position_m": [
-        4.5,
-        0,
-        8.10000038
-      ],
-      "role": "worker_approach"
-    },
-    {
-      "id": "ANCHOR_BENCH_REWORK_WORK",
-      "position_m": [
-        4.5,
-        0.86000001,
-        7.07999992
-      ],
-      "role": "work_surface"
-    },
-    {
       "id": "ANCHOR_QC_CENTER",
       "position_m": [
-        6.1500001,
+        5.73999977,
         0.86000001,
         0
       ],
@@ -273,55 +255,58 @@
       "role": "parcel_grasp"
     },
     {
-      "id": "ANCHOR_REWORK",
+      "id": "BENCH_REWORK",
       "position_m": [
-        4.5,
-        0.86000001,
-        7
+        1.8,
+        0.0,
+        6.35
       ],
-      "role": "rework_surface"
+      "role": "rework_bench"
     },
     {
-      "id": "MOUNT_actor_pack",
+      "id": "ANCHOR_BENCH_REWORK_WORK",
       "position_m": [
-        1.79999995,
-        0,
-        2.20000005
-      ],
-      "role": "future_actor",
-      "clearance_xyz_m": [
         1.8,
-        2.4,
-        1.8
-      ]
+        0.86,
+        6.35
+      ],
+      "role": "work_surface"
     },
     {
-      "id": "MOUNT_actor_pick",
+      "id": "ANCHOR_BENCH_REWORK_APPROACH",
       "position_m": [
-        -5.4000001,
-        0,
-        2.20000005
-      ],
-      "role": "future_actor",
-      "clearance_xyz_m": [
         1.8,
-        2.4,
-        1.8
-      ]
+        0.0,
+        5.55
+      ],
+      "role": "worker_approach"
     },
     {
-      "id": "MOUNT_actor_quality",
+      "id": "BENCH_SCRAP",
       "position_m": [
-        6.1500001,
-        0,
-        2.20000005
+        8.65,
+        0.0,
+        6.35
       ],
-      "role": "future_actor",
-      "clearance_xyz_m": [
-        1.8,
-        2.4,
-        1.8
-      ]
+      "role": "scrap_bench"
+    },
+    {
+      "id": "ANCHOR_BENCH_SCRAP_WORK",
+      "position_m": [
+        8.65,
+        0.86,
+        6.35
+      ],
+      "role": "work_surface"
+    },
+    {
+      "id": "ANCHOR_BENCH_SCRAP_APPROACH",
+      "position_m": [
+        8.65,
+        0.0,
+        5.55
+      ],
+      "role": "worker_approach"
     }
   ]
 }

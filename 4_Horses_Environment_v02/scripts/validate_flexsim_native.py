@@ -13,7 +13,7 @@ import math
 from pathlib import Path
 from mathutils import Vector
 
-REFERENCE_BINDINGS_SHA256 = '28e9760eff5a1389a3315f0d27490b5851b4a10d92056bcf181db4f18827e792'
+REFERENCE_BINDINGS_SHA256 = 'a96d46309f52f1b28ee9cf35dd4b316050f1fe7412492d7c6a70bd2892e82374'
 TOL = 1e-5
 
 
@@ -132,6 +132,11 @@ def validate_native(output_directory):
         actual = list(ob.matrix_world.translation) if ob else None
         if ob is None or max(abs(actual[i]-want[i]) for i in range(3)) > TOL:
             position_errors.append({'name': name, 'expected_blender_m': want, 'actual_blender_m': actual})
+    assist_ob = bpy.data.objects.get('VIS_ROBOT_ASSIST')
+    want_assist_yaw = math.atan2(3.5 - 2.8, -2.39 - (-1.95))
+    actual_assist_yaw = float(assist_ob.rotation_euler.z) if assist_ob else None
+    if assist_ob is None or abs(actual_assist_yaw - want_assist_yaw) > TOL:
+        position_errors.append({'name': 'VIS_ROBOT_ASSIST.rotation_euler.z', 'expected_rad': want_assist_yaw, 'actual_rad': actual_assist_yaw})
     check('fixed_anchors_and_42_queue_slots', not position_errors, {'verified': len(expected), 'errors': position_errors})
 
     library = bpy.data.collections.get('INTEGRATION / Visual templates')
@@ -212,6 +217,34 @@ def validate_native(output_directory):
     check('roller_tangent_height_086', len(main_rollers) == 200 and bool(buffer_rollers) and not roller_errors, {'main_count': len(main_rollers), 'buffer_count': len(buffer_rollers), 'errors': roller_errors})
     protected = [f'CONVEYOR_{i:02d}' for i in range(1, 11)] + [f'ROLLER_{i:02d}_{j:02d}' for i in range(1, 11) for j in range(1, 21)] + ['QC_PORTAL', 'STOPPER_GATE', 'PACK_PAPER_ROLL']
     check('protected_equipment_names', all(bpy.data.objects.get(n) for n in protected), {'missing': [n for n in protected if not bpy.data.objects.get(n)]})
+
+    env_overhead = bpy.data.objects.get('ENV_OVERHEAD')
+    overhead_meshes = [o.name for o in env_overhead.children_recursive if o.type == 'MESH'] if env_overhead else []
+    forbidden_overhead = [
+        o.name for o in bpy.data.objects
+        if o.name.startswith((
+            'OVERHEAD_TRUSS', 'OVERHEAD_CABLE_TRAY', 'HIGH_BAY_LED', 'HIGHBAY', 'ENV_LIGHTING_RIG',
+            'Truss longitudinal chord', 'Truss diagonal web', 'High bay LED', 'High bay suspension',
+            'Cable tray ',
+        ))
+    ]
+    native_lights = sorted(o.name for o in bpy.data.objects if o.type == 'LIGHT')
+    check(
+        'unobstructed_ceiling_and_native_lights',
+        env_overhead is not None
+        and env_overhead.type == 'EMPTY'
+        and len(overhead_meshes) == 0
+        and len(forbidden_overhead) == 0
+        and len(native_lights) >= 1,
+        {
+            'env_overhead_exists': env_overhead is not None,
+            'env_overhead_type': env_overhead.type if env_overhead else None,
+            'overhead_mesh_children': overhead_meshes,
+            'forbidden_overhead_objects': forbidden_overhead,
+            'native_light_count': len(native_lights),
+            'native_lights': native_lights,
+        },
+    )
 
     pallet_errors = []
     for index, y in [(0, 2.2), (1, 4.4)]:

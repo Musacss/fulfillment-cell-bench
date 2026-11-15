@@ -5,7 +5,7 @@
   "export_axes": "glTF: X right, Y up, Z forward; (x,y,z) -> (x,z,-y)",
   "style": "FlexSim engineering CAD palette, light neutral floor, blue and orange warehouse racks, graphite roller conveyors",
   "room": {
-    "width": 28,
+    "width": 36,
     "depth": 18,
     "wall_height": 3.6
   },
@@ -73,7 +73,7 @@
   },
   "layout": {
     "qc_origin": [
-      6.15,
+      5.74,
       0,
       0
     ],
@@ -88,18 +88,13 @@
       4.4
     ],
     "rework": [
-      4.5,
-      -7.0,
+      4.36,
+      -7.24,
       0
     ],
     "trolley": [
       -1.8,
       3.7,
-      0
-    ],
-    "cabinet": [
-      -11.7,
-      6.4,
       0
     ],
     "paper_stock": [
@@ -131,11 +126,11 @@
   },
   "stations": [
     {
-      "id": "intake",
-      "label": "01 / INTAKE",
+      "id": "prep",
+      "label": "01 / PREP",
       "center": [
-        -8.1,
-        0,
+        -11.0,
+        2.775,
         0
       ],
       "type": "presentation-zone"
@@ -152,7 +147,7 @@
     },
     {
       "id": "pack",
-      "label": "03 / PACK",
+      "label": "03 / PACK (MANUAL + AUTO SLOT)",
       "center": [
         1.8,
         0,
@@ -171,55 +166,12 @@
       "type": "presentation-zone"
     }
   ],
-  "future_mounts": [
-    {
-      "id": "actor_pick",
-      "position": [
-        -5.4,
-        -2.2,
-        0
-      ],
-      "clearance": [
-        1.8,
-        1.8,
-        2.4
-      ],
-      "visible_geometry": false
-    },
-    {
-      "id": "actor_pack",
-      "position": [
-        1.8,
-        -2.2,
-        0
-      ],
-      "clearance": [
-        1.8,
-        1.8,
-        2.4
-      ],
-      "visible_geometry": false
-    },
-    {
-      "id": "actor_quality",
-      "position": [
-        6.15,
-        -2.2,
-        0
-      ],
-      "clearance": [
-        1.8,
-        1.8,
-        2.4
-      ],
-      "visible_geometry": false
-    }
-  ],
+  "future_mounts": [],
   "demo": {
     "kind": "visual replay only; no production metrics",
     "start_x": -9.0,
     "end_x": 9.0,
-    "stop_x": 6.29,
+    "stop_x": 5.82,
     "speed_mps": 0.38,
     "carton_count": 5,
     "cycle_seconds": 60,

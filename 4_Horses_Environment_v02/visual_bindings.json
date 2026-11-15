@@ -91,7 +91,44 @@
     ],
     "yaw_gltf_rad": 3.141592653589793,
     "order_anchor": "VIS_ROBOT_ORDER",
-    "helper_anchor": "VIS_ROBOT_ASSIST"
+    "helper_anchor": "VIS_ROBOT_ASSIST",
+    "helper_position_gltf_m": [
+      2.8,
+      0,
+      -1.95
+    ],
+    "helper_yaw_gltf_rad": 2.131959739083249
+  },
+  "rework_station": {
+    "bench_node": "BENCH_REWORK",
+    "queue_node": "VIS_QUEUE_R",
+    "order_position_gltf_m": [
+      1.8,
+      0.86,
+      6.35
+    ],
+    "worker_position_gltf_m": [
+      1.8,
+      0.0,
+      5.55
+    ],
+    "worker_yaw_gltf_rad": 0.0
+  },
+  "scrap_station": {
+    "bench_node": "BENCH_SCRAP",
+    "bin_node": "SCRAP_BIN",
+    "outcome_node": "VIS_OUTCOME_SCRAP",
+    "order_position_gltf_m": [
+      8.65,
+      0.86,
+      6.35
+    ],
+    "worker_position_gltf_m": [
+      8.65,
+      0.0,
+      5.55
+    ],
+    "worker_yaw_gltf_rad": 0.0
   },
   "queues": {
     "Q1": {

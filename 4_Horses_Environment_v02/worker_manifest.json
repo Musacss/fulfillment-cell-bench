@@ -9,7 +9,7 @@
   "triangles": 3736,
   "authored_vertices": 2106,
   "materials": 12,
-  "bones": 26,
+  "bones": 35,
   "faceless": true,
   "flat_shaded": true,
   "clothing": [
@@ -61,99 +61,135 @@
     "hand_scale": 1,
     "prop_bones": [
       "prop_box",
-      "prop_stand"
+      "prop_stand",
+      "prop_closed",
+      "prop_shell",
+      "prop_flap_front",
+      "prop_flap_back",
+      "prop_flap_left",
+      "prop_flap_right",
+      "prop_item",
+      "prop_tote",
+      "prop_tape"
+    ],
+    "operation_props": [
+      "WORKER_ClosedCarton",
+      "WORKER_OpenCarton",
+      "WORKER_Flap_front",
+      "WORKER_Flap_back",
+      "WORKER_Flap_left",
+      "WORKER_Flap_right",
+      "WORKER_Product",
+      "WORKER_PickingTote",
+      "WORKER_SealingTape"
     ]
   },
   "clips": [
     {
       "name": "Idle",
-      "action": "Worker_Idle",
+      "action": "FBF_Worker_Idle",
       "duration_seconds": 3.2,
+      "fps": 30,
       "loop": true,
       "root_motion": false
     },
     {
       "name": "Walk",
-      "action": "Worker_Walk",
+      "action": "FBF_Worker_Walk",
       "duration_seconds": 1,
+      "fps": 30,
       "loop": true,
       "root_motion": false
     },
     {
       "name": "CarryIdle",
-      "action": "Worker_CarryIdle",
+      "action": "FBF_Worker_CarryIdle",
       "duration_seconds": 2.4,
+      "fps": 30,
       "loop": true,
       "root_motion": false
     },
     {
       "name": "Reach",
-      "action": "Worker_Reach",
+      "action": "FBF_Worker_Reach",
       "duration_seconds": 2.4,
+      "fps": 30,
       "loop": false,
       "root_motion": false
     },
     {
       "name": "PickUp",
-      "action": "Worker_PickUp",
+      "action": "FBF_Worker_PickUp",
       "duration_seconds": 3.2,
+      "fps": 30,
       "loop": false,
       "root_motion": false
     },
     {
       "name": "PlaceDown",
-      "action": "Worker_PlaceDown",
+      "action": "FBF_Worker_PlaceDown",
       "duration_seconds": 3.2,
+      "fps": 30,
       "loop": false,
       "root_motion": false
     },
     {
       "name": "CarryWalk",
-      "action": "Worker_CarryWalk",
+      "action": "FBF_Worker_CarryWalk",
       "duration_seconds": 1,
+      "fps": 30,
       "loop": true,
       "root_motion": false
     },
     {
       "name": "Prepare",
-      "action": "Worker_Prepare",
+      "action": "FBF_Worker_Prepare",
       "duration_seconds": 3.2,
-      "loop": true,
+      "fps": 30,
+      "loop": false,
       "root_motion": false,
       "visual_only": true,
-      "frozen": false
+      "frozen": false,
+      "order_variant": "standard"
     },
     {
       "name": "Pick",
-      "action": "Worker_Pick",
+      "action": "FBF_Worker_Pick",
       "duration_seconds": 4,
-      "loop": true,
+      "fps": 30,
+      "loop": false,
       "root_motion": false,
       "visual_only": true,
-      "frozen": false
+      "frozen": false,
+      "order_variant": "standard"
     },
     {
       "name": "Pack",
-      "action": "Worker_Pack",
+      "action": "FBF_Worker_Pack",
       "duration_seconds": 3,
-      "loop": true,
+      "fps": 30,
+      "loop": false,
       "root_motion": false,
       "visual_only": true,
-      "frozen": false
+      "frozen": false,
+      "order_variant": "standard"
     },
     {
       "name": "Inspect",
-      "action": "Worker_Inspect",
+      "action": "FBF_Worker_Inspect",
       "duration_seconds": 3.6,
-      "loop": true,
+      "fps": 30,
+      "loop": false,
       "root_motion": false,
       "visual_only": true,
-      "frozen": false
+      "frozen": false,
+      "order_variant": "standard"
     },
     {
       "name": "Assist",
-      "action": "Worker_Assist",
+      "action": "FBF_Worker_Assist",
       "duration_seconds": 3.2,
+      "fps": 30,
       "loop": true,
       "root_motion": false,
       "visual_only": true,
@@ -161,8 +197,9 @@
     },
     {
       "name": "Break",
-      "action": "Worker_Break",
+      "action": "FBF_Worker_Break",
       "duration_seconds": 4,
+      "fps": 30,
       "loop": true,
       "root_motion": false,
       "visual_only": true,
@@ -170,9 +207,10 @@
     },
     {
       "name": "Prepare_Oversize",
-      "action": "Worker_Prepare_Oversize",
+      "action": "FBF_Worker_Prepare_Oversize",
       "duration_seconds": 3.2,
-      "loop": true,
+      "fps": 30,
+      "loop": false,
       "root_motion": false,
       "visual_only": true,
       "frozen": false,
@@ -180,9 +218,10 @@
     },
     {
       "name": "Pick_Oversize",
-      "action": "Worker_Pick_Oversize",
+      "action": "FBF_Worker_Pick_Oversize",
       "duration_seconds": 4,
-      "loop": true,
+      "fps": 30,
+      "loop": false,
       "root_motion": false,
       "visual_only": true,
       "frozen": false,
@@ -190,9 +229,10 @@
     },
     {
       "name": "Pack_Oversize",
-      "action": "Worker_Pack_Oversize",
+      "action": "FBF_Worker_Pack_Oversize",
       "duration_seconds": 3,
-      "loop": true,
+      "fps": 30,
+      "loop": false,
       "root_motion": false,
       "visual_only": true,
       "frozen": false,
@@ -200,9 +240,10 @@
     },
     {
       "name": "Inspect_Oversize",
-      "action": "Worker_Inspect_Oversize",
+      "action": "FBF_Worker_Inspect_Oversize",
       "duration_seconds": 3.6,
-      "loop": true,
+      "fps": 30,
+      "loop": false,
       "root_motion": false,
       "visual_only": true,
       "frozen": false,

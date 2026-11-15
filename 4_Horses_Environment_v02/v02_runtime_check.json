@@ -26,7 +26,7 @@
       "max": [
         0.18000000715255737,
         0.25099998712539673,
-        0.14430000880065375
+        0.14430001378059387
       ]
     },
     "order_oversize": {
@@ -38,7 +38,7 @@
       "max": [
         0.23999999463558197,
         0.32100000977516174,
-        0.1743000056211203
+        0.17430000007152557
       ]
     },
     "order_tray": {
@@ -119,23 +119,23 @@
   "characters": [
     {
       "character": "worker",
-      "bones": 26,
+      "bones": 35,
       "clips": 17,
-      "skinned_primitives": 15,
-      "vertex_pose_samples": 450993
+      "skinned_primitives": 23,
+      "vertex_pose_samples": 469353
     },
     {
       "character": "robot",
-      "bones": 32,
+      "bones": 41,
       "clips": 14,
-      "skinned_primitives": 10,
-      "vertex_pose_samples": 330372
+      "skinned_primitives": 18,
+      "vertex_pose_samples": 345492
     }
   ],
   "gltf": [
     {
       "file": "warehouse_environment.glb",
-      "bytes": 10071556,
+      "bytes": 9427860,
       "errors": 0,
       "warnings": 0,
       "messages": [
@@ -143,19 +143,97 @@
           "code": "UNUSED_OBJECT",
           "message": "This object may be unused.",
           "severity": 2,
-          "pointer": "/meshes/27/primitives/0/attributes/TEXCOORD_0"
+          "pointer": "/meshes/301/primitives/0/attributes/TEXCOORD_0"
         },
         {
           "code": "UNUSED_OBJECT",
           "message": "This object may be unused.",
           "severity": 2,
-          "pointer": "/meshes/355/primitives/0/attributes/TEXCOORD_0"
+          "pointer": "/meshes/303/primitives/0/attributes/TEXCOORD_0"
         },
         {
           "code": "UNUSED_OBJECT",
           "message": "This object may be unused.",
           "severity": 2,
-          "pointer": "/meshes/356/primitives/0/attributes/TEXCOORD_0"
+          "pointer": "/meshes/304/primitives/0/attributes/TEXCOORD_0"
+        },
+        {
+          "code": "UNUSED_OBJECT",
+          "message": "This object may be unused.",
+          "severity": 2,
+          "pointer": "/meshes/309/primitives/0/attributes/TEXCOORD_0"
+        },
+        {
+          "code": "UNUSED_OBJECT",
+          "message": "This object may be unused.",
+          "severity": 2,
+          "pointer": "/meshes/310/primitives/0/attributes/TEXCOORD_0"
+        },
+        {
+          "code": "UNUSED_OBJECT",
+          "message": "This object may be unused.",
+          "severity": 2,
+          "pointer": "/meshes/331/primitives/0/attributes/TEXCOORD_0"
+        },
+        {
+          "code": "UNUSED_OBJECT",
+          "message": "This object may be unused.",
+          "severity": 2,
+          "pointer": "/meshes/334/primitives/0/attributes/TEXCOORD_0"
+        },
+        {
+          "code": "UNUSED_OBJECT",
+          "message": "This object may be unused.",
+          "severity": 2,
+          "pointer": "/meshes/337/primitives/0/attributes/TEXCOORD_0"
+        },
+        {
+          "code": "UNUSED_OBJECT",
+          "message": "This object may be unused.",
+          "severity": 2,
+          "pointer": "/meshes/340/primitives/0/attributes/TEXCOORD_0"
+        },
+        {
+          "code": "UNUSED_OBJECT",
+          "message": "This object may be unused.",
+          "severity": 2,
+          "pointer": "/meshes/344/primitives/0/attributes/TEXCOORD_0"
+        },
+        {
+          "code": "UNUSED_OBJECT",
+          "message": "This object may be unused.",
+          "severity": 2,
+          "pointer": "/meshes/350/primitives/0/attributes/TEXCOORD_0"
+        },
+        {
+          "code": "UNUSED_OBJECT",
+          "message": "This object may be unused.",
+          "severity": 2,
+          "pointer": "/meshes/354/primitives/0/attributes/TEXCOORD_0"
+        },
+        {
+          "code": "UNUSED_OBJECT",
+          "message": "This object may be unused.",
+          "severity": 2,
+          "pointer": "/meshes/360/primitives/0/attributes/TEXCOORD_0"
+        },
+        {
+          "code": "UNUSED_OBJECT",
+          "message": "This object may be unused.",
+          "severity": 2,
+          "pointer": "/meshes/361/primitives/0/attributes/TEXCOORD_0"
+        },
+        {
+          "code": "UNUSED_OBJECT",
+          "message": "This object may be unused.",
+          "severity": 2,
+          "pointer": "/meshes/363/primitives/0/attributes/TEXCOORD_0"
+        },
+        {
+          "code": "UNUSED_OBJECT",
+          "message": "This object may be unused.",
+          "severity": 2,
+          "pointer": "/meshes/364/primitives/0/attributes/TEXCOORD_0"
         },
         {
           "code": "UNUSED_OBJECT",
@@ -167,19 +245,157 @@
           "code": "UNUSED_OBJECT",
           "message": "This object may be unused.",
           "severity": 2,
+          "pointer": "/meshes/366/primitives/0/attributes/TEXCOORD_0"
+        },
+        {
+          "code": "UNUSED_OBJECT",
+          "message": "This object may be unused.",
+          "severity": 2,
+          "pointer": "/meshes/367/primitives/0/attributes/TEXCOORD_0"
+        },
+        {
+          "code": "UNUSED_OBJECT",
+          "message": "This object may be unused.",
+          "severity": 2,
+          "pointer": "/meshes/368/primitives/0/attributes/TEXCOORD_0"
+        },
+        {
+          "code": "UNUSED_OBJECT",
+          "message": "This object may be unused.",
+          "severity": 2,
+          "pointer": "/meshes/371/primitives/0/attributes/TEXCOORD_0"
+        },
+        {
+          "code": "UNUSED_OBJECT",
+          "message": "This object may be unused.",
+          "severity": 2,
+          "pointer": "/meshes/372/primitives/0/attributes/TEXCOORD_0"
+        },
+        {
+          "code": "UNUSED_OBJECT",
+          "message": "This object may be unused.",
+          "severity": 2,
+          "pointer": "/meshes/373/primitives/0/attributes/TEXCOORD_0"
+        },
+        {
+          "code": "UNUSED_OBJECT",
+          "message": "This object may be unused.",
+          "severity": 2,
+          "pointer": "/meshes/376/primitives/0/attributes/TEXCOORD_0"
+        },
+        {
+          "code": "UNUSED_OBJECT",
+          "message": "This object may be unused.",
+          "severity": 2,
+          "pointer": "/meshes/377/primitives/0/attributes/TEXCOORD_0"
+        },
+        {
+          "code": "UNUSED_OBJECT",
+          "message": "This object may be unused.",
+          "severity": 2,
+          "pointer": "/meshes/378/primitives/0/attributes/TEXCOORD_0"
+        },
+        {
+          "code": "UNUSED_OBJECT",
+          "message": "This object may be unused.",
+          "severity": 2,
+          "pointer": "/meshes/379/primitives/0/attributes/TEXCOORD_0"
+        },
+        {
+          "code": "UNUSED_OBJECT",
+          "message": "This object may be unused.",
+          "severity": 2,
+          "pointer": "/meshes/380/primitives/0/attributes/TEXCOORD_0"
+        },
+        {
+          "code": "UNUSED_OBJECT",
+          "message": "This object may be unused.",
+          "severity": 2,
+          "pointer": "/meshes/381/primitives/0/attributes/TEXCOORD_0"
+        },
+        {
+          "code": "UNUSED_OBJECT",
+          "message": "This object may be unused.",
+          "severity": 2,
+          "pointer": "/meshes/382/primitives/0/attributes/TEXCOORD_0"
+        },
+        {
+          "code": "UNUSED_OBJECT",
+          "message": "This object may be unused.",
+          "severity": 2,
+          "pointer": "/meshes/383/primitives/0/attributes/TEXCOORD_0"
+        },
+        {
+          "code": "UNUSED_OBJECT",
+          "message": "This object may be unused.",
+          "severity": 2,
           "pointer": "/meshes/390/primitives/0/attributes/TEXCOORD_0"
         },
         {
           "code": "UNUSED_OBJECT",
           "message": "This object may be unused.",
           "severity": 2,
-          "pointer": "/meshes/424/primitives/0/attributes/TEXCOORD_0"
+          "pointer": "/meshes/394/primitives/0/attributes/TEXCOORD_0"
+        },
+        {
+          "code": "UNUSED_OBJECT",
+          "message": "This object may be unused.",
+          "severity": 2,
+          "pointer": "/meshes/400/primitives/0/attributes/TEXCOORD_0"
+        },
+        {
+          "code": "UNUSED_OBJECT",
+          "message": "This object may be unused.",
+          "severity": 2,
+          "pointer": "/meshes/452/primitives/0/attributes/TEXCOORD_0"
+        },
+        {
+          "code": "UNUSED_OBJECT",
+          "message": "This object may be unused.",
+          "severity": 2,
+          "pointer": "/meshes/456/primitives/0/attributes/TEXCOORD_0"
+        },
+        {
+          "code": "UNUSED_OBJECT",
+          "message": "This object may be unused.",
+          "severity": 2,
+          "pointer": "/meshes/471/primitives/0/attributes/TEXCOORD_0"
+        },
+        {
+          "code": "UNUSED_OBJECT",
+          "message": "This object may be unused.",
+          "severity": 2,
+          "pointer": "/meshes/472/primitives/0/attributes/TEXCOORD_0"
+        },
+        {
+          "code": "UNUSED_OBJECT",
+          "message": "This object may be unused.",
+          "severity": 2,
+          "pointer": "/meshes/609/primitives/0/attributes/TEXCOORD_0"
+        },
+        {
+          "code": "UNUSED_OBJECT",
+          "message": "This object may be unused.",
+          "severity": 2,
+          "pointer": "/meshes/610/primitives/0/attributes/TEXCOORD_0"
+        },
+        {
+          "code": "UNUSED_OBJECT",
+          "message": "This object may be unused.",
+          "severity": 2,
+          "pointer": "/meshes/643/primitives/0/attributes/TEXCOORD_0"
+        },
+        {
+          "code": "UNUSED_OBJECT",
+          "message": "This object may be unused.",
+          "severity": 2,
+          "pointer": "/meshes/678/primitives/0/attributes/TEXCOORD_0"
         }
       ]
     },
     {
       "file": "modules/carton_closed.glb",
-      "bytes": 40244,
+      "bytes": 40228,
       "errors": 0,
       "warnings": 0,
       "messages": [
@@ -193,49 +409,49 @@
     },
     {
       "file": "modules/carton_open.glb",
-      "bytes": 20532,
+      "bytes": 20516,
       "errors": 0,
       "warnings": 0,
       "messages": []
     },
     {
       "file": "modules/humanoid_robot.glb",
-      "bytes": 692720,
+      "bytes": 1600988,
       "errors": 0,
       "warnings": 0,
       "messages": []
     },
     {
       "file": "modules/inspection_portal.glb",
-      "bytes": 61928,
+      "bytes": 61876,
       "errors": 0,
       "warnings": 0,
       "messages": []
     },
     {
       "file": "modules/packing_bench_1800.glb",
-      "bytes": 119328,
+      "bytes": 119240,
       "errors": 0,
       "warnings": 0,
       "messages": []
     },
     {
       "file": "modules/pallet_1200x800.glb",
-      "bytes": 20812,
+      "bytes": 20808,
       "errors": 0,
       "warnings": 0,
       "messages": []
     },
     {
       "file": "modules/roller_conveyor_1800.glb",
-      "bytes": 57156,
+      "bytes": 57124,
       "errors": 0,
       "warnings": 0,
       "messages": []
     },
     {
       "file": "modules/shelving_1800.glb",
-      "bytes": 385060,
+      "bytes": 384984,
       "errors": 0,
       "warnings": 0,
       "messages": [
@@ -345,7 +561,7 @@
     },
     {
       "file": "modules/supply_trolley.glb",
-      "bytes": 82504,
+      "bytes": 82452,
       "errors": 0,
       "warnings": 0,
       "messages": [
@@ -359,7 +575,7 @@
     },
     {
       "file": "modules/tote_600x400.glb",
-      "bytes": 54224,
+      "bytes": 54192,
       "errors": 0,
       "warnings": 0,
       "messages": [
@@ -373,7 +589,7 @@
     },
     {
       "file": "modules/visual_layout.glb",
-      "bytes": 631796,
+      "bytes": 641684,
       "errors": 0,
       "warnings": 0,
       "messages": [
@@ -381,39 +597,39 @@
           "code": "UNUSED_OBJECT",
           "message": "This object may be unused.",
           "severity": 2,
-          "pointer": "/meshes/68/primitives/0/attributes/TEXCOORD_0"
+          "pointer": "/meshes/70/primitives/0/attributes/TEXCOORD_0"
         },
         {
           "code": "UNUSED_OBJECT",
           "message": "This object may be unused.",
           "severity": 2,
-          "pointer": "/meshes/136/primitives/0/attributes/TEXCOORD_0"
+          "pointer": "/meshes/140/primitives/0/attributes/TEXCOORD_0"
         },
         {
           "code": "UNUSED_OBJECT",
           "message": "This object may be unused.",
           "severity": 2,
-          "pointer": "/meshes/200/primitives/0/attributes/TEXCOORD_0"
+          "pointer": "/meshes/206/primitives/0/attributes/TEXCOORD_0"
         }
       ]
     },
     {
       "file": "modules/visual_support.glb",
-      "bytes": 79476,
+      "bytes": 74244,
       "errors": 0,
       "warnings": 0,
       "messages": []
     },
     {
       "file": "modules/warehouse_worker.glb",
-      "bytes": 780856,
+      "bytes": 1994528,
       "errors": 0,
       "warnings": 0,
       "messages": []
     },
     {
       "file": "modules/workbench_1800.glb",
-      "bytes": 134200,
+      "bytes": 134116,
       "errors": 0,
       "warnings": 0,
       "messages": [
@@ -432,5 +648,5 @@
       ]
     }
   ],
-  "environment_bytes": 10071556
+  "environment_bytes": 9427860
 }
