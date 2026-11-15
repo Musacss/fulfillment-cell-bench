@@ -41,7 +41,7 @@ def parse_plan(value: object, world: World) -> Plan:
 
     workers = value["workers"]
     spec = world["workers"]
-    if type(workers) is not list or not spec["min"] <= len(workers) <= spec["max"]:
+    if type(workers) not in (list, tuple) or not spec["min"] <= len(workers) <= spec["max"]:
         raise InvalidPlan(
             f"workers must be an array of {_fmt_int(spec['min'])} to {_fmt_int(spec['max'])} workers"
         )
@@ -51,7 +51,7 @@ def parse_plan(value: object, world: World) -> Plan:
     allowed_label = "[" + ", ".join(_fmt_int(z) for z in allowed_zones) + "]"
     for index, zones in enumerate(workers):
         idx_label = _fmt_int(index)
-        if type(zones) is not list or not 1 <= len(zones) <= len(allowed_zones):
+        if type(zones) not in (list, tuple) or not 1 <= len(zones) <= len(allowed_zones):
             raise InvalidPlan(f"workers[{idx_label}] must be a nonempty list of distinct zones")
         if any(type(zone) is not int or zone not in allowed_zones for zone in zones):
             raise InvalidPlan(f"workers[{idx_label}] zones must be integers from {allowed_label}")

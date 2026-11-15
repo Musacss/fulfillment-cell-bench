@@ -174,3 +174,28 @@ def test_unstaffed_jam_keeps_pending_orders_until_horizon():
     assert (raw.total, raw.unfinished, raw.pack_started, raw.pack_finished) == (2, 2, 1, 0)
     assert [e.order_id for e in raw.events if e.kind == "jam"] == [0]
     assert not any(e.kind == "assist" for e in raw.events)
+
+
+def test_quarterly_active_automation_commissioning_and_shift_trace_invariants():
+    from robotization_bench.quarterly import manual_quarterly_value, simulate_quarter
+    from robotization_bench.validation import parse_quarterly_plan
+
+    world = load_world()
+    raw_plan = manual_quarterly_value(world)
+    # Weeks 0..1 buy robot but route manually; commissioning must start only at Week 2 when route != "manual".
+    raw_plan["weeks"][0]["robot"] = True
+    raw_plan["weeks"][1]["robot"] = True
+    for w in range(2, 12):
+        raw_plan["weeks"][w] = {
+            "robot": True,
+            "trays": True,
+            "route": "bypass",
+            "maintenance": w in (4, 6, 10),
+            "workers": [[1], [2], [3], [4], [2, 3]],
+        }
+    qplan = parse_quarterly_plan(raw_plan, world)
+    qrep = simulate_quarter(world, qplan, 11, trace=True)
+    assert [wr.week for wr in qrep.weeks if wr.commissioning_active] == [2, 3]
+    for wr in qrep.weeks:
+        check_trace(world, wr.shift_plan, wr.scenario, wr.raw)
+        check_worker_intervals(world, wr.shift_plan, wr.raw)

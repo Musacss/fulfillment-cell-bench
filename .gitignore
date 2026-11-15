@@ -4,4 +4,11 @@ __pycache__/
 .pytest_cache/
 artifacts/
 .worktrees/
+.env
+.env.*
 .DS_Store
+node_modules/
+studio/node_modules/
+studio/dist/
+studio/public/scene/
+/video/
