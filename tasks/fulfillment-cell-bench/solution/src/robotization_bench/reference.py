@@ -578,10 +578,11 @@ def _generate_analytical_quarterly_candidates(
     off_34 = _normalize_crew([[1], [2], [3, 4], [2, 3]], world)
     peak_34_nested = _normalize_crew([[1], [2], [3, 4], [2, 3], [2, 3]], world)
     default_route = "all" if pooled_reg_bps < auto_min_bps + 600 else "bypass"
+    all_active_maint = set(range(1, num_weeks))
     even_maint = {w for w in range(2, num_weeks, 2)}
     even_non_surge_maint = {w for w in even_maint if w not in high_surge_weeks}
     for off_crew, peak_crew in ((off_43, peak_43_nested), (off_34, peak_34_nested)):
-        for mset in (even_maint, even_non_surge_maint):
+        for mset in (all_active_maint, even_maint, even_non_surge_maint):
             _add_candidate(
                 {
                     "schema_version": 2,
@@ -876,6 +877,8 @@ def _synthesize_empirical_repairs(
         trimmed = copy.deepcopy(plan)
         slack_candidates: list[tuple[float, int, int]] = []
         for w_idx, wr in enumerate(q_rep["weeks"]):
+            if int(q_spec["week_profiles"][w_idx].get("waves", 0)) >= 12:
+                continue
             workers = trimmed["weeks"][w_idx]["workers"]
             cur_rung = crew_rung_index(workers)
             if cur_rung <= 0:
@@ -1032,7 +1035,7 @@ def solve_quarterly(episode: Any, obs: dict[str, Any] | None = None) -> dict[str
 
     # Stage 2: Empirical Bottleneck Repair & Cost Trim on hard_seed
     remaining_for_stage2 = max(0, (pilot_cap - calls_made) - reserved_confirm)
-    if remaining_for_stage2 > 0:
+    if remaining_for_stage2 > 0 and confirm_top_k >= 1:
         synthesized = _synthesize_empirical_repairs(world, screened, seen_keys)
         for rep_cand in synthesized[:remaining_for_stage2]:
             rep = try_pilot(rep_cand, hard_seed)

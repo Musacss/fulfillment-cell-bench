@@ -375,9 +375,9 @@ def build_sft_trajectory_record(
 def main(argv: Sequence[str] | None = None) -> int:
     ap = argparse.ArgumentParser(description=__doc__)
     ap.add_argument("--out", type=Path, default=REPO_ROOT / "artifacts" / "verda" / "sft_traces.jsonl")
-    ap.add_argument("--rl-seeds-out", type=Path, default=REPO_ROOT / "artifacts" / "verda" / "rl_seeds.json")
+    ap.add_argument("--rl-seeds-out", type=Path, default=None)
     ap.add_argument("--existing-blind-seeds", type=Path, default=None)
-    ap.add_argument("--train-count", type=int, default=16)
+    ap.add_argument("--train-count", "--num-traces", "--count", "-n", dest="train_count", type=int, default=16)
     ap.add_argument("--val-count", type=int, default=4)
     ap.add_argument("--model-id", type=str, default=None)
     ap.add_argument("--env-ready-file", type=Path, default=None)
@@ -470,10 +470,11 @@ def main(argv: Sequence[str] | None = None) -> int:
     if not traces:
         raise RuntimeError("Zero winning SFT trajectories generated")
 
+    rl_seeds_out = args.rl_seeds_out or (args.out.parent / "rl_seeds.json")
     args.out.parent.mkdir(parents=True, exist_ok=True)
-    args.rl_seeds_out.parent.mkdir(parents=True, exist_ok=True)
+    rl_seeds_out.parent.mkdir(parents=True, exist_ok=True)
     args.out.write_text("\n".join(json.dumps(t) for t in traces) + "\n", encoding="utf-8")
-    args.rl_seeds_out.write_text(
+    rl_seeds_out.write_text(
         json.dumps(
             {
                 "schema_version": 2,
@@ -493,7 +494,7 @@ def main(argv: Sequence[str] | None = None) -> int:
                 "model_id": model_id,
                 "traces_written": len(traces),
                 "out": str(args.out),
-                "rl_seeds_out": str(args.rl_seeds_out),
+                "rl_seeds_out": str(rl_seeds_out),
             }
         )
     )
