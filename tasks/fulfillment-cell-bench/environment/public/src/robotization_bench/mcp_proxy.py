@@ -32,22 +32,22 @@ def _tool(name: str, description: str, properties: dict[str, Any], required: tup
     )
 
 
-_PLAN = {"description": "The full v1 plan object. See the manual plan in observe for its shape."}
+_PLAN = {"description": "The full plan object matching observe().manual (schema_version 2 quarterly or 1 shift)."}
 _TOOLS = [
-    _tool("observe", "Read the catalog, rules, manual plan, and public development days.", {}),
+    _tool("observe", "Read the catalog, rules, manual plan, and public development seeds.", {}),
     _tool(
         "pilot",
-        "Run one development shift. A failed pilot leaves the episode open.",
+        "Run one development simulation on a public seed. A failed pilot leaves the episode open.",
         {
             "plan": _PLAN,
-            "seed": {"type": "integer", "description": "A public day from observe."},
+            "seed": {"type": "integer", "description": "A public development seed from observe."},
             "trace": {"type": "boolean", "default": False, "description": "Include detailed shift events."},
         },
         ("plan", "seed"),
     ),
     _tool(
         "submit",
-        "Close the episode by submitting one plan. A missing or invalid plan scores zero.",
+        "Close the episode permanently by submitting one final plan. A missing or invalid plan scores zero.",
         {"plan": _PLAN},
     ),
     _tool("stop", "Close the episode without submitting a plan.", {}),

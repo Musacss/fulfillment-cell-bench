@@ -163,8 +163,9 @@ def simulate_quarter(
         owned_robot = owned_robot or wp.robot
         owned_trays = owned_trays or wp.trays
 
-        commissioning_active = wp.robot and (robot_weeks_seen < comm_weeks)
-        if wp.robot:
+        active_auto = wp.robot and (wp.route != "manual")
+        commissioning_active = active_auto and (robot_weeks_seen < comm_weeks)
+        if active_auto:
             robot_weeks_seen += 1
 
         wear_start = wear

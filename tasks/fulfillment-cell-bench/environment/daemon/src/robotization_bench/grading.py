@@ -38,6 +38,8 @@ def _minimum(actual: int, target: int) -> F:
 
 
 def _maximum(actual: int, limit: int) -> F:
+    if limit <= 0 or actual < 0:
+        raise ValueError("invalid threshold limit")
     return F(1) if actual <= limit else F(limit, actual)
 
 

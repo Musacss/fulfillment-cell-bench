@@ -24,7 +24,7 @@ from .contracts import (
 from .economics import calculate
 from .engine import simulate
 from .grading import manual_value
-from .validation import parse_plan, parse_quarterly_plan
+from .validation import _reject_constant, _unique_keys, parse_plan, parse_quarterly_plan
 
 _PUBLIC_WORLD_KEYS = frozenset(
     {
@@ -62,6 +62,7 @@ _PUBLIC_QUARTERLY_KEYS = frozenset(
 _INT64_MIN = -(1 << 63)
 _INT64_MAX = (1 << 63) - 1
 _MAX_ERROR_LOG_ENTRIES = 64
+_MAX_STATE_BYTES = 16_777_216
 
 
 def wire(value):
@@ -120,7 +121,7 @@ def _read_rules(rules_path: Path | None) -> str:
     return ""
 
 
-def _load_state(path: Path, expected_mode: str) -> dict[str, Any] | None:
+def _load_state(path: Path, expected_mode: str, *, world: World | None = None) -> dict[str, Any] | None:
     if path.is_symlink():
         raise ValueError("state_path must not be a symlink")
     try:
@@ -137,13 +138,19 @@ def _load_state(path: Path, expected_mode: str) -> dict[str, Any] | None:
         raise
     try:
         meta = os.fstat(fd)
-        if not stat.S_ISREG(meta.st_mode):
-            raise ValueError("state_path must be a regular file")
+        if not stat.S_ISREG(meta.st_mode) or meta.st_size > _MAX_STATE_BYTES:
+            raise ValueError("state_path must be a regular file <= 16 MiB")
         try:
             with os.fdopen(fd, "rb", closefd=False) as stream:
-                raw_bytes = stream.read()
-            data = json.loads(raw_bytes.decode("utf-8"))
-        except (UnicodeError, json.JSONDecodeError, ValueError) as exc:
+                raw_bytes = stream.read(_MAX_STATE_BYTES + 1)
+            if len(raw_bytes) > _MAX_STATE_BYTES:
+                raise ValueError("state_path exceeds 16 MiB")
+            data = json.loads(
+                raw_bytes.decode("utf-8"),
+                object_pairs_hook=_unique_keys,
+                parse_constant=_reject_constant,
+            )
+        except (UnicodeError, json.JSONDecodeError, InvalidPlan, RecursionError, ValueError) as exc:
             raise ValueError("corrupt episode state file") from exc
     finally:
         os.close(fd)
@@ -160,10 +167,19 @@ def _load_state(path: Path, expected_mode: str) -> dict[str, Any] | None:
     if type(closed) is not bool:
         raise ValueError("invalid closed flag in state file")
     submission = data.get("submission")
-    if submission is not None and type(submission) is not dict:
-        raise ValueError("invalid submission in state file")
+    if submission is not None:
+        if type(submission) is not dict:
+            raise ValueError("invalid submission in state file")
+        if world is not None:
+            try:
+                if expected_mode == "quarterly":
+                    parse_quarterly_plan(submission, world)
+                else:
+                    parse_plan(submission, world)
+            except (InvalidPlan, RecursionError, ValueError) as exc:
+                raise ValueError("invalid submission in state file") from exc
     saved_log = data.get("log")
-    if type(saved_log) is not list:
+    if type(saved_log) is not list or any(type(item) is not dict for item in saved_log):
         raise ValueError("invalid log in state file")
     rejected_calls = data.get("rejected_calls", 0)
     if type(rejected_calls) is not int or rejected_calls < 0:
@@ -231,7 +247,7 @@ class Episode:
         self.log: list[dict[str, Any]] = []
 
         if self._state_path is not None:
-            loaded = _load_state(self._state_path, "v1")
+            loaded = _load_state(self._state_path, "v1", world=self._world)
             if loaded is not None:
                 self._pilot_used = loaded["pilot_used"]
                 saved_max = loaded["max_pilots"]
@@ -310,16 +326,23 @@ class Episode:
             raise
 
     def observe(self) -> dict[str, Any]:
-        self._action("observe")
-        try:
-            self._persist()
-        except BaseException:
-            self.log.pop()
-            raise
+        if self._closed:
+            raise EpisodeClosed("episode already closed")
+        rules_text = _read_rules(self._rules_path)
+        obs_count = sum(1 for e in self.log if e.get("action") == "observe")
+        appended = False
+        if obs_count < _MAX_ERROR_LOG_ENTRIES:
+            self._action("observe")
+            appended = True
+            try:
+                self._persist()
+            except BaseException:
+                self.log.pop()
+                raise
         return wire(
             {
                 "world": _sanitize_public_world(self._world),
-                "rules": _read_rules(self._rules_path),
+                "rules": rules_text,
                 "history": [asdict(d) for d in self._days.values()],
                 "manual": manual_value(),
             }
@@ -335,6 +358,8 @@ class Episode:
             raise PilotBudgetExceeded(msg)
 
         try:
+            if type(trace) is not bool:
+                raise ValueError("trace must be a boolean")
             plan = parse_plan(value, self._world)
             if type(seed) is not int or seed not in self._days:
                 raise ValueError("unknown public day")
@@ -367,8 +392,8 @@ class Episode:
         except InvalidPlan as exc:
             entry["error"] = _safe_error_log(exc)
             plan = None
-        entry["plan"] = plan
-        self._submission = plan
+        entry["plan"] = copy.deepcopy(plan)
+        self._submission = copy.deepcopy(plan)
         try:
             self._persist()
         except BaseException:
@@ -435,7 +460,7 @@ class QuarterlyEpisode:
         self._exogenous = {s: generate_quarter_exogenous(self._world, s) for s in self._seeds}
 
         if self._state_path is not None:
-            loaded = _load_state(self._state_path, "quarterly")
+            loaded = _load_state(self._state_path, "quarterly", world=self._world)
             if loaded is not None:
                 self._pilot_used = loaded["pilot_used"]
                 saved_max = loaded["max_pilots"]
@@ -552,19 +577,26 @@ class QuarterlyEpisode:
         }
 
     def observe(self) -> dict[str, Any]:
-        self._action("observe")
-        try:
-            self._persist()
-        except BaseException:
-            self.log.pop()
-            raise
+        if self._closed:
+            raise EpisodeClosed("episode already closed")
+        rules_text = _read_rules(self._rules_path)
+        obs_count = sum(1 for e in self.log if e.get("action") == "observe")
+        appended = False
+        if obs_count < _MAX_ERROR_LOG_ENTRIES:
+            self._action("observe")
+            appended = True
+            try:
+                self._persist()
+            except BaseException:
+                self.log.pop()
+                raise
         from .quarterly import manual_quarterly_value
 
         return wire(
             {
                 "schema_version": QUARTERLY_SCHEMA_VERSION,
                 "world": _sanitize_public_world(self._world),
-                "rules": _read_rules(self._rules_path),
+                "rules": rules_text,
                 "development_seeds": list(self._seeds),
                 "history": [self._summarize_seed(s) for s in self._seeds],
                 "manual": manual_quarterly_value(self._world),
@@ -582,6 +614,8 @@ class QuarterlyEpisode:
             raise PilotBudgetExceeded(msg)
 
         try:
+            if type(trace) is not bool:
+                raise ValueError("trace must be a boolean")
             plan = parse_quarterly_plan(value, self._world)
             if type(seed) is not int or seed not in self._seed_set:
                 raise ValueError("unknown public day: seed must be in development_seeds")
@@ -684,8 +718,8 @@ class QuarterlyEpisode:
         except InvalidPlan as exc:
             entry["error"] = _safe_error_log(exc)
             plan = None
-        entry["plan"] = plan
-        self._submission = plan
+        entry["plan"] = copy.deepcopy(plan)
+        self._submission = copy.deepcopy(plan)
         try:
             self._persist()
         except BaseException:

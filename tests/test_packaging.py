@@ -293,7 +293,7 @@ def test_dockerfile_c_launcher_and_task_toml_security_invariants(tmp_path):
         assert mcp_srv["name"] == "cell"
         assert mcp_srv["transport"] == "stdio"
         assert mcp_srv["command"] == "python3"
-        assert mcp_srv["args"] == ["-m", "robotization_bench.mcp_proxy", "--socket", "/run/bench/bench.sock"]
+        assert mcp_srv["args"] == ["/app/src/robotization_bench/mcp_proxy.py", "--socket", "/run/bench/bench.sock"]
 
 
 def test_blackbox_e2e_daemon_oracle_verifier_and_zero_baselines(tmp_path, short_sock_dir):

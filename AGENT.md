@@ -18,10 +18,12 @@ Interact with the environment through four MCP tools:
 - **`observe({})`**: Returns `schema_version: 2`, the public `world` catalog (`data/world_spec.json`, amounts in integer euro cents, times in `30`-second ticks, probabilities/thresholds in basis points where `10000 = 100%`), full specification text (`rules`), `development_seeds` (`[11, 29, 47]`), exogenous 12-week order summaries (`history`), the `manual` baseline 12-week plan, and `pilot_budget` (`{"used": ..., "max": 24}`).
 - **`pilot({"plan": <QuarterlyPlan>, "seed": <int>, "trace": false})`**: Simulates a full 12-week quarter on one public development seed (`11`, `29`, or `47`). Returns total CapEx `purchase`, `total_cost`, `labor_ticks`, pooled `totals`, and per-week `carryover_in`, `carryover_out`, `wear_start`, `wear_end`, `commissioning_active`, `jams`, `assists`, `raw`, and `week_economy`.
   - **Hard rollout budget**: You have **`max_pilots = 24`** valid pilot simulations across the entire episode. Exhausting the budget raises `BudgetExceeded` while leaving the episode open so you can still call `submit`. Restarting the MCP client does **not** reset `pilot_budget`.
-- **`submit({"plan": <QuarterlyPlan>})`**: Validates and records your final 12-week plan, returns `{"terminal": true, "plan": ...}`, and permanently closes the episode. Submitting an invalid plan records `null` and scores `0`.
+- **`submit({"plan": <QuarterlyPlan>})`**: Validates and records your final 12-week plan into `/logs/artifacts/submission.json` via the privileged episode daemon, returns `{"terminal": true, "plan": ...}`, and permanently closes the episode. Submitting an invalid plan records `null` and scores `0`.
 - **`stop({})`**: Aborts without a plan (`plan: null`), closes the episode, and scores `0`.
 
-If MCP tools are unavailable in a fallback harness, write the exact `QuarterlyPlan` JSON object to `/logs/artifacts/submission.json` (`<= 16384` bytes, UTF-8, regular file). An isolated verifier re-evaluates your plan from scratch on held-out evaluation seeds.
+> Do NOT waste episode wall-clock time re-implementing the discrete-event simulator from scratch -- internal PRNG streams live inside the server, container CPU is capped (`2` vCPUs), and each `pilot` call simulates all 12 weeks in `< 0.2s` (`24` pilots available). Test hypotheses directly via `pilot` and call `submit` (terminal) well before the `1500s` timeout.
+
+An isolated airgapped verifier re-evaluates `/logs/artifacts/submission.json` from scratch on held-out evaluation seeds.
 
 ---
 
@@ -60,7 +62,7 @@ Validation invariants (any violation raises `InvalidPlan` and scores `0` if subm
 
 Each week runs a representative `1080`-tick shift (`960` regular ticks + `120` overtime ticks at `30s`/tick) scaled across `shifts_per_week = 5` shifts, with state coupled from week `w` to week `w + 1`:
 
-- **Commissioning spike (`commissioning.weeks = 2`)**: During the first **2 active robot weeks** (`robot: true`), jam rates increase by **`+1400` bps** (`bare`) / **`+650` bps** (`tray`) and auto-pack defect rates increase by **`+200` bps** (`bare`) / **`+80` bps** (`tray`). A jammed robot holds its order and `Q4` slot until a worker certified for **Zone `3`** clears it (`jam_service = 8` ticks + walk). Without Zone-3 coverage, a single jam deadlocks the robot for the rest of the shift.
+- **Commissioning spike (`commissioning.weeks = 2`)**: During the first **2 active robot weeks** (`robot: true` and `route != "manual"`), jam rates increase by **`+1400` bps** (`bare`) / **`+650` bps** (`tray`) and auto-pack defect rates increase by **`+200` bps** (`bare`) / **`+80` bps** (`tray`). A jammed robot holds its order and `Q4` slot until a worker certified for **Zone `3`** clears it (`jam_service = 8` ticks + walk). Without Zone-3 coverage, a single jam deadlocks the robot for the rest of the shift.
 - **Cumulative wear & preventive maintenance (`max_wear = 12`)**:
   - If `maintenance: true`, start-of-week wear drops by **`5`** (`effective_wear = max(0, wear_start - 5)`), costing **EUR 45.00/week** (`4500` cents) and adding **`+1` tick** to automated pack cycle times that week.
   - Each unit of `effective_wear` adds **`+350` bps** to robot jam probability and **`+120` bps** to auto-pack defect probability across all SKUs.

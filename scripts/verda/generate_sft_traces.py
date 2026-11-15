@@ -175,11 +175,19 @@ def verify_4way_seed_disjointness(
                 )
 
 
-def _fast_disjoint_csprng_seeds(count: int, forbidden: set[int]) -> list[int]:
+_FIXED_FORBIDDEN_SEEDS = frozenset({101, 203, 307, 409, 503})
+
+
+def _fast_disjoint_csprng_seeds(
+    count: int,
+    forbidden: set[int],
+    *,
+    min_seed: int = 500_000,
+) -> list[int]:
     chosen: list[int] = []
-    taken = set(forbidden)
+    taken = set(forbidden) | _FIXED_FORBIDDEN_SEEDS
     while len(chosen) < count:
-        cand = secrets.randbelow(1_900_000_000) + 10_000
+        cand = secrets.randbelow(1_400_000_000) + min_seed
         if cand not in taken:
             chosen.append(cand)
             taken.add(cand)
@@ -191,6 +199,7 @@ def sample_feasible_csprng_seeds(
     *,
     count: int,
     forbidden: set[int],
+    min_seed: int = 500_000,
     max_attempts: int = 512,
     extra_worlds: Sequence[dict[str, Any]] = (),
     extra_world_pools: Sequence[Sequence[int]] = (),
@@ -203,12 +212,12 @@ def sample_feasible_csprng_seeds(
     manual_plan = manual_quarterly_value(world)
     extra_checks = [(ew, manual_quarterly_value(ew)) for ew in extra_worlds]
     chosen: list[int] = []
-    taken = set(forbidden)
+    taken = set(forbidden) | _FIXED_FORBIDDEN_SEEDS
     attempts = 0
 
     while len(chosen) < count and attempts < max_attempts:
         attempts += 1
-        cand = secrets.randbelow(1_900_000_000) + 10_000
+        cand = secrets.randbelow(1_400_000_000) + min_seed
         if cand in taken:
             continue
         ev = evaluate_quarterly(world, manual_plan, [cand])

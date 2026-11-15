@@ -5,11 +5,13 @@ from __future__ import annotations
 
 import argparse
 from collections.abc import Sequence
+from concurrent.futures import ProcessPoolExecutor
 from dataclasses import asdict
 from fractions import Fraction
 import hashlib
 import json
 import math
+import multiprocessing
 import os
 import platform
 from pathlib import Path
@@ -71,6 +73,15 @@ _RUN_REWARD_RELS = (
     "artifacts/reward.txt",
     "logs/artifacts/reward.txt",
 )
+
+_VERIFY_WORLD_REF: World | None = None
+_VERIFY_PLANS_REF: list[QuarterlyPlan] | None = None
+
+
+def _simulate_verify_pair(pair: tuple[int, int]) -> Any:
+    plan_idx, seed = pair
+    assert _VERIFY_WORLD_REF is not None and _VERIFY_PLANS_REF is not None
+    return simulate_quarter(_VERIFY_WORLD_REF, _VERIFY_PLANS_REF[plan_idx], seed)
 
 
 class BenchError(RuntimeError):
@@ -1149,7 +1160,54 @@ def _verify_evidence(evidence_dir: Path) -> int:
     nop_probe = invalid("missing submission")
     stop_probe = evaluate_quarterly(world, None, blind_seeds)
     baseline_plan = parse_quarterly_plan(manual_quarterly_value(world), world)
-    baseline_quarters = tuple(simulate_quarter(world, baseline_plan, s) for s in blind_seeds)
+
+    unique_plans: list[QuarterlyPlan] = [baseline_plan]
+    unique_plan_index: dict[QuarterlyPlan, int] = {baseline_plan: 0}
+    for item in discovered_runs:
+        sp = item["submission_path"]
+        try:
+            st_pre = os.lstat(sp)
+        except OSError:
+            continue
+        if not stat.S_ISLNK(st_pre.st_mode) and stat.S_ISREG(st_pre.st_mode) and st_pre.st_size <= 16_384:
+            try:
+                raw_b = _read_regular_bytes(sp, max_bytes=16_384, label="predecode")
+                dec = decode_quarterly_plan(raw_b.decode("utf-8"), world)
+            except Exception:
+                continue
+            if dec not in unique_plan_index:
+                unique_plan_index[dec] = len(unique_plans)
+                unique_plans.append(dec)
+
+    quarters_by_plan: dict[QuarterlyPlan, tuple[Any, ...]] = {}
+    tasks = [(p_idx, s) for p_idx in range(len(unique_plans)) for s in blind_seeds]
+    cpu_workers = min(8, os.cpu_count() or 1, len(tasks))
+    used_parallel = False
+    if cpu_workers > 1 and len(tasks) >= 8 and "fork" in multiprocessing.get_all_start_methods():
+        global _VERIFY_WORLD_REF, _VERIFY_PLANS_REF
+        _VERIFY_WORLD_REF = world
+        _VERIFY_PLANS_REF = unique_plans
+        try:
+            ctx = multiprocessing.get_context("fork")
+            with ProcessPoolExecutor(max_workers=cpu_workers, mp_context=ctx) as pool:
+                sim_results = list(
+                    pool.map(_simulate_verify_pair, tasks, chunksize=max(1, len(tasks) // (cpu_workers * 2)))
+                )
+            n_seeds = len(blind_seeds)
+            for p_idx, p_obj in enumerate(unique_plans):
+                quarters_by_plan[p_obj] = tuple(sim_results[p_idx * n_seeds : (p_idx + 1) * n_seeds])
+            used_parallel = True
+        except (OSError, PermissionError, RuntimeError):
+            used_parallel = False
+        finally:
+            _VERIFY_WORLD_REF = None
+            _VERIFY_PLANS_REF = None
+
+    if not used_parallel:
+        for p_obj in unique_plans:
+            quarters_by_plan[p_obj] = tuple(simulate_quarter(world, p_obj, s) for s in blind_seeds)
+
+    baseline_quarters = quarters_by_plan[baseline_plan]
     manual_eval = grade_quarters(world, baseline_plan, baseline_quarters, baseline_quarters)
     manual_reward = Fraction(manual_eval.reward_num, manual_eval.reward_den)
     if not (
@@ -1166,7 +1224,14 @@ def _verify_evidence(evidence_dir: Path) -> int:
         raise BenchError("baseline probe hierarchy failed on blind_seeds")
 
     eval_cache: dict[bytes, Evaluation] = {}
-    plan_eval_cache: dict[QuarterlyPlan, Evaluation] = {baseline_plan: manual_eval}
+    plan_eval_cache: dict[QuarterlyPlan, Evaluation] = {
+        p_obj: (
+            manual_eval
+            if p_obj == baseline_plan
+            else grade_quarters(world, p_obj, quarters_by_plan[p_obj], baseline_quarters)
+        )
+        for p_obj in unique_plans
+    }
     verified_artifacts: set[Path] = set()
     summary_rows: list[tuple[str, str, Evaluation, Fraction]] = []
     role_rewards: dict[str, list[Fraction]] = {}

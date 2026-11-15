@@ -57,17 +57,32 @@ def write_json(dest: Path, value: object, *, indent: int | None = 2) -> None:
     dest.write_text(text, encoding="utf-8")
 
 
-def prepare(out: Path, seeds_file: Path, *, overwrite: bool = False) -> None:
+def prepare(
+    out: Path,
+    seeds_file: Path,
+    *,
+    overwrite: bool = False,
+    min_seeds: int | None = None,
+    allow_short_seeds: bool = False,
+) -> None:
     w = json.loads((ROOT / "data/world_spec.json").read_text(encoding="utf-8"))
     seeds = json.loads(seeds_file.read_text(encoding="utf-8"))
+    canonical_out = (ROOT / "tasks" / "fulfillment-cell-bench").resolve()
+    required_min = (
+        1
+        if allow_short_seeds
+        else (min_seeds if min_seeds is not None else (3 if out.resolve() == canonical_out else 1))
+    )
     if (
         type(seeds) is not list
-        or not seeds
+        or len(seeds) < required_min
         or any(type(s) is not int for s in seeds)
         or len(set(seeds)) != len(seeds)
         or set(seeds) & set(w["development_seeds"])
     ):
-        raise ValueError("use distinct evaluation seeds, disjoint from public history")
+        raise ValueError(
+            f"use >= {required_min} distinct integer evaluation seeds, disjoint from public history"
+        )
 
     if out.exists() or out.is_symlink():
         if not overwrite:
@@ -97,7 +112,11 @@ def prepare(out: Path, seeds_file: Path, *, overwrite: bool = False) -> None:
     for mod in PUBLIC:
         rel = Path("src/robotization_bench") / f"{mod}.py"
         copy_file(ROOT / rel, public_dir / rel)
-    write_json(public_dir / "data/world_spec.json", _sanitize_public_world(w))
+    sanitized_w = _sanitize_public_world(w)
+    if sanitized_w == w:
+        copy_file(ROOT / "data/world_spec.json", public_dir / "data/world_spec.json")
+    else:
+        write_json(public_dir / "data/world_spec.json", sanitized_w)
     copy_file(ROOT / "data/plans/manual.json", public_dir / "data/plans/manual.json")
     for seed in w["development_seeds"]:
         rel_dev = Path("data/development") / f"{seed}.json"
@@ -120,6 +139,7 @@ def prepare(out: Path, seeds_file: Path, *, overwrite: bool = False) -> None:
     for mod in SOLUTION:
         rel = Path("src/robotization_bench") / f"{mod}.py"
         copy_file(ROOT / rel, sol_dir / rel)
+    copy_file(ROOT / "src/robotization_bench/reference.py", sol_dir / "reference.py")
     for data_file in ("data/world_spec.json", "data/plans/manual.json", "docs/SPEC.md"):
         copy_file(ROOT / data_file, sol_dir / data_file)
 
@@ -147,8 +167,16 @@ def main() -> None:
     ap.add_argument("--out", type=Path, required=True, help="Target Harbor task directory")
     ap.add_argument("--seeds-file", "--seeds", dest="seeds_file", type=Path, required=True)
     ap.add_argument("--overwrite", action="store_true", help="Replace existing output directory if present")
+    ap.add_argument("--min-seeds", type=int, default=None, help="Minimum distinct evaluation seeds required")
+    ap.add_argument("--allow-short-seeds", action="store_true", help="Allow <3 seeds even on canonical task dir")
     args = ap.parse_args()
-    prepare(args.out, args.seeds_file, overwrite=args.overwrite)
+    prepare(
+        args.out,
+        args.seeds_file,
+        overwrite=args.overwrite,
+        min_seeds=args.min_seeds,
+        allow_short_seeds=args.allow_short_seeds,
+    )
 
 
 if __name__ == "__main__":

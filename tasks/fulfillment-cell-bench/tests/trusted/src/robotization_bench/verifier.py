@@ -50,7 +50,19 @@ def verify_file(world, path: Path, days):
     return evaluate(world, json.loads(json.dumps(asdict(plan))), days)
 
 
+def _validate_seeds(seeds: Sequence[int]) -> None:
+    if (
+        isinstance(seeds, (str, bytes))
+        or not isinstance(seeds, Sequence)
+        or not seeds
+        or any(type(s) is not int for s in seeds)
+        or len(set(seeds)) != len(seeds)
+    ):
+        raise ValueError("seeds must be a nonempty sequence of unique integers")
+
+
 def verify_quarterly_file(world: World, path: Path, seeds: Sequence[int]) -> Evaluation:
+    _validate_seeds(seeds)
     text, err = _read_bounded_utf8(path)
     if err is not None:
         return err
@@ -63,6 +75,7 @@ def verify_quarterly_file(world: World, path: Path, seeds: Sequence[int]) -> Eva
 
 
 def verify_any_file(world: World, path: Path, seeds: Sequence[int]) -> Evaluation:
+    _validate_seeds(seeds)
     text, err = _read_bounded_utf8(path)
     if err is not None:
         return err

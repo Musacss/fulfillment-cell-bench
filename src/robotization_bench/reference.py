@@ -319,11 +319,12 @@ def _is_valid_quarterly_plan(plan: dict[str, Any], world: dict[str, Any]) -> boo
 def _normalize_crew(crew: list[list[int]], world: dict[str, Any]) -> list[list[int]]:
     w_spec = world["workers"]
     min_w, max_w = int(w_spec["min"]), int(w_spec["max"])
-    valid_zones = sorted(int(z) for z in w_spec["zones"])
-    cleaned = [sorted({int(z) for z in zlist if int(z) in valid_zones}) for zlist in crew]
+    valid_zones = {int(z) for z in w_spec["zones"]}
+    valid_sorted = sorted(valid_zones)
+    cleaned = [list(dict.fromkeys(int(z) for z in zlist if int(z) in valid_zones)) for zlist in crew]
     cleaned = [zlist for zlist in cleaned if zlist]
     while len(cleaned) < min_w:
-        cleaned.append([valid_zones[0]])
+        cleaned.append([valid_sorted[0]])
     return cleaned[:max_w]
 
 
@@ -343,9 +344,17 @@ def _build_nested_ladders(world: dict[str, Any]) -> dict[str, list[list[list[int
         [[1], [2], [2], [3], [3], [2, 3], [3, 4]],
         [[1, 2], [2], [2], [3], [3], [4], [2, 3], [3, 4]],
     ]
+    ladder_c_raw = [
+        [[1], [2], [4], [2, 3]],
+        [[1], [2], [3], [4], [2, 3]],
+        [[1], [2], [2], [3], [4], [2, 3]],
+        [[1], [2], [2], [3], [3], [4], [2, 3]],
+        [[1, 2], [2], [2], [3], [3], [4], [2, 3], [3, 4]],
+    ]
     return {
         "a": [_normalize_crew(c, world) for c in ladder_a_raw],
         "b": [_normalize_crew(c, world) for c in ladder_b_raw],
+        "c": [_normalize_crew(c, world) for c in ladder_c_raw],
     }
 
 
@@ -478,7 +487,8 @@ def _simulate_maintenance_schedule(
             elif comm_maint and in_commissioning:
                 do_maint = True
             elif not is_last:
-                if wear >= wear_trigger and (not avoid_surge or not is_surge or wear >= wear_trigger + 1):
+                surge_cap = wear_trigger + 2
+                if wear >= wear_trigger and (not avoid_surge or not is_surge or wear >= surge_cap):
                     do_maint = True
                 elif (
                     pre_surge_trigger is not None
@@ -549,23 +559,60 @@ def _generate_analytical_quarterly_candidates(
 
     comm_weeks = int(q["commissioning"]["weeks"])
 
-    # Parameterized candidate configurations:
-    # (ladder, tau1, tau2, tau3, wear_trig, avoid_surge, pre_surge, comm_maint, comm_boost, route_mode)
-    configs = [
-        ("a", 1.82, 3.08, 3.95, 1, False, 1, True, False, "bypass"),
-        ("a", 1.82, 3.08, 3.95, 2, False, 1, True, False, "bypass"),
-        ("a", 1.82, 3.08, 3.95, 2, True, 2, False, False, "bypass"),
-        ("a", 1.98, 3.18, 4.05, 1, False, 1, True, False, "bypass"),
-        ("a", 1.68, 2.95, 3.80, 1, False, 1, True, False, "bypass"),
-        ("a", 1.82, 3.08, 3.95, 3, True, 2, False, False, "bypass"),
-        ("b", 1.82, 3.05, 3.90, 1, False, 1, True, False, "bypass"),
-        ("a", 1.60, 2.75, 3.60, 1, False, 1, True, True, "bypass"),
-    ]
-    if pooled_reg_bps < auto_min_bps + 600:
-        configs.append(("a", 1.65, 2.85, 3.65, 2, False, 1, True, False, "hybrid_all"))
-
     seen: set[str] = set()
     candidates_out: list[dict[str, Any]] = []
+
+    def _add_candidate(cand_plan: dict[str, Any]) -> None:
+        if _is_valid_quarterly_plan(cand_plan, world):
+            key = _plan_key(cand_plan)
+            if key not in seen:
+                seen.add(key)
+                candidates_out.append(cand_plan)
+
+    # High-surge-only cross-skilled candidates (skipping single-week promo churn & zero retrain prefix)
+    high_surge_weeks = {
+        idx for idx, prof in enumerate(q["week_profiles"]) if int(prof.get("waves", 0)) >= 13
+    }
+    off_43 = _normalize_crew([[1], [2], [4, 3], [2, 3]], world)
+    peak_43_nested = _normalize_crew([[1], [2], [4, 3], [2, 3], [2, 3]], world)
+    off_34 = _normalize_crew([[1], [2], [3, 4], [2, 3]], world)
+    peak_34_nested = _normalize_crew([[1], [2], [3, 4], [2, 3], [2, 3]], world)
+    default_route = "all" if pooled_reg_bps < auto_min_bps + 600 else "bypass"
+    even_maint = {w for w in range(2, num_weeks, 2)}
+    even_non_surge_maint = {w for w in even_maint if w not in high_surge_weeks}
+    for off_crew, peak_crew in ((off_43, peak_43_nested), (off_34, peak_34_nested)):
+        for mset in (even_maint, even_non_surge_maint):
+            _add_candidate(
+                {
+                    "schema_version": 2,
+                    "weeks": [
+                        {
+                            "robot": True,
+                            "trays": has_trays,
+                            "route": default_route,
+                            "maintenance": w in mset,
+                            "workers": [list(z) for z in (peak_crew if w in high_surge_weeks else off_crew)],
+                        }
+                        for w in range(num_weeks)
+                    ],
+                }
+            )
+
+    # Parameterized candidate configurations:
+    # (ladder, tau1, tau2, tau3, wear_trig, avoid_surge, pre_surge, comm_maint, comm_boost, route_mode)
+    configs: list[tuple[str, float, float, float, int, bool, int | None, bool, bool, str]] = []
+    if pooled_reg_bps < auto_min_bps + 600:
+        configs.append(("a", 1.65, 2.85, 3.65, 2, False, 1, True, False, "hybrid_all"))
+    configs.extend(
+        [
+            ("a", 1.82, 3.08, 3.95, 1, False, 1, True, False, "bypass"),
+            ("c", 1.82, 3.08, 3.95, 2, True, 2, False, False, "bypass"),
+            ("a", 1.82, 3.08, 3.95, 2, True, 2, False, False, "bypass"),
+            ("a", 1.68, 2.95, 3.80, 1, False, 1, True, False, "bypass"),
+            ("b", 1.82, 3.05, 3.90, 1, False, 1, True, False, "bypass"),
+            ("a", 1.60, 2.75, 3.60, 1, False, 1, True, True, "bypass"),
+        ]
+    )
 
     for (
         ladder_key,
@@ -630,11 +677,7 @@ def _generate_analytical_quarterly_candidates(
                 for w in range(num_weeks)
             ],
         }
-        if _is_valid_quarterly_plan(plan, world):
-            key = _plan_key(plan)
-            if key not in seen:
-                seen.add(key)
-                candidates_out.append(plan)
+        _add_candidate(plan)
 
     if not candidates_out:
         candidates_out.append(copy.deepcopy(manual_plan))
@@ -753,15 +796,11 @@ def _grade_quarterly_surrogate(
 
 
 def _candidate_rank_key(grade_info: dict[str, Any]) -> tuple[int, int, int, F, int, int]:
-    # Add a tiny 15-bps out-of-sample wear-variance credit when effective wear stays 0 every week
-    adjusted_reward = grade_info["reward"] + (
-        F(15, 10_000) if (grade_info["robust"] and grade_info.get("zero_wear_maintained")) else F(0)
-    )
     return (
         1 if grade_info["robust"] else 0,
         1 if grade_info["win"] else 0,
         1 if grade_info["feasible"] else 0,
-        adjusted_reward,
+        grade_info["reward"],
         min(grade_info["min_good_margin_bps"], 450),
         -grade_info["labor_ticks"],
     )

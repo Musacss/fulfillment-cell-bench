@@ -1,10 +1,12 @@
 #define _GNU_SOURCE
 #include <errno.h>
 #include <fcntl.h>
+#include <signal.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <sys/file.h>
+#include <sys/resource.h>
 #include <sys/socket.h>
 #include <sys/stat.h>
 #include <sys/types.h>
@@ -97,6 +99,20 @@ int main(int argc, char **argv) {
         return 1;
     }
     umask(0022);
+    sigset_t empty_mask;
+    if (sigemptyset(&empty_mask) == 0) {
+        (void)sigprocmask(SIG_SETMASK, &empty_mask, NULL);
+    }
+    struct rlimit inf_lim = { RLIM_INFINITY, RLIM_INFINITY };
+    (void)setrlimit(RLIMIT_FSIZE, &inf_lim);
+    (void)setrlimit(RLIMIT_CPU, &inf_lim);
+#ifdef __linux__
+    (void)close_range(3, ~0U, 0);
+#else
+    for (int fd = 3; fd < 1024; ++fd) {
+        (void)close(fd);
+    }
+#endif
     if (clearenv() != 0) {
         perror("clearenv");
         return 1;
@@ -112,7 +128,7 @@ int main(int argc, char **argv) {
         perror("mkdir /run/bench");
         return 1;
     }
-    if (ensure_dir("/logs", 0755) != 0 || ensure_dir("/logs/artifacts", 0755) != 0) {
+    if (ensure_dir("/logs", 0755) != 0 || ensure_dir("/logs/artifacts", 0755) != 0 || ensure_dir("/logs/verifier", 0755) != 0) {
         perror("mkdir /logs/artifacts");
         return 1;
     }

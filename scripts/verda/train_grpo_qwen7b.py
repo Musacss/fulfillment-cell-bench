@@ -407,11 +407,11 @@ def _sample_csprng_seeds(world: dict[str, Any], count: int, forbidden: set[int])
 
     manual_plan = manual_quarterly_value(world)
     out: list[int] = []
-    used = set(forbidden)
+    used = set(forbidden) | {101, 203, 307, 409, 503}
     for _ in range(512):
         if len(out) >= count:
             break
-        s = secrets.randbelow(1_900_000_000) + 10_000
+        s = secrets.randbelow(1_400_000_000) + 500_000
         if s in used:
             continue
         ev = evaluate_quarterly(world, manual_plan, [s])
@@ -421,6 +421,50 @@ def _sample_csprng_seeds(world: dict[str, Any], count: int, forbidden: set[int])
     if len(out) != count:
         raise RuntimeError("Unable to sample manual-feasible RL seeds")
     return out
+
+
+def _rewrite_adapter_base_model(adapter_dir: Path, model_id: str) -> None:
+    cfg_path = adapter_dir / "adapter_config.json"
+    if not cfg_path.is_file():
+        return
+    cfg = json.loads(cfg_path.read_text(encoding="utf-8"))
+    if isinstance(cfg, dict):
+        cfg["base_model_name_or_path"] = model_id
+        cfg_path.write_text(json.dumps(cfg, indent=2) + "\n", encoding="utf-8")
+
+
+def materialize_causal_lm_base(model_id: str, chat_proc: Any, text_base_dir: Path) -> str:
+    low = model_id.lower()
+    if "qwen3.5" not in low and "qwen3_5" not in low:
+        return model_id
+
+    prestage_dir = Path("/tmp/fast-cache/rl-prestage/qwen35_9b_text_base")
+    if model_id == "Qwen/Qwen3.5-9B" and (prestage_dir / "config.json").is_file():
+        return str(prestage_dir)
+    if (text_base_dir / "config.json").is_file():
+        return str(text_base_dir)
+
+    import shutil
+    import torch
+    import transformers
+
+    text_base_dir.mkdir(parents=True, exist_ok=True)
+    cpu_model = transformers.AutoModelForCausalLM.from_pretrained(
+        model_id,
+        dtype=torch.bfloat16,
+        device_map="cpu",
+    )
+    cpu_model.save_pretrained(str(text_base_dir))
+    chat_proc.save_pretrained(str(text_base_dir))
+    del cpu_model
+    gc.collect()
+
+    hf_home = Path(os.environ.get("HF_HOME", FAST_CACHE_DEFAULTS["HF_HOME"]))
+    hub_slug = "models--" + model_id.replace("/", "--")
+    for jinja_cand in sorted((hf_home / "hub" / hub_slug).rglob("chat_template.jinja")):
+        shutil.copy2(jinja_cand, text_base_dir / "chat_template.jinja")
+        break
+    return str(text_base_dir)
 
 
 def _run_live_sft_and_grpo(
@@ -433,6 +477,7 @@ def _run_live_sft_and_grpo(
     rl_val_seeds: list[int],
     out_dir: Path,
     checkpoint_root: Path,
+    max_steps: int = 50,
 ) -> None:
     import datasets
     import peft
@@ -455,8 +500,13 @@ def _run_live_sft_and_grpo(
             bnb_4bit_quant_type="nf4",
         )
 
-    base_model = transformers.AutoModelForCausalLM.from_pretrained(
+    load_model_path = materialize_causal_lm_base(
         model_id,
+        chat_proc,
+        Path(os.environ.get("TMPDIR", FAST_CACHE_DEFAULTS["TMPDIR"])) / "qwen_causal_lm_base",
+    )
+    base_model = transformers.AutoModelForCausalLM.from_pretrained(
+        load_model_path,
         dtype=torch.bfloat16,
         quantization_config=quant_cfg,
         device_map="auto",
@@ -478,6 +528,7 @@ def _run_live_sft_and_grpo(
     sft_train_ds = datasets.Dataset.from_list(sft_rows)
     sft_eval_ds = datasets.Dataset.from_list(sft_rows[: max(1, min(4, len(sft_rows)))])
 
+    short_smoke = max_steps <= 5
     sft_ckpt_dir = checkpoint_root / "sft"
     sft_cfg = _build_filtered_config(
         trl.SFTConfig,
@@ -485,12 +536,13 @@ def _run_live_sft_and_grpo(
         max_length=4096,
         gradient_checkpointing=True,
         per_device_train_batch_size=1,
-        gradient_accumulation_steps=4,
+        gradient_accumulation_steps=1 if short_smoke else 4,
         learning_rate=2e-5,
         num_train_epochs=1,
+        max_steps=max_steps if short_smoke else -1,
         bf16=True,
-        logging_steps=5,
-        eval_strategy="steps",
+        logging_steps=1 if short_smoke else 5,
+        eval_strategy="no" if short_smoke else "steps",
         eval_steps=25,
         save_steps=25,
         save_total_limit=2,
@@ -507,6 +559,7 @@ def _run_live_sft_and_grpo(
     sft_trainer.train()
     sft_adapter_dir = out_dir / "sft_adapter"
     sft_trainer.save_model(str(sft_adapter_dir))
+    _rewrite_adapter_base_model(sft_adapter_dir, model_id)
     sft_model = sft_trainer.model
     del sft_trainer
     gc.collect()
@@ -531,20 +584,20 @@ def _run_live_sft_and_grpo(
     grpo_cfg = _build_filtered_config(
         trl.GRPOConfig,
         output_dir=str(grpo_ckpt_dir),
-        max_completion_length=1536,
+        max_completion_length=512 if short_smoke else 1536,
         gradient_checkpointing=True,
         vllm_max_model_length=4096,
-        num_generations=8,
-        per_device_train_batch_size=1,
-        gradient_accumulation_steps=4,
+        num_generations=2 if short_smoke else 8,
+        per_device_train_batch_size=1 if not short_smoke else 2,
+        gradient_accumulation_steps=1 if short_smoke else 4,
         learning_rate=5e-6,
-        max_steps=50,
+        max_steps=max_steps,
         bf16=True,
         use_vllm=True,
         vllm_mode=str(topology["grpo_vllm_mode"]),
         vllm_gpu_memory_utilization=float(topology["grpo_vllm_gpu_memory_utilization"]),
-        logging_steps=5,
-        eval_strategy="steps",
+        logging_steps=1 if short_smoke else 5,
+        eval_strategy="no" if short_smoke else "steps",
         eval_steps=25,
         save_steps=25,
         save_total_limit=2,
@@ -560,6 +613,7 @@ def _run_live_sft_and_grpo(
     grpo_trainer.train()
     final_adapter_dir = out_dir / "grpo_adapter"
     grpo_trainer.save_model(str(final_adapter_dir))
+    _rewrite_adapter_base_model(final_adapter_dir, model_id)
 
     val_reward_fn = build_quarterly_reward_func(world, rl_val_seeds)
     sample_scores = val_reward_fn([ json.dumps(traces[0]["plan"]) ])
@@ -582,9 +636,12 @@ def main(argv: Sequence[str] | None = None) -> int:
     ap.add_argument("--model-id", type=str, default=None)
     ap.add_argument("--env-ready-file", type=Path, default=None)
     ap.add_argument("--mock-gpu-spec", type=str, default=None)
+    ap.add_argument("--max-steps", type=int, default=50)
     ap.add_argument("--smoke-local", action="store_true")
     ap.add_argument("--dry-run", action="store_true")
     args = ap.parse_args(argv)
+    if args.max_steps <= 0:
+        raise ValueError("--max-steps must be positive")
 
     fast_cache = configure_fast_cache_env(create_dirs=not args.dry_run)
     model_id = resolve_model_id(args.model_id, args.env_ready_file)
@@ -606,13 +663,13 @@ def main(argv: Sequence[str] | None = None) -> int:
         rl_train_seeds = list(seed_doc["rl_train_seeds"])
         rl_val_seeds = list(seed_doc["rl_val_seeds"])
     elif args.dry_run:
-        forb = set(dev_seeds) | set(replay_seeds) | set(blind_seeds or [])
-        rl_train_seeds = [secrets.randbelow(1_900_000_000) + 10_000]
+        forb = set(dev_seeds) | set(replay_seeds) | set(blind_seeds or []) | {101, 203, 307, 409, 503}
+        rl_train_seeds = [secrets.randbelow(1_400_000_000) + 500_000]
         while rl_train_seeds[0] in forb:
-            rl_train_seeds = [secrets.randbelow(1_900_000_000) + 10_000]
-        rl_val_seeds = [secrets.randbelow(1_900_000_000) + 10_000]
+            rl_train_seeds = [secrets.randbelow(1_400_000_000) + 500_000]
+        rl_val_seeds = [secrets.randbelow(1_400_000_000) + 500_000]
         while rl_val_seeds[0] in (forb | set(rl_train_seeds)):
-            rl_val_seeds = [secrets.randbelow(1_900_000_000) + 10_000]
+            rl_val_seeds = [secrets.randbelow(1_400_000_000) + 500_000]
     else:
         forb = set(dev_seeds) | set(replay_seeds) | set(blind_seeds or [])
         rl_train_seeds = _sample_csprng_seeds(world, 2, forb)
@@ -630,6 +687,7 @@ def main(argv: Sequence[str] | None = None) -> int:
                     "gpu_topology": topology,
                     "fast_cache_env": fast_cache,
                     "checkpoint_dir": str(args.checkpoint_dir),
+                    "max_steps": args.max_steps,
                     "save_total_limit": 2,
                     "save_steps": 25,
                     "disjoint_4way": True,
@@ -677,6 +735,7 @@ def main(argv: Sequence[str] | None = None) -> int:
         rl_val_seeds=rl_val_seeds,
         out_dir=args.out_dir,
         checkpoint_root=args.checkpoint_dir,
+        max_steps=args.max_steps,
     )
     return 0
 

@@ -11,28 +11,21 @@ This document is the authoritative public rulebook for **Fulfillment-Cell-Bench*
 
 ## 1. Deterministic PRNG & Exogenous Demand Generation
 
-All randomness uses stateless SHA-256 hashing (`contracts.draw`):
-
-```text
-key  = json.dumps([seed, order_id, stage, attempt, event_type], separators=(",", ":"), ensure_ascii=True)
-draw = int.from_bytes(sha256(key.encode("ascii")).digest()[:8], "big") % modulus
-```
-
-A Bernoulli event with rate `threshold_bps` triggers iff `draw(..., 10000) < threshold_bps`. Draws depend only on `(seed, order_id, stage, attempt, event_type)`—never on worker identity, routing mode, or neighboring orders.
+Shift-level randomness uses an internal server-side PRNG seeded per week; exact micro-streams are only observable via `pilot()`. Every stochastic outcome is deterministic for a fixed `(seed, order_id, stage, attempt, event_type)` tuple -- never depending on worker identity, routing mode, or neighboring orders.
 
 ### 1.1 Shift Exogenous Generator (`scenarios.generate`)
 Given `generator` parameters (`waves`, `spacing`, `orders_min`, `orders_span`, `jitter_span`, `regular_bps`, `fragile_bps`, `due_offset`, `due_span`) and integer `seed`:
-- For each wave `w` in `0 .. waves - 1`, order count is `orders_min + draw(seed, w, 0, 0, "wave", orders_span)`.
+- For each wave `w` in `0 .. waves - 1`, order count is sampled deterministically in `[orders_min, orders_min + orders_span)`.
 - Orders receive sequential `order_id = 0, 1, ...` prior to sorting:
-  - `arrival = w * spacing + draw(seed, order_id, 0, 0, "arrival", jitter_span)` (`0 <= arrival < shift_ticks`)
-  - `due = arrival + due_offset + draw(seed, order_id, 0, 0, "due", due_span)`
-  - `kind_draw = draw(seed, order_id, 0, 0, "kind", 10000)`: `"regular"` if `< regular_bps`, `"fragile"` if `< regular_bps + fragile_bps`, else `"oversize"`.
+  - `arrival` is sampled deterministically in `[w * spacing, w * spacing + jitter_span)` (`0 <= arrival < shift_ticks`).
+  - `due` is sampled deterministically in `[arrival + due_offset, arrival + due_offset + due_span)`.
+  - `kind` is `"regular"` at rate `regular_bps / 10000`, `"fragile"` at rate `fragile_bps / 10000`, else `"oversize"`.
 - Final `Scenario.orders` is sorted by `(arrival, id)`.
 
 ### 1.2 Quarterly Demand Profiles (`quarterly.generate_quarter_exogenous`)
 For quarter `seed` and week `w` in `0..11`:
-- `week_seed = draw(seed, w, 0, 0, "quarter_week", 2_147_483_647)`.
-- `world["quarterly"]["week_profiles"][w]` overrides `waves`, `orders_min`, `regular_bps`, `fragile_bps`, and `due_offset` for week `w` (spanning baseline weeks `0..1`, `autumn_ramp` `2`, `fragile_promo` `3`, mid-quarter/prep `4..6`, peak holiday waves `7..9` where non-regular share reaches `38%–42%`, and post-peak/close `10..11`).
+- `week_seed` is derived deterministically per `(seed, w)` from the internal server-side PRNG.
+- `world["quarterly"]["week_profiles"][w]` overrides `waves`, `orders_min`, `regular_bps`, `fragile_bps`, and `due_offset` for week `w` (spanning baseline weeks `0..1`, `autumn_ramp` `2`, `fragile_promo` `3`, mid-quarter/prep `4..6`, peak holiday waves `7..9` where non-regular share reaches `38%--42%`, and post-peak/close `10..11`).
 
 ---
 
@@ -50,7 +43,7 @@ At each integer tick `t`:
    - If `job.mode == "assist"`, the jammed robot transitions from `"assisted"` to `"released"` with `robot.end = t` (no human `finish` event is emitted for an assist).
    - Otherwise, `complete(job, w.name)` emits `finish` and advances or terminates the order.
 2. **Process robot (`robot.end == t` and `robot.mode in {"work", "released"}`)**:
-   - If `robot.mode == "work"` and `draw(seed, id, 3, 0, "jam", 10000) < jam_bps[rig][kind]`, `robot.mode` becomes `"waiting"` and `jam` is emitted (holding the order and its `Q4` reservation).
+   - If `robot.mode == "work"` and the per-order jam outcome triggers at rate `jam_bps[rig][kind] / 10000`, `robot.mode` becomes `"waiting"` and `jam` is emitted (holding the order and its `Q4` reservation).
    - Otherwise, `complete(robot, "robot")` emits `finish`, records `pack_finished += 1` and `auto_finished += 1`, rolls `defect_auto`, and enqueues into `Q4`.
 3. **Inject exogenous arrivals (`order.arrival == t`)** in ascending `id` order, emitting `arrival` followed by `enqueue(stage=1)`.
 4. **Horizon / early-exit gate**: If `t == H` or `good + escaped + scrap == len(orders)`, the loop terminates immediately. No new `start`, `assist`, or `break` events can begin at `t == H`.
@@ -65,7 +58,7 @@ At each integer tick `t`:
 - **Trays**: When `trays = true`, every `attempt == 0` pack start (robot or manual) consumes `1` tray (`trays_used += 1`); `attempt == 1` rework consumes `0` trays and is always packed manually.
 - **Defects & QC**: Upon finishing stage `3`, `item.defect` is drawn against `defect_auto[rig][kind]` (robot) or `defect_manual[kind]` (human). Upon finishing stage `4`:
   - If `not item.defect`: emits `good` (`on_time += (t <= order.due)`).
-  - Else if `draw(seed, id, 4, attempt, "detect", 10000) >= detect` (`9500` bps): undetected defect ships as `escaped`.
+  - Else if QC inspection misses the defect (rate `(10000 - detect) / 10000`, where `detect = 9500` bps): undetected defect ships as `escaped`.
   - Else if `attempt == 0`: detected defect enters rework queue `R` (`stage=3, attempt=1`).
   - Else (`attempt == 1`): second detected defect terminates as `scrap`.
 - **Conservation**: At horizon `H`, `total == good + escaped + scrap + unfinished` holds identically.
@@ -76,7 +69,7 @@ At each integer tick `t`:
 
 Across weeks `w = 0..11` of a `QuarterlyPlan`:
 1. **Irreversible ownership**: `owned_robot` and `owned_trays` latch to `True` permanently once purchased; `maintenance` and non-manual `route` require `robot = True`.
-2. **Commissioning (`commissioning.weeks = 2`)**: `commissioning_active` is `True` during the first 2 weeks in which `wp.robot` is `True`, adding `+1400`/`+650` bps (`bare`/`tray`) to `jam` and `+200`/`+80` bps (`bare`/`tray`) to `defect_auto`.
+2. **Commissioning (`commissioning.weeks = 2`)**: `commissioning_active` is `True` during the first 2 weeks in which `wp.robot` is `True` and `wp.route != "manual"`, adding `+1400`/`+650` bps (`bare`/`tray`) to `jam` and `+200`/`+80` bps (`bare`/`tray`) to `defect_auto`.
 3. **Wear & preventive maintenance (`max_wear = 12`)**:
    - `effective_wear = min(12, max(0, wear_start - (5 if wp.maintenance else 0)))`.
    - Week `w` probabilities add `effective_wear * 350` bps to `jam` and `effective_wear * 120` bps to `defect_auto` (clamped to `[0, 10000]`).

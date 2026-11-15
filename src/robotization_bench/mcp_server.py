@@ -17,8 +17,11 @@ from mcp.types import Tool
 from .contracts import EpisodeClosed, InvalidPlan, PilotBudgetExceeded, load_world
 from .episode import Episode, QuarterlyEpisode
 from .scenarios import generate
+from .validation import _reject_constant, _unique_keys
 
-_SOCKET_STREAM_LIMIT = 16 * 1024 * 1024
+_SOCKET_STREAM_LIMIT = 256 * 1024
+_SOCKET_IDLE_TIMEOUT_SEC = 30.0
+_SOCKET_MAX_CONCURRENCY = 16
 _SYSTEM_SYMLINK_DIRS = frozenset({Path("/tmp"), Path("/var")})
 
 
@@ -35,22 +38,22 @@ def _tool(name: str, description: str, properties: dict[str, Any], required: tup
     )
 
 
-_PLAN = {"description": "The full v1 plan object. See the manual plan in observe for its shape."}
+_PLAN = {"description": "The full plan object matching observe().manual (schema_version 2 quarterly or 1 shift)."}
 _TOOLS = [
-    _tool("observe", "Read the catalog, rules, manual plan, and public development days.", {}),
+    _tool("observe", "Read the catalog, rules, manual plan, and public development seeds.", {}),
     _tool(
         "pilot",
-        "Run one development shift. A failed pilot leaves the episode open.",
+        "Run one development simulation on a public seed. A failed pilot leaves the episode open.",
         {
             "plan": _PLAN,
-            "seed": {"type": "integer", "description": "A public day from observe."},
+            "seed": {"type": "integer", "description": "A public development seed from observe."},
             "trace": {"type": "boolean", "default": False, "description": "Include detailed shift events."},
         },
         ("plan", "seed"),
     ),
     _tool(
         "submit",
-        "Close the episode by submitting one plan. A missing or invalid plan scores zero.",
+        "Close the episode permanently by submitting one final plan. A missing or invalid plan scores zero.",
         {"plan": _PLAN},
     ),
     _tool("stop", "Close the episode without submitting a plan.", {}),
@@ -190,58 +193,66 @@ async def serve(
 
     if socket_path is not None:
         _prepare_socket_path(socket_path)
+        conn_sem = asyncio.Semaphore(_SOCKET_MAX_CONCURRENCY)
 
         async def handle_client(reader: asyncio.StreamReader, writer: asyncio.StreamWriter) -> None:
-            try:
-                while True:
-                    try:
-                        raw_line = await reader.readline()
-                    except (asyncio.LimitOverrunError, ValueError) as exc:
-                        err_frame = {"ok": False, "error_type": type(exc).__name__, "error": str(exc)}
-                        writer.write((json.dumps(err_frame, ensure_ascii=True, allow_nan=False) + "\n").encode("utf-8"))
-                        await writer.drain()
-                        break
-                    if not raw_line:
-                        break
-                    if not raw_line.strip():
-                        continue
-                    try:
-                        req = json.loads(raw_line.decode("utf-8"))
-                        if type(req) is not dict:
-                            raise TypeError("request must be a JSON object")
-                        action = req.get("action")
-                        if type(action) is not str:
-                            raise ValueError("request 'action' must be a string")
-                        raw_args = req.get("args", {})
-                        if raw_args is None:
-                            raw_args = {}
-                        if type(raw_args) is not dict:
-                            raise TypeError("request 'args' must be a JSON object")
-                        async with lock:
-                            data = _execute_action(episode, action, raw_args, submission, log)
-                        resp: dict[str, Any] = {"ok": True, "result": data}
-                    except (
-                        EpisodeClosed,
-                        PilotBudgetExceeded,
-                        InvalidPlan,
-                        ValueError,
-                        KeyError,
-                        TypeError,
-                        UnicodeDecodeError,
-                        RecursionError,
-                    ) as exc:
-                        resp = {"ok": False, "error_type": type(exc).__name__, "error": str(exc)}
-                    payload = (json.dumps(resp, ensure_ascii=True, allow_nan=False) + "\n").encode("utf-8")
-                    writer.write(payload)
-                    await writer.drain()
-            except (ConnectionResetError, BrokenPipeError, EOFError):
-                pass
-            finally:
+            async with conn_sem:
                 try:
-                    writer.close()
-                    await writer.wait_closed()
-                except Exception:
+                    while True:
+                        try:
+                            raw_line = await asyncio.wait_for(reader.readline(), timeout=_SOCKET_IDLE_TIMEOUT_SEC)
+                        except asyncio.TimeoutError:
+                            break
+                        except (asyncio.LimitOverrunError, ValueError) as exc:
+                            err_frame = {"ok": False, "error_type": type(exc).__name__, "error": str(exc)}
+                            writer.write((json.dumps(err_frame, ensure_ascii=True, allow_nan=False) + "\n").encode("utf-8"))
+                            await writer.drain()
+                            break
+                        if not raw_line:
+                            break
+                        if not raw_line.strip():
+                            continue
+                        try:
+                            req = json.loads(
+                                raw_line.decode("utf-8"),
+                                object_pairs_hook=_unique_keys,
+                                parse_constant=_reject_constant,
+                            )
+                            if type(req) is not dict:
+                                raise TypeError("request must be a JSON object")
+                            action = req.get("action")
+                            if type(action) is not str:
+                                raise ValueError("request 'action' must be a string")
+                            raw_args = req.get("args", {})
+                            if raw_args is None:
+                                raw_args = {}
+                            if type(raw_args) is not dict:
+                                raise TypeError("request 'args' must be a JSON object")
+                            async with lock:
+                                data = _execute_action(episode, action, raw_args, submission, log)
+                            resp: dict[str, Any] = {"ok": True, "result": data}
+                        except (
+                            EpisodeClosed,
+                            PilotBudgetExceeded,
+                            InvalidPlan,
+                            ValueError,
+                            KeyError,
+                            TypeError,
+                            UnicodeDecodeError,
+                            RecursionError,
+                        ) as exc:
+                            resp = {"ok": False, "error_type": type(exc).__name__, "error": str(exc)}
+                        payload = (json.dumps(resp, ensure_ascii=True, allow_nan=False) + "\n").encode("utf-8")
+                        writer.write(payload)
+                        await writer.drain()
+                except (ConnectionResetError, BrokenPipeError, EOFError):
                     pass
+                finally:
+                    try:
+                        writer.close()
+                        await writer.wait_closed()
+                    except Exception:
+                        pass
 
         stop_event = asyncio.Event()
         loop = asyncio.get_running_loop()

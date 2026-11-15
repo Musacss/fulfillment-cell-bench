@@ -5,6 +5,7 @@ import hashlib
 import json
 import os
 from pathlib import Path
+import shutil
 import sys
 
 HERE = Path(__file__).resolve().parent
@@ -15,8 +16,27 @@ from robotization_bench.scenarios import generate  # noqa: E402
 from robotization_bench.verifier import verify_file, verify_quarterly_file  # noqa: E402
 
 
+def _prepare_clean_verdict_dir(out: Path) -> None:
+    if out.is_symlink() or out.is_file():
+        out.unlink()
+    elif out.exists():
+        shutil.rmtree(out)
+    out.mkdir(parents=True, mode=0o755, exist_ok=True)
+    # Fail-closed baseline before parsing or evaluating any untrusted input.
+    (out / "reward.txt").write_text("0.0\n", encoding="utf-8")
+
+
 def grade(submission: Path, out: Path, *, mode: str | None = None) -> None:
-    raw_mode = os.environ.get("BENCH_MODE", "quarterly") if mode is None else mode
+    _prepare_clean_verdict_dir(out)
+
+    provenance = json.loads((HERE / "provenance.json").read_text(encoding="utf-8"))
+    if mode is not None:
+        raw_mode = mode
+    elif "BENCH_MODE" in os.environ:
+        raw_mode = os.environ["BENCH_MODE"]
+    else:
+        raw_mode = "v1" if provenance.get("schema_version") == 1 else "quarterly"
+
     resolved_mode = raw_mode.strip().lower()
     if resolved_mode not in ("quarterly", "v1"):
         raise ValueError(f"Unsupported BENCH_MODE: {raw_mode!r}")
@@ -33,12 +53,11 @@ def grade(submission: Path, out: Path, *, mode: str | None = None) -> None:
         result = verify_quarterly_file(w, submission, seeds)
         world_id = w.get("quarterly", {}).get("world_id", w["world_id"])
 
-    out.mkdir(parents=True, exist_ok=True)
     payload = {
         "evaluation": asdict(result),
         "seeds_sha256": hashlib.sha256(seed_bytes).hexdigest(),
         "world": world_id,
-        "source": json.loads((HERE / "provenance.json").read_text(encoding="utf-8")),
+        "source": provenance,
     }
     (out / "evaluation.json").write_text(
         json.dumps(payload, indent=2, ensure_ascii=True, allow_nan=False) + "\n",
