@@ -2011,6 +2011,10 @@ def validate_quarter_pack(
             raise ValueError(f"diagnostics.json is not valid UTF-8: {exc}") from exc
         if type(diag_json_obj) is not dict:
             raise ValueError("diagnostics.json must be a JSON object")
+        if diag_json_obj.get("diagnostics_format") != "robotization-bench.quarter-diagnostics.v1":
+            raise ValueError(
+                f"Unsupported diagnostics_format in diagnostics.json: {diag_json_obj.get('diagnostics_format')!r}"
+            )
 
     if not qm_path.is_file() or not stat.S_ISREG(os.lstat(qm_path).st_mode):
         raise ValueError(f"Missing regular quarter_manifest.json in {pack_dir}")

@@ -15,7 +15,7 @@ To prevent data contamination, prompt memorization, and test-set overfitting, **
 3. **Domain-Randomized RL Train & Validation Pools (Verda Cloud CSPRNG)**:
    - Fresh CSPRNG seeds paired with randomized `world_spec` cost, demand-wave, commissioning, and wear regimes used to train `Qwen/Qwen3.5-9B` via LoRA SFT + multi-turn GRPO (`scripts/verda/generate_sft_traces.py`, `scripts/verda/train_grpo_qwen7b.py`), forcing genuine `observe -> pilot -> diagnose -> submit` adaptation rather than static JSON memorization.
 4. **Post-Freeze Blind Evaluation Seeds (`evidence/benchmark-v2/blind_seeds.json` + `.sha256`)**:
-   - Generated once via CSPRNG *after* simulator code, `reference.py`, Harbor Dockerfiles, and RL LoRA checkpoints are frozen. Evaluated across `nop`, `stop_early`, `manual`, `oracle`/`reference`, `3x` `gemini/gemini-4-carbon` (OpenCode), `gemini/gemini-3.1-pro-preview` (OpenCode), `3x` Base `Qwen/Qwen3.5-9B`, and `3x` Post-RL `Qwen/Qwen3.5-9B`.
+   - Generated once via CSPRNG *after* simulator code, `reference.py`, Harbor Dockerfiles, and RL LoRA checkpoints are frozen. Evaluated across `nop`, `stop_early`, `manual`, `oracle`/`reference`, `3x` `anthropic/claude-fable-5-2` (Claude Fable 5.2, OpenCode), `3x` `anthropic/claude-opus-5-5` (Claude Opus 5.5, OpenCode), `3x` `gemini/gemini-3.1-pro-preview` (Gemini 3.1 Pro, OpenCode), `3x` `gemini/gemini-4-carbon` (Gemini 4 Carbon, OpenCode), `3x` Base `Qwen/Qwen3.5-9B`, and `3x` Post-RL `Qwen/Qwen3.5-9B`.
 
 ---
 
