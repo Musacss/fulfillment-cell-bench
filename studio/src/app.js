@@ -134,17 +134,19 @@ function renderDiagnostics(entry){
   const diag=entry.diagnostics,wdiag=entry.weekDiagnostics,box=$('diagnostics-summary'),body=$('diagnostics-details');
   if(!diag){box.hidden=true;return;}
   box.hidden=false;
-  const ov=diag.overall||{};
+  const ov=diag.overall||diag.quarter_summary||entry.evaluation||{};
   $('diagnostics-badge').textContent=ov.win?'WIN':ov.feasible?'NO WIN':'FAIL';
-  const headline=ov.headline_summary||entry.run.diagnostics_headline||'';
+  const headline=ov.headline_summary||ov.headline||entry.run.diagnostics_headline||'';
   const mistakes=(diag.key_mistakes||[]).slice(0,3);
-  const weekNotes=wdiag?.active_mistakes||[];
+  const weekNotes=wdiag?.active_mistakes?.length?wdiag.active_mistakes:(wdiag?.issues||[]).map(i=>i?.message).filter(Boolean);
   const highlights=(wdiag?.highlight_ticks||[]).slice(0,4);
+  const rewardFraction=ov.reward_fraction||(Number.isInteger(entry.evaluation?.reward_num)&&Number.isInteger(entry.evaluation?.reward_den)&&entry.evaluation.reward_den>0?`${entry.evaluation.reward_num}/${entry.evaluation.reward_den}`:'');
+  const rewardFloat=ov.reward_float??(Number.isInteger(entry.evaluation?.reward_num)&&Number.isInteger(entry.evaluation?.reward_den)&&entry.evaluation.reward_den>0?entry.evaluation.reward_num/entry.evaluation.reward_den:0);
   let out='';
-  if(ov.reward_fraction)out+=`<div class="diag-score">Reward: <strong>${html(ov.reward_fraction)}</strong> (${Number(ov.reward_float||0).toFixed(4)})</div>`;
+  if(rewardFraction)out+=`<div class="diag-score">Reward: <strong>${html(rewardFraction)}</strong> (${Number(rewardFloat||0).toFixed(4)})</div>`;
   if(headline)out+=`<p class="diag-headline">${html(headline)}</p>`;
   if(weekNotes.length)out+=`<div class="diag-group"><strong>Week ${entry.week+1} Callouts</strong>${weekNotes.map(m=>`<div class="diag-callout warn">${html(m)}</div>`).join('')}</div>`;
-  else if(mistakes.length)out+=`<div class="diag-group"><strong>Quarter Root Causes</strong>${mistakes.map(m=>`<div class="diag-callout ${html(m.severity||'warn')}">${html(m.hud_callout||m.category||'')}</div>`).join('')}</div>`;
+  if(mistakes.length)out+=`<div class="diag-group"><strong>Quarter Root Causes</strong>${mistakes.map(m=>`<div class="diag-callout ${html(m.severity||'warn')}">${html(m.hud_callout||m.category||'')}</div>`).join('')}</div>`;
   if(highlights.length){
     out+=`<div class="diag-group"><strong>Jump to Highlight Tick</strong><div class="diag-jumps">${highlights.map(h=>{const t=h.focus_tick??h.start_tick??0;return `<button type="button" class="diag-jump" data-seek-tick="${Number(t)}" data-reason="${html(h.reason||h.kind)}">${html(h.kind)} @ t=${Number(t)}</button>`;}).join('')}</div></div>`;
   }

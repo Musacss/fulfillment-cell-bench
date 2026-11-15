@@ -231,17 +231,145 @@ assert.throws(()=>validateQuarter({...quarter,replay_pack_format:'unknown'},'qua
 assert.throws(()=>parseDocument('{\n "a": }','broken.json'),/строка|line/i);
 await assert.rejects(()=>openLocal([browserFile('manifest.json',JSON.stringify(one.manifest))]).then(source=>source.loadRun('local-shift')),/events\.jsonl/);
 
-const originalFetch=globalThis.fetch;const fetchOptions=[];
+const originalFetch=globalThis.fetch;const fetchOptions=[];const fetchedUrls=[];
 try{
  const responses=new Map(fileRecords.map(([name,text])=>['http://bridge.test/'+name.replace(/^pack\//,''),text]));
- globalThis.fetch=async(url,options)=>{fetchOptions.push(options);const text=responses.get(String(url));return {ok:text!==undefined,status:text===undefined?404:200,text:async()=>text};};
+ globalThis.fetch=async(url,options)=>{fetchedUrls.push(String(url));fetchOptions.push(options);const text=responses.get(String(url));return {ok:text!==undefined,status:text===undefined?404:200,text:async()=>text};};
  const remote=await openRemote('http://bridge.test/index.json');
  const remoteRun=await remote.loadRun('v1-manual-seed11');
  assert.equal(remoteRun.replay.seekTo(remoteRun.replay.durationSeconds).counters.good,166);
  assert.ok(fetchOptions.length>=3);
  assert.ok(fetchOptions.every(options=>!options.headers&&Object.keys(options).every(k=>k==='signal')),'Bridge requests must not send unsupported custom CORS headers');
 }finally{globalThis.fetch=originalFetch;}
-const dataLoading={offline_pair:true,offline_catalog:true,same_seed_comparison:true,quarterly_v2_weeks:12,quarterly_fixture_is_synthetic:true,plain_fetch_cors:true};
+
+// Regression coverage for v2 quarterly diagnostics loading:
+// 1) Standalone quarter_manifest.json (diagnostics_version: 1 + diagnostics_file: "diagnostics.md", no diagnostics.json)
+//    must synthesize overall.win / feasible / timeline_weeks cleanly and never parse diagnostics.md as JSON.
+// 2) External diagnostics.json (robotization-bench.quarter-diagnostics.v1) must take precedence over embedded
+//    quarter.diagnostics in both openLocal and openRemote.
+const badgeOf=diag=>diag?.overall?.win?'WIN':diag?.overall?.feasible?'NO WIN':'FAIL';
+const embeddedSummaryQuarter={
+ ...quarter,
+ evaluation:{valid:true,feasible:true,win:true,reward_num:7,reward_den:20,reasons:[]},
+ diagnostics_file:'diagnostics.md',
+ diagnostics:{
+  diagnostics_version:1,
+  seed:99,
+  quarter_summary:{feasible:true,win:true,reasons:[],headline:'Standalone quarter summary [WIN]'},
+  weeks:Array.from({length:12},(_,w)=>({week:w,label:`w${w}`,status:w===8?'critical':'ok',issues:w===8?[{category:'sla',severity:'critical',message:'Week 8 SLA pressure'}]:[]})),
+ },
+};
+const standaloneQuarterFiles=[
+ browserFile('quarter/quarter_manifest.json',JSON.stringify(embeddedSummaryQuarter)),
+ browserFile('quarter/diagnostics.md','# Non-JSON Markdown diagnostics\n'),
+ ...quarter.weeks.flatMap(w=>[
+  browserFile(`quarter/${w.bundle_dir}/manifest.json`,JSON.stringify(one.manifest)),
+  browserFile(`quarter/${w.bundle_dir}/events.jsonl`,one.text),
+ ]),
+];
+const standaloneLocal=await openLocal(standaloneQuarterFiles);
+const standaloneWeek8=await standaloneLocal.loadRun('local-quarter',{week:8});
+assert.equal(standaloneWeek8.diagnostics?.overall?.win,true,'Standalone quarter_manifest fallback must preserve win=true');
+assert.equal(standaloneWeek8.diagnostics?.overall?.feasible,true,'Standalone quarter_manifest fallback must preserve feasible=true');
+assert.equal(badgeOf(standaloneWeek8.diagnostics),'WIN');
+assert.equal(standaloneWeek8.diagnostics?.overall?.reward_fraction,'7/20');
+assert.equal(standaloneWeek8.weekDiagnostics?.status,'critical');
+assert.deepEqual(standaloneWeek8.weekDiagnostics?.active_mistakes,['Week 8 SLA pressure']);
+
+const overlayDiagnostics={
+ diagnostics_format:'robotization-bench.quarter-diagnostics.v1',
+ schema_version:2,
+ seed:99,
+ overall:{valid:true,feasible:false,win:false,reward_float:0.017836,reward_fraction:'1062/59543',headline_summary:'Overlay infeasible summary'},
+ key_mistakes:[{severity:'critical',category:'all_route_wear_blowout',hud_callout:'Wear hit 12/12'}],
+ timeline_weeks:Array.from({length:12},(_,w)=>({
+  week:w,
+  status:w===8?'critical':'ok',
+  active_mistakes:w===8?['Overlay week 8 callout']:[],
+  highlight_ticks:w===8?[{kind:'jam',start_tick:442,end_tick:488,focus_tick:442,reason:'Jam @ 442'}]:[],
+ })),
+};
+const overlayLocal=await openLocal([...standaloneQuarterFiles,browserFile('quarter/diagnostics.json',JSON.stringify(overlayDiagnostics))]);
+const overlayWeek8=await overlayLocal.loadRun('local-quarter',{week:8});
+assert.equal(overlayWeek8.diagnostics?.diagnostics_format,'robotization-bench.quarter-diagnostics.v1','External diagnostics.json must not be shadowed by quarter.diagnostics');
+assert.equal(badgeOf(overlayWeek8.diagnostics),'FAIL');
+assert.equal(overlayWeek8.diagnostics?.key_mistakes?.length,1);
+assert.equal(overlayWeek8.weekDiagnostics?.highlight_ticks?.length,1);
+
+const quarterlyTargets=['quarterly-reference-seed11','quarterly-qwen_grpo-seed11','quarterly-manual-seed11','quarterly-qwen_base-seed11','quarterly-naive_ai-seed11'];
+const hasQuarterlyPack=quarterlyTargets.every(id=>index.runs.some(r=>r.id===id));
+if(hasQuarterlyPack){
+ const mdRequests=[];
+ try{
+  globalThis.fetch=async(url,options)=>{
+   const rel=decodeURIComponent(new URL(String(url)).pathname).replace(/^\//,'');
+   if(rel.endsWith('.md'))mdRequests.push(rel);
+   try{const text=await fs.readFile(path.join(pack,rel),'utf8');return {ok:true,status:200,text:async()=>text};}
+   catch{return {ok:false,status:404,text:async()=>''};}
+  };
+  const remotePack=await openRemote('http://pack.local/index.json');
+  for(const winId of ['quarterly-reference-seed11','quarterly-qwen_grpo-seed11']){
+   const entry=await remotePack.loadRun(winId,{week:8});
+   assert.equal(entry.diagnostics?.diagnostics_format,'robotization-bench.quarter-diagnostics.v1',`${winId} must load diagnostics.json`);
+   assert.equal(entry.diagnostics?.overall?.win,true,`${winId} overall.win must be true`);
+   assert.equal(badgeOf(entry.diagnostics),'WIN',`${winId} badge must be WIN`);
+   assert.ok(typeof entry.diagnostics?.overall?.reward_fraction==='string'&&entry.diagnostics.overall.reward_fraction.length>0,`${winId} reward_fraction missing`);
+   assert.ok(entry.weekDiagnostics!==null&&entry.weekDiagnostics.week===8,`${winId} weekDiagnostics missing for week 8`);
+  }
+  for(const noWinId of ['quarterly-manual-seed11','quarterly-qwen_base-seed11']){
+   const entry=await remotePack.loadRun(noWinId,{week:8});
+   assert.equal(entry.diagnostics?.diagnostics_format,'robotization-bench.quarter-diagnostics.v1',`${noWinId} must load diagnostics.json`);
+   assert.equal(entry.diagnostics?.overall?.win,false,`${noWinId} overall.win must be false`);
+   assert.equal(entry.diagnostics?.overall?.feasible,true,`${noWinId} overall.feasible must be true`);
+   assert.equal(badgeOf(entry.diagnostics),'NO WIN',`${noWinId} badge must be NO WIN`);
+  }
+  const naiveEntry=await remotePack.loadRun('quarterly-naive_ai-seed11',{week:8});
+  assert.equal(naiveEntry.diagnostics?.diagnostics_format,'robotization-bench.quarter-diagnostics.v1');
+  assert.equal(naiveEntry.diagnostics?.overall?.feasible,false,'naive_ai overall.feasible must be false');
+  assert.equal(badgeOf(naiveEntry.diagnostics),'FAIL','naive_ai badge must be FAIL');
+  assert.ok((naiveEntry.diagnostics?.key_mistakes?.length||0)>0,'naive_ai key_mistakes must be non-empty');
+  assert.ok(naiveEntry.weekDiagnostics!==null&&naiveEntry.weekDiagnostics.week===8,'naive_ai weekDiagnostics must resolve week 8');
+  assert.ok((naiveEntry.weekDiagnostics?.highlight_ticks?.length||0)>0,'naive_ai week 8 highlight_ticks must be non-empty');
+  assert.equal(mdRequests.length,0,'openRemote must never fetch .md diagnostics files as JSON');
+ }finally{globalThis.fetch=originalFetch;}
+
+ // Exercise openLocal on real exported quarterly bundles (both with diagnostics.json and standalone fallback).
+ const localQuarterRecords=[['pack/index.json',JSON.stringify({
+  ...index,
+  runs:index.runs.filter(r=>['quarterly-qwen_grpo-seed11','quarterly-naive_ai-seed11'].includes(r.id)),
+  comparisons:[],
+ })]];
+ for(const id of ['quarterly-qwen_grpo-seed11','quarterly-naive_ai-seed11']){
+  for(const rel of [`${id}/quarter_manifest.json`,`${id}/diagnostics.json`,`${id}/weeks/week-08/manifest.json`,`${id}/weeks/week-08/events.jsonl`]){
+   localQuarterRecords.push([`pack/${rel}`,await fs.readFile(path.join(pack,rel),'utf8')]);
+  }
+ }
+ const localQuarterCatalog=await openLocal(localQuarterRecords.map(([name,text])=>browserFile(name,text)));
+ const localWin=await localQuarterCatalog.loadRun('quarterly-qwen_grpo-seed11',{week:8});
+ assert.equal(localWin.diagnostics?.overall?.win,true);
+ assert.ok((localWin.diagnostics?.overall?.reward_fraction||'').length>0);
+ const localFail=await localQuarterCatalog.loadRun('quarterly-naive_ai-seed11',{week:8});
+ assert.equal(localFail.diagnostics?.overall?.feasible,false);
+ assert.ok((localFail.diagnostics?.key_mistakes?.length||0)>0);
+ assert.ok((localFail.weekDiagnostics?.highlight_ticks?.length||0)>0);
+
+ const realStandaloneFiles=[
+  browserFile('qwen/quarter_manifest.json',await fs.readFile(path.join(pack,'quarterly-qwen_grpo-seed11/quarter_manifest.json'),'utf8')),
+  browserFile('qwen/diagnostics.md',await fs.readFile(path.join(pack,'quarterly-qwen_grpo-seed11/diagnostics.md'),'utf8')),
+  ...await Promise.all(Array.from({length:12},async(_,w)=>{
+   const wdir=`weeks/week-${String(w).padStart(2,'0')}`;
+   return [
+    browserFile(`qwen/${wdir}/manifest.json`,await fs.readFile(path.join(pack,'quarterly-qwen_grpo-seed11',wdir,'manifest.json'),'utf8')),
+    browserFile(`qwen/${wdir}/events.jsonl`,await fs.readFile(path.join(pack,'quarterly-qwen_grpo-seed11',wdir,'events.jsonl'),'utf8')),
+   ];
+  })).then(rows=>rows.flat()),
+ ];
+ const realStandaloneSource=await openLocal(realStandaloneFiles);
+ const realStandaloneEntry=await realStandaloneSource.loadRun('local-quarter',{week:6});
+ assert.equal(realStandaloneEntry.diagnostics?.overall?.win,true,'Real standalone quarter_manifest fallback must resolve overall.win=true');
+ assert.equal(realStandaloneEntry.weekDiagnostics?.status,'critical','Real standalone week 6 status must resolve');
+}
+const dataLoading={offline_pair:true,offline_catalog:true,same_seed_comparison:true,quarterly_v2_weeks:12,quarterly_fixture_is_synthetic:true,quarterly_diagnostics_overlay:true,quarterly_standalone_fallback:true,plain_fetch_cors:true};
 
 const baseline=await readJSON(path.join(ROOT,'4_Horses_Environment_v02/asset_stats_v02.json'));
 const records=Array.isArray(baseline)?baseline:(baseline.assets||baseline.files||baseline.glbs);
