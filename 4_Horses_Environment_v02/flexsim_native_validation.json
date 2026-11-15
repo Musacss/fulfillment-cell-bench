@@ -1,0 +1,441 @@
+{
+  "format": "four-horses.native-acceptance.v2",
+  "units": "meters",
+  "failures": [],
+  "checks": {
+    "metric_scale": {
+      "passed": true,
+      "mandatory": true,
+      "details": null
+    },
+    "original_bindings_contract_unchanged": {
+      "passed": true,
+      "mandatory": true,
+      "details": {
+        "actual_sha256": "28e9760eff5a1389a3315f0d27490b5851b4a10d92056bcf181db4f18827e792",
+        "reference_sha256": "28e9760eff5a1389a3315f0d27490b5851b4a10d92056bcf181db4f18827e792"
+      }
+    },
+    "fixed_anchors_and_42_queue_slots": {
+      "passed": true,
+      "mandatory": true,
+      "details": {
+        "verified": 61,
+        "errors": []
+      }
+    },
+    "fourteen_template_identifiers": {
+      "passed": true,
+      "mandatory": true,
+      "details": [
+        "VIS_empty_slot",
+        "VIS_manual_bench",
+        "VIS_order_fragile",
+        "VIS_order_oversize",
+        "VIS_order_regular",
+        "VIS_order_tray",
+        "VIS_outcome_escaped",
+        "VIS_outcome_good",
+        "VIS_outcome_scrap",
+        "VIS_reserved_slot",
+        "VIS_status_break",
+        "VIS_status_jammed",
+        "VIS_status_offline",
+        "VIS_status_service"
+      ]
+    },
+    "bottom_center_portable_templates": {
+      "passed": true,
+      "mandatory": true,
+      "details": []
+    },
+    "active_order_tray_volumes_clear": {
+      "passed": true,
+      "mandatory": false,
+      "details": {
+        "envelope_m": [
+          0.54,
+          0.4,
+          0.3195
+        ],
+        "z_range_m": [
+          0.8605,
+          1.18
+        ],
+        "errors": []
+      }
+    },
+    "work_and_queue_support_envelopes": {
+      "passed": true,
+      "mandatory": false,
+      "details": [
+        {
+          "root": "VIS_STAGE_1_TABLE",
+          "passed": true,
+          "height_m": 0.86,
+          "support_envelope_xy_m": [
+            [
+              -11.550000190734863,
+              1.0799999237060547
+            ],
+            [
+              -10.449999809265137,
+              2.119999885559082
+            ]
+          ],
+          "required_envelope_xy_m": [
+            [
+              -11.27,
+              1.1400000000000001
+            ],
+            [
+              -10.73,
+              1.54
+            ]
+          ],
+          "top_meshes": 1
+        },
+        {
+          "root": "BENCH_PICK",
+          "passed": true,
+          "height_m": 0.86,
+          "support_envelope_xy_m": [
+            [
+              -6.300000190734863,
+              2.179999828338623
+            ],
+            [
+              -4.5,
+              3.1500000953674316
+            ]
+          ],
+          "required_envelope_xy_m": [
+            [
+              -5.67,
+              2.1899999999999995
+            ],
+            [
+              -5.130000000000001,
+              2.59
+            ]
+          ],
+          "top_meshes": 1
+        },
+        {
+          "root": "BENCH_PACK",
+          "passed": true,
+          "height_m": 0.86,
+          "support_envelope_xy_m": [
+            [
+              0.8999999761581421,
+              2.180000066757202
+            ],
+            [
+              2.6999998092651367,
+              3.1500000953674316
+            ]
+          ],
+          "required_envelope_xy_m": [
+            [
+              1.53,
+              2.1899999999999995
+            ],
+            [
+              2.0700000000000003,
+              2.59
+            ]
+          ],
+          "top_meshes": 1
+        },
+        {
+          "root": "QC_TABLE_TOOLING",
+          "passed": true,
+          "height_m": 0.86,
+          "support_envelope_xy_m": [
+            [
+              5.449999809265137,
+              2.130000114440918
+            ],
+            [
+              6.550000190734863,
+              3.1700000762939453
+            ]
+          ],
+          "required_envelope_xy_m": [
+            [
+              5.73,
+              2.1899999999999995
+            ],
+            [
+              6.27,
+              2.59
+            ]
+          ],
+          "top_meshes": 2
+        },
+        {
+          "root": "VIS_ROBOT_PACK_TABLE",
+          "passed": true,
+          "height_m": 0.86,
+          "support_envelope_xy_m": [
+            [
+              2.950000047683716,
+              2.130000114440918
+            ],
+            [
+              4.050000190734863,
+              3.1700000762939453
+            ]
+          ],
+          "required_envelope_xy_m": [
+            [
+              3.23,
+              2.19
+            ],
+            [
+              3.77,
+              2.5900000000000003
+            ]
+          ],
+          "top_meshes": 1
+        },
+        {
+          "root": "Q1_PAIRED_PALLET_DECK",
+          "passed": true,
+          "height_m": 0.15,
+          "support_envelope_xy_m": [
+            [
+              -11.639999389648438,
+              2.879999876022339
+            ],
+            [
+              -9.239999771118164,
+              3.740000009536743
+            ]
+          ],
+          "required_envelope_xy_m": [
+            [
+              -11.27,
+              2.9
+            ],
+            [
+              -9.61,
+              3.72
+            ]
+          ],
+          "top_meshes": 1
+        },
+        {
+          "root": "VIS_QUEUE_Q2_FRAME",
+          "passed": true,
+          "height_m": 0.86,
+          "support_envelope_xy_m": [
+            [
+              -7.590000152587891,
+              -3.3550000190734863
+            ],
+            [
+              -5.329999923706055,
+              -2.0849997997283936
+            ]
+          ],
+          "required_envelope_xy_m": [
+            [
+              -7.57,
+              -3.34
+            ],
+            [
+              -5.35,
+              -2.0999999999999996
+            ]
+          ],
+          "top_meshes": 18
+        },
+        {
+          "root": "VIS_QUEUE_Q3_FRAME",
+          "passed": true,
+          "height_m": 0.86,
+          "support_envelope_xy_m": [
+            [
+              -0.9900000095367432,
+              -2.93500018119812
+            ],
+            [
+              1.8299999237060547,
+              -2.0849997997283936
+            ]
+          ],
+          "required_envelope_xy_m": [
+            [
+              -0.97,
+              -2.92
+            ],
+            [
+              1.8100000000000003,
+              -2.0999999999999996
+            ]
+          ],
+          "top_meshes": 12
+        },
+        {
+          "root": "VIS_QUEUE_Q4_FRAME",
+          "passed": true,
+          "height_m": 0.86,
+          "support_envelope_xy_m": [
+            [
+              5.309999942779541,
+              -2.93500018119812
+            ],
+            [
+              7.570000171661377,
+              -2.0849997997283936
+            ]
+          ],
+          "required_envelope_xy_m": [
+            [
+              5.33,
+              -2.92
+            ],
+            [
+              7.549999999999999,
+              -2.0999999999999996
+            ]
+          ],
+          "top_meshes": 12
+        },
+        {
+          "root": "QUEUE_R_ROLLER_SECTION",
+          "passed": true,
+          "height_m": 0.86,
+          "support_envelope_xy_m": [
+            [
+              3.4149999618530273,
+              -7.679999828338623
+            ],
+            [
+              5.305000305175781,
+              -6.799999713897705
+            ]
+          ],
+          "required_envelope_xy_m": [
+            [
+              3.53,
+              -7.65
+            ],
+            [
+              5.1899999999999995,
+              -6.83
+            ]
+          ],
+          "top_meshes": 24
+        }
+      ]
+    },
+    "roller_tangent_height_086": {
+      "passed": true,
+      "mandatory": true,
+      "details": {
+        "main_count": 200,
+        "buffer_count": 132,
+        "errors": []
+      }
+    },
+    "protected_equipment_names": {
+      "passed": true,
+      "mandatory": true,
+      "details": {
+        "missing": []
+      }
+    },
+    "dispatch_pallet_alignment_and_empty_tick_zero": {
+      "passed": true,
+      "mandatory": true,
+      "details": {
+        "pallet_errors": [],
+        "forbidden_static_loads": []
+      }
+    },
+    "robot_helper_standing_clearance": {
+      "passed": true,
+      "mandatory": false,
+      "details": {
+        "center_blender_m": [
+          2.8,
+          1.95,
+          0
+        ],
+        "diameter_m": 0.55,
+        "height_m": 1.8,
+        "collisions": []
+      }
+    },
+    "finite_geometry_and_no_zero_area_triangles": {
+      "passed": true,
+      "mandatory": true,
+      "details": {
+        "unique_meshes": 1056,
+        "invalid_vertex_objects": [],
+        "degenerate_triangle_objects": [],
+        "area_threshold_m2": 1e-12
+      }
+    },
+    "closed_mesh_outward_volume": {
+      "passed": true,
+      "mandatory": false,
+      "details": {
+        "closed_meshes": 928,
+        "open_meshes": 128,
+        "negative_closed_meshes": [],
+        "scope": "Signed volume of closed mesh datablocks only. Open lettering/paint and local face consistency are not certified by this test."
+      }
+    }
+  },
+  "operator_arm_reach_envelope_contacts": [
+    {
+      "anchor": "VIS_STAGE_1_WORK",
+      "diameter_m": 0.55,
+      "contact_meshes": [
+        "VIS_Bench_top.001"
+      ]
+    },
+    {
+      "anchor": "VIS_STAGE_2_WORK",
+      "diameter_m": 0.55,
+      "contact_meshes": [
+        "Laminate worktop",
+        "Edge band"
+      ]
+    },
+    {
+      "anchor": "VIS_STAGE_3_WORK",
+      "diameter_m": 0.55,
+      "contact_meshes": [
+        "Laminate worktop.001",
+        "Edge band front"
+      ]
+    },
+    {
+      "anchor": "VIS_STAGE_4_WORK",
+      "diameter_m": 0.55,
+      "contact_meshes": [
+        "QC scale base",
+        "QC_SCALE_FLUSH"
+      ]
+    },
+    {
+      "anchor": "VIS_ROBOT_WORK",
+      "diameter_m": 0.55,
+      "contact_meshes": [
+        "VIS_Bench_top_robot_chamfer"
+      ]
+    }
+  ],
+  "limitations": [
+    "Q1 and R are unbounded in the replay contract. Physical supports cover their documented six preview slots; arbitrary later rows require runtime extension or virtualization.",
+    "Roller support is checked against tangent-plane envelopes, with deliberate gaps between adjacent rollers.",
+    "Fixed operator work anchors imply arm/reach-envelope contact with bench fronts. Contacts are reported separately; helper standing clearance is mandatory.",
+    "This verifies the visual contract and geometry, not execution against the unavailable private production simulation core."
+  ],
+  "passed": true,
+  "mandatory_failures": []
+}

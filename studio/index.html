@@ -1,0 +1,50 @@
+<!doctype html>
+<html lang="en">
+<head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="theme-color" content="#142b43"><title>4 Horses — Replay Studio</title></head>
+<body>
+  <header class="app-header">
+    <div class="brand"><span class="brand-symbol">4H</span><div><strong>4 HORSES</strong><span>REPLAY STUDIO <b>01</b></span></div></div>
+    <nav class="mode-switch" aria-label="View mode"><button data-mode="single" class="selected">Shift</button><button data-mode="compare">Compare</button><button data-mode="quarter" hidden>12 Weeks</button></nav>
+    <div class="connection"><span id="connection-dot" class="dot"></span><span id="connection-text">Connecting to bridge…</span><span class="readonly">READ ONLY</span></div>
+    <button id="inspector-toggle" class="header-button" aria-expanded="true">Metrics</button>
+  </header>
+  <div class="application">
+    <aside class="sidebar">
+      <section class="source-section"><div class="section-heading"><span>01 / SOURCE</span><span id="source-kind" class="mini-tag">BRIDGE</span></div>
+        <form id="source-form"><label class="field-label" for="bridge-url">Pack catalog URL</label><div class="input-action"><input id="bridge-url" type="url" value="http://127.0.0.1:8765/index.json" spellcheck="false" aria-label="Pack catalog URL"><button type="submit" title="Connect to bridge" aria-label="Connect">↗</button></div></form>
+        <div class="offline-actions"><label class="file-button" for="local-files">Open files<input id="local-files" type="file" accept=".json,.jsonl,.ndjson" multiple></label><label class="file-button" for="local-folder">Folder<input id="local-folder" type="file" webkitdirectory multiple></label></div>
+        <p class="hint">manifest.json + events.jsonl<br>or complete pack folder</p>
+      </section>
+      <section><div class="section-heading"><span>02 / RUN</span><span id="seed-tag" class="mini-tag">SEED —</span></div>
+        <div id="single-fields"><label class="field-label" for="run-select">Policy / shift</label><select id="run-select" disabled><option>Loading catalog…</option></select></div>
+        <div id="comparison-fields" hidden><label class="field-label" for="comparison-select">Same-seed comparison pair</label><select id="comparison-select"></select></div>
+        <div id="quarter-fields" hidden><label class="field-label" for="quarter-select">Quarterly policy</label><select id="quarter-select"></select></div>
+        <div id="week-fields" hidden><label class="field-label" for="week-select">Week</label><select id="week-select"></select></div>
+        <div id="plan-summary" class="plan-summary">Deterministic shift replay — simulator rules unchanged.</div>
+      </section>
+      <section><div class="section-heading"><span>03 / CAMERA</span><span class="mini-tag">ORBIT</span></div><div class="camera-grid">
+        <button data-camera="overview" class="selected">▧ Overview</button><button data-camera="q1">Q1 / Pick</button><button data-camera="robot">Robot Cell</button><button data-camera="qc">QC / Outbound</button><button data-camera="break">Break Area</button>
+      </div><p class="hint">Left drag — orbit · wheel — zoom<br>Right drag — pan</p></section>
+      <section><div class="section-heading"><span>04 / SCENE LAYERS</span><span id="layer-count" class="mini-tag">5 / 6</span></div><div id="layers" class="layers"></div></section>
+      <div class="sidebar-foot"><span class="dot"></span>1 unit = 1 meter<span>GLB v02 / Y-UP</span></div>
+    </aside>
+    <main class="main-area">
+      <div class="workspace-heading"><div><span class="eyebrow">DIGITAL TWIN / FULFILLMENT CELL</span><h1 id="workspace-title">3D Fulfillment Cell Replay</h1></div><span id="replay-status" class="status-badge">Awaiting data</span></div>
+      <div id="error-panel" class="error-panel" role="alert" hidden><strong>Failed to open replay</strong><p id="error-message"></p><button id="error-close" aria-label="Dismiss error">×</button></div>
+      <div id="scene-grid" class="scene-grid"><section class="scene-panel" id="panel-left"><div class="scene-title"><span id="scene-label-left">4 Horses / Environment v02</span><span id="scene-info-left">Preparing scene</span></div><canvas id="canvas-left" aria-label="Interactive 3D scene — left run"></canvas><div id="scene-badges-left" class="scene-badges"></div><div class="scene-credit">X / Z · CAD GRID 1 m</div><div id="loading-left" class="loading"><span class="spinner"></span><strong>Loading 3D environment</strong><small>Geometry &amp; animations v02</small></div></section>
+        <section class="scene-panel" id="panel-right" hidden><div class="scene-title"><span id="scene-label-right">Comparison</span><span id="scene-info-right"></span></div><canvas id="canvas-right" aria-label="Interactive 3D scene — right run"></canvas><div id="scene-badges-right" class="scene-badges"></div><div class="scene-credit">INDEPENDENT RUN</div><div id="loading-right" class="loading"><span class="spinner"></span><strong>Loading second scene</strong></div></section></div>
+      <div class="scene-legend"><span><i class="legend-box"></i>Order</span><span><i class="legend-reserve"></i>Output reservation</span><span><i class="legend-empty"></i>Free slot</span><span class="legend-note" id="event-note">Replay trace drives every state</span></div>
+      <section class="transport" aria-label="Playback controls"><div class="timeline-head"><strong id="clock">00:00:00</strong><span id="tick-label">Tick 0 / —</span><span id="duration">Shift horizon —</span></div><input id="timeline" type="range" min="0" max="1080" step="0.02" value="0" disabled aria-label="Shift time in ticks"><div class="transport-actions"><button id="play" class="play-button" disabled>▶ <span>Play</span></button><button id="reset" title="Reset playback" disabled>↶ Reset</button><span class="divider"></span><label class="speed-label">Speed<select id="speed"><option value="1">1×</option><option value="5">5×</option><option value="20">20×</option><option value="60" selected>60×</option><option value="100">100×</option></select></label><div class="event-navigation"><select id="event-filter" aria-label="Key event filter"><option value="all">All key events</option><option value="jam">Robot jam</option><option value="assist">Jam assist</option><option value="rework">Rework</option><option value="break">Break</option><option value="escaped">Escaped defect</option><option value="scrap">Scrap</option></select><button id="next-event" disabled>Next ▷</button></div></div></section>
+    </main>
+    <aside id="inspector" class="inspector"><div class="inspector-tabs"><button data-inspector="0" class="selected">Run A</button><button data-inspector="1" hidden>Run B</button></div>
+      <section><div class="section-heading"><span>SHIFT TELEMETRY</span><span id="metrics-tick" class="mini-tag">0 TICK</span></div><div id="metrics" class="metric-grid"></div><div id="throughput" class="throughput"></div></section>
+      <section id="diagnostics-summary" hidden><div class="section-heading"><span>AI DIAGNOSTICS / HUD</span><span id="diagnostics-badge" class="mini-tag">V2</span></div><div id="diagnostics-details" class="diagnostics-details"></div></section>
+      <section><div class="section-heading"><span>BUFFERS &amp; RESERVATIONS</span></div><table class="queue-table"><thead><tr><th>Queue</th><th>Waiting</th><th>Rsrv</th><th>Cap</th></tr></thead><tbody id="queue-body"></tbody></table></section>
+      <section><div class="section-heading"><span>RESOURCES</span></div><div id="resources" class="resources"></div></section>
+      <section id="quarter-summary" hidden><div class="section-heading"><span>QUARTER / WEEK</span></div><div id="quarter-details"></div></section>
+      <section class="economy-section"><details open><summary>Shift Operating Cost <span>OpEx</span></summary><div id="costs" class="costs"></div></details><div id="purchase" class="purchase"></div><p class="hint">Exact cost computed by verifier.<br>Viewer is strictly read-only.</p></section>
+      <section id="evaluation" class="evaluation"></section>
+    </aside>
+  </div>
+  <script type="module" src="/src/app.js"></script>
+</body></html>

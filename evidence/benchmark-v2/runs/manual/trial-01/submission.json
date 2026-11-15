@@ -1,0 +1,329 @@
+{
+  "schema_version": 2,
+  "weeks": [
+    {
+      "robot": false,
+      "trays": false,
+      "route": "manual",
+      "maintenance": false,
+      "workers": [
+        [
+          1
+        ],
+        [
+          2
+        ],
+        [
+          3
+        ],
+        [
+          3
+        ],
+        [
+          4
+        ],
+        [
+          2,
+          3
+        ]
+      ]
+    },
+    {
+      "robot": false,
+      "trays": false,
+      "route": "manual",
+      "maintenance": false,
+      "workers": [
+        [
+          1
+        ],
+        [
+          2
+        ],
+        [
+          3
+        ],
+        [
+          3
+        ],
+        [
+          4
+        ],
+        [
+          2,
+          3
+        ]
+      ]
+    },
+    {
+      "robot": false,
+      "trays": false,
+      "route": "manual",
+      "maintenance": false,
+      "workers": [
+        [
+          1
+        ],
+        [
+          2
+        ],
+        [
+          3
+        ],
+        [
+          3
+        ],
+        [
+          4
+        ],
+        [
+          2,
+          3
+        ]
+      ]
+    },
+    {
+      "robot": false,
+      "trays": false,
+      "route": "manual",
+      "maintenance": false,
+      "workers": [
+        [
+          1
+        ],
+        [
+          2
+        ],
+        [
+          3
+        ],
+        [
+          3
+        ],
+        [
+          4
+        ],
+        [
+          2,
+          3
+        ]
+      ]
+    },
+    {
+      "robot": false,
+      "trays": false,
+      "route": "manual",
+      "maintenance": false,
+      "workers": [
+        [
+          1
+        ],
+        [
+          2
+        ],
+        [
+          3
+        ],
+        [
+          3
+        ],
+        [
+          4
+        ],
+        [
+          2,
+          3
+        ]
+      ]
+    },
+    {
+      "robot": false,
+      "trays": false,
+      "route": "manual",
+      "maintenance": false,
+      "workers": [
+        [
+          1
+        ],
+        [
+          2
+        ],
+        [
+          3
+        ],
+        [
+          3
+        ],
+        [
+          4
+        ],
+        [
+          2,
+          3
+        ]
+      ]
+    },
+    {
+      "robot": false,
+      "trays": false,
+      "route": "manual",
+      "maintenance": false,
+      "workers": [
+        [
+          1
+        ],
+        [
+          2
+        ],
+        [
+          3
+        ],
+        [
+          3
+        ],
+        [
+          4
+        ],
+        [
+          2,
+          3
+        ]
+      ]
+    },
+    {
+      "robot": false,
+      "trays": false,
+      "route": "manual",
+      "maintenance": false,
+      "workers": [
+        [
+          1
+        ],
+        [
+          2
+        ],
+        [
+          3
+        ],
+        [
+          3
+        ],
+        [
+          4
+        ],
+        [
+          2,
+          3
+        ]
+      ]
+    },
+    {
+      "robot": false,
+      "trays": false,
+      "route": "manual",
+      "maintenance": false,
+      "workers": [
+        [
+          1
+        ],
+        [
+          2
+        ],
+        [
+          3
+        ],
+        [
+          3
+        ],
+        [
+          4
+        ],
+        [
+          2,
+          3
+        ]
+      ]
+    },
+    {
+      "robot": false,
+      "trays": false,
+      "route": "manual",
+      "maintenance": false,
+      "workers": [
+        [
+          1
+        ],
+        [
+          2
+        ],
+        [
+          3
+        ],
+        [
+          3
+        ],
+        [
+          4
+        ],
+        [
+          2,
+          3
+        ]
+      ]
+    },
+    {
+      "robot": false,
+      "trays": false,
+      "route": "manual",
+      "maintenance": false,
+      "workers": [
+        [
+          1
+        ],
+        [
+          2
+        ],
+        [
+          3
+        ],
+        [
+          3
+        ],
+        [
+          4
+        ],
+        [
+          2,
+          3
+        ]
+      ]
+    },
+    {
+      "robot": false,
+      "trays": false,
+      "route": "manual",
+      "maintenance": false,
+      "workers": [
+        [
+          1
+        ],
+        [
+          2
+        ],
+        [
+          3
+        ],
+        [
+          3
+        ],
+        [
+          4
+        ],
+        [
+          2,
+          3
+        ]
+      ]
+    }
+  ]
+}

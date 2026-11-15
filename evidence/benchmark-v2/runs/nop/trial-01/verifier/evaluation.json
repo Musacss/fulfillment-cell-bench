@@ -1,0 +1,21 @@
+{
+  "evaluation": {
+    "valid": false,
+    "feasible": false,
+    "win": false,
+    "reward_num": 0,
+    "reward_den": 1,
+    "metrics": {},
+    "reasons": [
+      "missing submission"
+    ]
+  },
+  "seeds_sha256": "a32a879f8fe5476d000884555749f50543527bcda4ecaf703c1be72a308dfc8b",
+  "world": "cell-quarterly-v2",
+  "source": {
+    "commit": null,
+    "world_sha256": "62b99fc9187d85c549331db857cb112921434a7391a19bef13cc61944ca720b2",
+    "schema_version": 2,
+    "harbor_checked_version": "0.26.0"
+  }
+}

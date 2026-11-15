@@ -1,0 +1,42 @@
+import assert from 'node:assert/strict';
+import fs from 'node:fs/promises';
+import {createHash} from 'node:crypto';
+import * as THREE from 'three';
+import {GLTFLoader} from 'three/addons/loaders/GLTFLoader.js';
+import {applyMapFloorFixes} from '../src/map-floor.js';
+
+const sourceURL=new URL('../../4_Horses_Environment_v02/warehouse_environment.glb',import.meta.url);
+const bytes=await fs.readFile(sourceURL),before=createHash('sha256').update(bytes).digest('hex');
+const loaded=await new Promise((resolve,reject)=>new GLTFLoader().parse(bytes.buffer.slice(bytes.byteOffset,bytes.byteOffset+bytes.byteLength),'',resolve,reject));
+const environment=loaded.scene.clone(true),untouched=loaded.scene.clone(true);
+const floor=environment.getObjectByName('ENV_FLOOR_AND_GRID');
+const oldLane=environment.getObjectByName('WALKWAY_GREEN_5S');
+const sourceMaterials=new Set();untouched.traverse(o=>{if(o.isMesh)sourceMaterials.add(o.material);});
+const result=applyMapFloorFixes(environment,null);
+assert.equal(applyMapFloorFixes(environment,null),result,'Applying twice must not add duplicate decals');
+assert.equal(oldLane.visible,false);
+assert.equal(untouched.getObjectByName('WALKWAY_GREEN_5S').visible,true,'Another comparison scene must remain untouched');
+const patch=environment.getObjectByName('MAP_FLOOR_FIXES');
+const arrows=patch.children.filter(o=>o.name.startsWith('MAP_WALKWAY_ARROW_'));
+assert.equal(arrows.length,3);
+assert.deepEqual(arrows.map(o=>o.userData.center_x),[-11.8,0,11.8]);
+assert.deepEqual(result.report.endMargins,[5.9,5.9]);
+assert.equal(result.report.arrowSpacing,11.8);
+assert.equal(result.report.zebras,0);assert.equal(result.report.wayfindingLabels,0);
+for(const mesh of patch.children){
+  assert.equal(mesh.castShadow,false);assert.equal(mesh.receiveShadow,false);
+  assert.equal(mesh.material.depthTest,true);assert.equal(mesh.material.depthWrite,true);
+  assert.equal(mesh.material.polygonOffset,true);assert.ok(mesh.material.polygonOffsetUnits<0);
+  assert.equal(sourceMaterials.has(mesh.material),false,'Decals must own their materials');
+  const p=mesh.geometry.getAttribute('position');for(let i=0;i<p.count;i++)assert.ok(p.getY(i)>=.0059&&p.getY(i)<.0081);
+}
+const label=environment.getObjectByName('MAP_ESCAPED_HOLD_LABEL');
+const bounds=new THREE.Box3().setFromObject(label);
+assert.ok(bounds.min.x>9.14&&bounds.max.x<10.86,'Caption fits completely inside HOLD');
+assert.ok(bounds.min.z>-4&&bounds.max.z<-3.725,'Caption is on the front strip, not under the pallet');
+assert.ok(result.report.holdZone.gapToQc>.15,'HOLD frame must not touch QC');
+const normal=label.geometry.getAttribute('normal');for(let i=0;i<normal.count;i++)assert.ok(normal.getY(i)>.999);
+result.dispose();assert.equal(environment.getObjectByName('MAP_FLOOR_FIXES'),undefined);
+assert.equal(oldLane.visible,true);assert.equal(oldLane.material,untouched.getObjectByName('WALKWAY_GREEN_5S').material);
+assert.equal(createHash('sha256').update(await fs.readFile(sourceURL)).digest('hex'),before);
+console.log(JSON.stringify({passed:true,...result.report},null,2));

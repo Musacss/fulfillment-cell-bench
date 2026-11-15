@@ -1,0 +1,14 @@
+{
+  "name": "four-horses-environment-v02",
+  "version": "2.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "check": "node scripts/check_v02.mjs",
+    "validate": "node scripts/validate_gltf.mjs warehouse_environment.glb modules/visual_layout.glb modules/visual_support.glb modules/warehouse_worker.glb modules/humanoid_robot.glb"
+  },
+  "dependencies": {
+    "three": "0.170.0",
+    "gltf-validator": "2.0.0-dev.3.10"
+  }
+}

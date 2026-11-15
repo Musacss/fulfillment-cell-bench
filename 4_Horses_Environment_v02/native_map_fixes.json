@@ -1,0 +1,18 @@
+{
+  "passed": true,
+  "cabinet_removed": true,
+  "rework_is_standalone_roller_section": true,
+  "arrow_centers_x_m": [
+    -8,
+    0,
+    8
+  ],
+  "zebras": 0,
+  "hold_zone_x_m": [
+    9,
+    11
+  ],
+  "robot_top_export_collection_corrected": true,
+  "character_actions_unchanged": 31,
+  "glb_files_rebuilt": false
+}
