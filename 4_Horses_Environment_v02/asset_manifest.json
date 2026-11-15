@@ -1,5 +1,29 @@
 [
   {
+    "id": "warehouse_environment",
+    "file": "warehouse_environment.glb",
+    "origin": "world / Blender Z-up; exported glTF Y-up",
+    "purpose": "Full 36x18x3.6m warehouse environment",
+    "bytes": 9427860,
+    "sha256": "7259e2793d4f5aefd2ce512855c160bc4b88062876f938c7ad502b9d74128db6",
+    "bounds_min_m": [
+      -18.00099945,
+      -9,
+      -0.2125
+    ],
+    "bounds_max_m": [
+      18.00099945,
+      9,
+      3.60000008
+    ],
+    "actual_envelope_m": [
+      36.0019989,
+      18,
+      3.81250008
+    ],
+    "bounds_coordinate_system": "Blender Z-up"
+  },
+  {
     "id": "carton_closed",
     "file": "modules/carton_closed.glb",
     "bounds_min_m": [
@@ -13,58 +37,62 @@
       0.25204999
     ],
     "actual_envelope_m": [
-      0.40000001,
+      0.4,
       0.3022,
       0.25204999
     ],
     "origin": "root-local",
     "editable_parts": 24,
-    "bounds_coordinate_system": "Blender Z-up"
+    "bounds_coordinate_system": "Blender Z-up",
+    "bytes": 40228,
+    "sha256": "81f0953add98b6232a2c8bb843a8d9ca5532e9754f045f8c836380f05084c3d7"
   },
   {
     "id": "carton_open",
     "file": "modules/carton_open.glb",
     "bounds_min_m": [
-      -0.38841174,
-      -0.29375371,
+      -0.38856033,
+      -0.2938915,
       0
     ],
     "bounds_max_m": [
-      0.38841174,
-      0.29375371,
-      0.25177289
+      0.38856033,
+      0.2938915,
+      0.25191068
     ],
     "actual_envelope_m": [
-      0.77682348,
-      0.58750742,
-      0.25177289
+      0.77712066,
+      0.587783,
+      0.25191068
     ],
     "origin": "root-local",
     "editable_parts": 13,
     "bounds_coordinate_system": "Blender Z-up",
-    "purpose": "Separate catalog asset; no carton embedded in active environment work areas"
+    "purpose": "Separate catalog asset; no carton embedded in active environment work areas",
+    "bytes": 20516,
+    "sha256": "be0747a6c45384685f82029701d547805246f25a2ea20f33b9401cb5e76a8734"
   },
   {
     "id": "humanoid_robot",
     "file": "modules/humanoid_robot.glb",
     "bounds_min_m": [
-      -0.45681159,
-      -0.14800009,
-      0.01199999
+      -0.45681173,
+      -0.62,
+      0.012
     ],
     "bounds_max_m": [
-      0.45681159,
+      0.45681173,
       0.126,
-      1.85100004
+      1.85099995
     ],
     "actual_envelope_m": [
-      0.91362318,
-      0.27400009,
-      1.83900005
+      0.91362346,
+      0.746,
+      1.83899995
     ],
     "origin": "floor-center / Blender Z-up",
     "rigged": true,
-    "bones": 32,
+    "bones": 41,
     "clips": [
       "Idle",
       "Walk",
@@ -82,29 +110,33 @@
       "Service_Oversize"
     ],
     "visual_states_document": "VISUAL_PREPARATION_RU.md",
-    "bounds_coordinate_system": "Blender Z-up"
+    "bounds_coordinate_system": "Blender Z-up",
+    "bytes": 1600988,
+    "sha256": "ad074b5dd9fd40f7655154e779bdb854c79cb780d479ed7612fa7d317e77547d"
   },
   {
     "id": "inspection_portal",
     "file": "modules/inspection_portal.glb",
     "bounds_min_m": [
-      -0.28,
+      -0.27000001,
       -0.59000001,
       0
     ],
     "bounds_max_m": [
-      0.39250001,
+      0.32249999,
       0.59000001,
       1.80249997
     ],
     "actual_envelope_m": [
-      0.67250002,
+      0.5925,
       1.18000002,
       1.80249997
     ],
     "origin": "root-local",
     "editable_parts": 22,
-    "bounds_coordinate_system": "Blender Z-up"
+    "bounds_coordinate_system": "Blender Z-up",
+    "bytes": 61876,
+    "sha256": "093f5aac63cb9bf8933fe9cf9d5ab64760a67c6d2bb6ce4f3b8aed6c4a1f6ae9"
   },
   {
     "id": "packing_bench_1800",
@@ -120,13 +152,15 @@
       2.04000002
     ],
     "actual_envelope_m": [
-      1.79999995,
-      0.97500001,
+      1.79999996,
+      0.975,
       2.04000002
     ],
     "origin": "root-local",
     "editable_parts": 66,
-    "bounds_coordinate_system": "Blender Z-up"
+    "bounds_coordinate_system": "Blender Z-up",
+    "bytes": 119240,
+    "sha256": "620e06d79793b399cfd56bffb42edd6499abf357f2da8ddd7e6288f86e08b54b"
   },
   {
     "id": "pallet_1200x800",
@@ -142,13 +176,15 @@
       0.15000001
     ],
     "actual_envelope_m": [
-      1.20000005,
-      0.80000001,
+      1.20000004,
+      0.80000002,
       0.15000001
     ],
     "origin": "root-local",
     "editable_parts": 20,
-    "bounds_coordinate_system": "Blender Z-up"
+    "bounds_coordinate_system": "Blender Z-up",
+    "bytes": 20808,
+    "sha256": "61701dfbac767b6ba24b10a71aa96d289333466a2a5c6323a20e36e7c01c76fc"
   },
   {
     "id": "roller_conveyor_1800",
@@ -164,13 +200,15 @@
       0.94700001
     ],
     "actual_envelope_m": [
-      1.79999995,
+      1.79999996,
       0.89250001,
       0.94700001
     ],
     "origin": "root-local",
     "editable_parts": 65,
-    "bounds_coordinate_system": "Blender Z-up"
+    "bounds_coordinate_system": "Blender Z-up",
+    "bytes": 57124,
+    "sha256": "7eeb6c8be6c17c346644f9a99fcacd9d7d693c56cf123b09e9ebc731c6d9f51e"
   },
   {
     "id": "shelving_1800",
@@ -186,13 +224,15 @@
       2.51099995
     ],
     "actual_envelope_m": [
-      1.88199997,
+      1.88199996,
       0.702,
       2.51099995
     ],
     "origin": "root-local",
     "editable_parts": 403,
-    "bounds_coordinate_system": "Blender Z-up"
+    "bounds_coordinate_system": "Blender Z-up",
+    "bytes": 384984,
+    "sha256": "8270ca0d753956cf89b2520359d8d713589a9727e393c7f98673eb34e610d9e7"
   },
   {
     "id": "supply_trolley",
@@ -200,7 +240,7 @@
     "bounds_min_m": [
       -0.48499998,
       -0.30000001,
-      0
+      -1e-8
     ],
     "bounds_max_m": [
       0.48499998,
@@ -208,13 +248,15 @@
       1.0925
     ],
     "actual_envelope_m": [
-      0.96999997,
+      0.96999996,
       0.60000002,
       1.09250001
     ],
     "origin": "root-local",
     "editable_parts": 48,
-    "bounds_coordinate_system": "Blender Z-up"
+    "bounds_coordinate_system": "Blender Z-up",
+    "bytes": 82452,
+    "sha256": "4776c12ed3c0cc640f40d1249c76933e2ec0d826487e17d2a0329ba12a6fdd85"
   },
   {
     "id": "tote_600x400",
@@ -230,13 +272,15 @@
       0.22
     ],
     "actual_envelope_m": [
-      0.60000003,
-      0.40000001,
+      0.60000002,
+      0.4,
       0.22
     ],
     "origin": "root-local",
     "editable_parts": 25,
-    "bounds_coordinate_system": "Blender Z-up"
+    "bounds_coordinate_system": "Blender Z-up",
+    "bytes": 54192,
+    "sha256": "ccebbc9e67d9130d81522ddcce90f3dcb095103589b4c75b42e2fdf5f8154a14"
   },
   {
     "id": "visual_layout",
@@ -252,15 +296,17 @@
     ],
     "bounds_max_m": [
       7.60500002,
-      3.08250004,
+      3.17000005,
       0.91750002
     ],
     "actual_envelope_m": [
       19.15500003,
-      6.47800003,
+      6.56550004,
       0.91750002
     ],
-    "bounds_coordinate_system": "Blender Z-up"
+    "bounds_coordinate_system": "Blender Z-up",
+    "bytes": 641684,
+    "sha256": "41bba8516d5b687f9fa8095e6af6d9e75caaa06ea46764ab2383a81f437c11ee"
   },
   {
     "id": "visual_support",
@@ -282,31 +328,33 @@
     "actual_envelope_m": [
       1.10000002,
       1.03999999,
-      0.93500002
+      0.93500001
     ],
-    "bounds_coordinate_system": "Blender Z-up"
+    "bounds_coordinate_system": "Blender Z-up",
+    "bytes": 74244,
+    "sha256": "f3ce69bd6552d1f46c1f95f472b083d4ef30a79b8e6b56c10c7500470f636ca6"
   },
   {
     "id": "warehouse_worker",
     "file": "modules/warehouse_worker.glb",
     "bounds_min_m": [
-      -0.45168133,
-      -0.171,
-      0.01199999
+      -0.45168146,
+      -0.62,
+      0.012
     ],
     "bounds_max_m": [
-      0.45168133,
+      0.45168146,
       0.149,
-      1.9440001
+      1.94400001
     ],
     "actual_envelope_m": [
-      0.90336267,
-      0.32000001,
-      1.93200011
+      0.90336292,
+      0.769,
+      1.93200001
     ],
     "origin": "floor-center / Blender Z-up",
     "rigged": true,
-    "bones": 26,
+    "bones": 35,
     "clips": [
       "Idle",
       "Walk",
@@ -327,7 +375,9 @@
       "Inspect_Oversize"
     ],
     "visual_states_document": "VISUAL_PREPARATION_RU.md",
-    "bounds_coordinate_system": "Blender Z-up"
+    "bounds_coordinate_system": "Blender Z-up",
+    "bytes": 1994528,
+    "sha256": "8aaaa029b251bc2788a51940da71d65f991d29e797f718a10be13137131ff994"
   },
   {
     "id": "workbench_1800",
@@ -343,12 +393,14 @@
       0.86000003
     ],
     "actual_envelope_m": [
-      1.79999995,
-      0.97500001,
+      1.79999996,
+      0.975,
       0.86000003
     ],
     "origin": "root-local",
     "editable_parts": 77,
-    "bounds_coordinate_system": "Blender Z-up"
+    "bounds_coordinate_system": "Blender Z-up",
+    "bytes": 134116,
+    "sha256": "7217061589bfe21e7502a7182fa5350e343d42f57bd65fa7238354805eae8140"
   }
 ]

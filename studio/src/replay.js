@@ -1,5 +1,6 @@
 // The trace is the sole source of production state. No scheduler or random draw
 // runs in this module; v2 weeks use this same v1 shift boundary.
+import { DEFAULT_VISUAL_BINDINGS, buildWorkerPresentationPlan, buildFlowPlan, sampleFlow, cleanNum } from './spatial.js';
 export const REPLAY_FORMAT = 'robotization-bench.replay.v1';
 export const EVENT_KINDS = Object.freeze(['arrival','enqueue','start','finish','walk','jam','assist','break','good','escaped','scrap']);
 export const COUNTER_KEYS = Object.freeze(['total','good','on_time','escaped','scrap','unfinished','pack_started','pack_finished','auto_finished','trays_used','rework_started','labor_ticks','overtime_ticks']);
@@ -238,19 +239,20 @@ function applyBatch(state,batch,manifest,horizon,validate=true) {
   state._lastEventTick=tick;
 }
 
-function sampleState(internal,tickFloat,manifest,horizon,tickSeconds) {
-  const state=clone(internal);expire(state,tickFloat);
-  state.tick=Math.floor(tickFloat);state.tickFloat=tickFloat;state.timeSeconds=tickFloat*tickSeconds;state.ended=tickFloat>=horizon;
+function sampleState(internal,tickFloat,manifest,horizon,tickSeconds,flowPlan) {
+  const tf=cleanNum(tickFloat);
+  const state=clone(internal);expire(state,tf);
+  state.tick=Math.floor(tf);state.tickFloat=tf;state.timeSeconds=cleanNum(tf*tickSeconds);state.ended=tf>=horizon;
   for(const worker of Object.values(state.workers)) {
     const a=worker.activity;
-    worker.state=!a?'idle':worker.walk&&tickFloat<worker.walk.endTick?'walk':a.kind==='work'?OPERATION[a.stage]:a.kind;
+    worker.state=!a?'idle':worker.walk&&tf<worker.walk.endTick?'walk':a.kind==='work'?OPERATION[a.stage]:a.kind;
     worker.unfinished=state.ended&&a!==null&&a.kind!=='break';
   }
   const r=state.robot;
-  if(r.activity&&r.jamTick!==null)r.state=r.helperId?(state.workers[r.helperId].walk&&tickFloat<state.workers[r.helperId].walk.endTick?'helper_walking':'service'):'jammed';
+  if(r.activity&&r.jamTick!==null)r.state=r.helperId?(state.workers[r.helperId].walk&&tf<state.workers[r.helperId].walk.endTick?'helper_walking':'service'):'jammed';
   r.stopped=state.ended;
-  state.counters.labor_ticks=state._laborIntervals.reduce((sum,a)=>sum+Math.max(0,Math.min(tickFloat,horizon,a.endTick)-a.startTick),0);
-  state.counters.overtime_ticks=Object.values(state.workers).map(w=>Math.max(0,Math.min(tickFloat,horizon,w.lastWorkEnd)-manifest.world.clock.shift_ticks));
+  state.counters.labor_ticks=cleanNum(state._laborIntervals.reduce((sum,a)=>sum+Math.max(0,Math.min(tf,horizon,a.endTick)-a.startTick),0));
+  state.counters.overtime_ticks=Object.values(state.workers).map(w=>cleanNum(Math.max(0,Math.min(tf,horizon,w.lastWorkEnd)-manifest.world.clock.shift_ticks)));
   if(state.ended) {
     for(const order of Object.values(state.orders))if(!TERMINAL.has(order.status)) {
       order.previousStatus=order.status;order.status='unfinished';state.counters.unfinished++;
@@ -259,11 +261,12 @@ function sampleState(internal,tickFloat,manifest,horizon,tickSeconds) {
   state.inSystem=state.arrivedCount-state.counters.good-state.counters.escaped-state.counters.scrap;
   state.notArrived=state.counters.total-state.arrivedCount;
   delete state._transitions;delete state._laborIntervals;delete state._lastEventTick;
+  state.flow=sampleFlow(flowPlan,tf,tickSeconds);
   return state;
 }
 
 /** Validate once, then deterministically reconstruct any prefix from checkpoints. */
-export function createReplay(input,eventsText,{runId='local'}={}) {
+export function createReplay(input,eventsText,{runId='local',bindings=null}={}) {
   const manifest=validateManifest(input),clock=manifest.world.clock;
   const horizonTicks=clock.shift_ticks+clock.overtime_ticks,tickSeconds=clock.tick_seconds;
   const events=parseEvents(eventsText,horizonTicks),batches=[];
@@ -282,17 +285,54 @@ export function createReplay(input,eventsText,{runId='local'}={}) {
   const r=current.robot;
   if(r.activity&&((r.jamTick===null&&r.activity.endTick<=horizonTicks)||(r.assistCompletedTick!==null&&r.assistCompletedTick<=horizonTicks)))fail('Truncated trace: missing robot finish/jam before horizon',eofLine);
   requireValue(current.arrivedCount===manifest.scenario.orders.length,'Truncated trace: orders are missing arrival events',eofLine);
-  const final=sampleState(current,horizonTicks,manifest,horizonTicks,tickSeconds);
+  const resolvedBindings=bindings||DEFAULT_VISUAL_BINDINGS;
+  const presentation=buildWorkerPresentationPlan({manifest,events},resolvedBindings);
+  const flowPlan=buildFlowPlan(manifest,events,resolvedBindings,presentation);
+  const final=sampleState(current,horizonTicks,manifest,horizonTicks,tickSeconds,flowPlan);
   for(const key of COUNTER_KEYS)requireValue(same(final.counters[key],manifest.raw[key]),`Trace does not match manifest.raw.${key}: reconstructed ${JSON.stringify(final.counters[key])}, expected ${JSON.stringify(manifest.raw[key])}`,eofLine);
   const importantEvents=events.filter(e=>['jam','assist','break','escaped','scrap'].includes(e.kind)||(e.kind==='enqueue'&&e.stage===3&&e.attempt===1)).map(e=>Object.freeze({tick:e.tick,kind:e.kind==='enqueue'?'rework':e.kind,eventIndex:e.eventIndex,orderId:e.order_id,line:e.line}));
-  return Object.freeze({manifest,events,runId:String(runId),tickSeconds,horizonTicks,durationSeconds:horizonTicks*tickSeconds,importantEvents:Object.freeze(importantEvents),
+  const conveyor=Object.freeze({
+    physicalConveyorTransportImplemented:true,
+    parcelsFollowConveyorGeometry:true,
+    nominalRollerSurfaceSpeedMetersPerSimulationSecond:.38,
+    rollerRadiusMeters:.025,
+    perSegmentOccupancy:true,
+    photoeyeOrStopperLogic:true,
+    modules:flowPlan.moduleSummaries,
+    spurs:flowPlan.spurSummaries,
+    transferCount:flowPlan.transits.length,
+  });
+  function reconstructAtTick(tickFloat){
+    const target=Math.floor(tickFloat);
+    let checkpoint=checkpoints[0];for(const candidate of checkpoints){if(candidate.tick<=target)checkpoint=candidate;else break;}
+    const state=clone(checkpoint.state);
+    for(let i=checkpoint.batchIndex;i<batches.length&&batches[i][0].tick<=target;i++)applyBatch(state,batches[i],manifest,horizonTicks,false);
+    return sampleState(state,tickFloat,manifest,horizonTicks,tickSeconds,flowPlan);
+  }
+  return Object.freeze({manifest,events,runId:String(runId),tickSeconds,horizonTicks,durationSeconds:horizonTicks*tickSeconds,importantEvents:Object.freeze(importantEvents),conveyor,
+    worldAt(tickFloat) {
+      requireValue(typeof tickFloat==='number'&&Number.isFinite(tickFloat),'worldAt requires a finite tickFloat',1,'player');
+      const clamped=cleanNum(Math.min(horizonTicks,Math.max(0,tickFloat)));
+      return reconstructAtTick(clamped);
+    },
     seekTo(seconds) {
       requireValue(typeof seconds==='number'&&Number.isFinite(seconds),'seekTo requires a finite time in seconds',1,'player');
-      const tickFloat=Math.min(horizonTicks,Math.max(0,seconds/tickSeconds)),target=Math.floor(tickFloat);
-      let checkpoint=checkpoints[0];for(const candidate of checkpoints){if(candidate.tick<=target)checkpoint=candidate;else break;}
-      const state=clone(checkpoint.state);
-      for(let i=checkpoint.batchIndex;i<batches.length&&batches[i][0].tick<=target;i++)applyBatch(state,batches[i],manifest,horizonTicks,false);
-      return sampleState(state,tickFloat,manifest,horizonTicks,tickSeconds);
+      const clamped=cleanNum(Math.min(horizonTicks,Math.max(0,seconds/tickSeconds)));
+      return reconstructAtTick(clamped);
     }
   });
+}
+
+export const createReplayModel = createReplay;
+
+export function validateReplay(manifest,eventsText,options={}) {
+  const replay=createReplay(manifest,eventsText,options);
+  return {
+    valid:true,
+    runId:replay.runId,
+    horizonTicks:replay.horizonTicks,
+    tickSeconds:replay.tickSeconds,
+    eventCount:replay.events.length,
+    counters:replay.worldAt(replay.horizonTicks).counters,
+  };
 }

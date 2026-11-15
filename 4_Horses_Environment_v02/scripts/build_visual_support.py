@@ -2,7 +2,7 @@
 import bpy,math,json,sys,argparse
 from pathlib import Path
 from mathutils import Vector
-p=argparse.ArgumentParser();p.add_argument('--output',required=True);opt=p.parse_args(sys.argv[sys.argv.index('--')+1:]);out=Path(opt.output);root=Path(__file__).resolve().parent.parent
+p=argparse.ArgumentParser();p.add_argument('--output',required=True);p.add_argument('--skip-export-and-save',action='store_true');opt=p.parse_args(sys.argv[sys.argv.index('--')+1:]);out=Path(opt.output);root=Path(__file__).resolve().parent.parent
 for ob in list(bpy.data.objects):
  if ob.get('integration_visual'):bpy.data.objects.remove(ob,do_unlink=True)
 for name in ['INTEGRATION / Stations and anchors','INTEGRATION / Visual templates']:
@@ -78,28 +78,35 @@ def flow_buffer(name,cx,cy,width,depth):
  return g
 
 def transition_infeed(name,cx):
- # Straight tangent-height transfer section ends before the first slot footprint.
- north,south=-.31,-2.03;cy=(north+south)/2;length=north-south;width=.60
+ # Straight tangent-height transfer section ends before the first slot footprint
+ # and stays strictly south of CONVEYOR_{02,06,09} steel/rollers (Y_b <= -0.356 m).
+ north,south=-.356,-2.03;cy=(north+south)/2;length=north-south;width=.60
  g=empty('VIS_QUEUE_'+name+'_INFEED',overlay,support_height_m=.86,equipment_type='conveyor_buffer_transition')
  for x in [cx-width/2-.025,cx+width/2+.025]:
-  box('VIS_QUEUE_'+name+'_INFEED_FRAME',(x,cy,.77),(.04,length,.12),steel,overlay,g)
+  box('VIS_QUEUE_'+name+'_INFEED_FRAME',(x,cy,.800),(.04,length,.064),steel,overlay,g)
   box('VIS_QUEUE_'+name+'_INFEED_GUIDE',(x,cy,.895),(.018,length,.045),orange,overlay,g)
  count=22
+ r_south,r_north=south+.035,north-.030
  for i in range(count):
-  yy=south+.035+i*(length-.07)/(count-1)
+  yy=r_south+i*(r_north-r_south)/(count-1)
   roller('VIS_QUEUE_'+name+'_INFEED_ROLLER_'+str(i).zfill(2),(cx,yy,.835),.025,width,roller_metal,overlay,g)
  # Flush transfer tongue closes the short gap to the first buffer roller.
  box('VIS_QUEUE_'+name+'_TRANSFER_TONGUE',(cx,-2.0575,.851),(.60,.055,.018),roller_metal,overlay,g)
  for x in [cx-.20,cx+.20]:
-  box('VIS_QUEUE_'+name+'_INFEED_LEG',(x,cy,.39),(.045,.045,.755),steel,overlay,g)
+  box('VIS_QUEUE_'+name+'_INFEED_LEG',(x,cy,.390),(.045,.045,.755),steel,overlay,g)
+  box('VIS_QUEUE_'+name+'_INFEED_FOOT',(x,cy,.00625),(.09,.09,.0125),dark,overlay,g)
  return g
 
 def beam(name,a,b,width,mat,col,parent=None):
- a,b=Vector(a),Vector(b);ob=box(name,(0,0,0),(width,width,(b-a).length),mat,col,parent);ob.location=(a+b)/2;ob.rotation_euler=(b-a).to_track_quat('Z','Y').to_euler();return ob
+ a,b=Vector(a),Vector(b);mid=(a+b)/2;rot=(b-a).to_track_quat('Z','Y').to_matrix()
+ ob=box(name,(0,0,0),(width,width,(b-a).length),mat,col,parent)
+ for v in ob.data.vertices:v.co=mid+rot@v.co
+ ob.data.update();return ob
 def label(name,text,position,size,col,parent=None,rot=(0,0,0),mat=None):
  data=bpy.data.curves.new(name,'FONT');data.body=text;data.size=size;data.align_x='CENTER';data.extrude=.0005;data.materials.append(mat or line)
- ob=bpy.data.objects.new(name,data);col.objects.link(ob);ob.parent=parent;ob.location=position;ob.rotation_euler=rot;ob['integration_visual']=True
- bpy.ops.object.select_all(action='DESELECT');ob.select_set(True);bpy.context.view_layer.objects.active=ob;bpy.ops.object.convert(target='MESH');return ob
+ tmp=bpy.data.objects.new(name+'_tmp',data);me=bpy.data.meshes.new_from_object(tmp);bpy.data.objects.remove(tmp);bpy.data.curves.remove(data);me.name=name
+ if not me.materials:me.materials.append(mat or line)
+ ob=bpy.data.objects.new(name,me);col.objects.link(ob);ob.parent=parent;ob.location=position;ob.rotation_euler=rot;ob['integration_visual']=True;return ob
 def prototype(name,**meta):return empty('VIS_'+name,library,template_id=name,**meta)
 bench=prototype('manual_bench',label='Рабочая поверхность 0,86 м',dimensions=[1.1,1.04,.86])
 # Extended front supports the entire .40 m tray at the fixed ORDER anchor.
@@ -118,8 +125,8 @@ for kind,(w,d,h) in order_sizes.items():
  elif kind=='oversize':
   yy=-d/2-.0018
   for x in [-.04,.04]:
-   beam('VIS_Large_arrow',(x,yy,h*.28),(x,yy,h*.72),.005,amber,library,g)
-   for sign in [-1,1]:beam('VIS_Large_arrow_head',(x+sign*.016,yy,h*.61),(x,yy,h*.72),.005,amber,library,g)
+   beam('VIS_Oversize_gauge',(x,yy,h*.28),(x,yy,h*.72),.005,amber,library,g)
+   beam('VIS_Oversize_cap',(x-.016,yy,h*.72),(x+.016,yy,h*.72),.005,amber,library,g)
 slot=prototype('empty_slot',origin='bottom-center',label='Свободное визуальное место')
 for x in [-.27,.27]:box('VIS_Slot_edge',(x,0,.002),(.008,.40,.004),line,library,slot)
 for y in [-.20,.20]:box('VIS_Slot_edge',(0,y,.002),(.54,.008,.004),line,library,slot)
@@ -152,26 +159,29 @@ for status,mat in [('good',green),('escaped',amber),('scrap',red)]:
  elif status=='scrap':
   for sign in [-1,1]:beam('VIS_Scrap_cross',(-.06,0,-sign*.06),(.06,0,sign*.06),.022,mat,library,g)
  else:
-  beam('VIS_Issued_arrow',(-.07,0,0),(.07,0,0),.022,mat,library,g)
-  for sign in [-1,1]:beam('VIS_Issued_arrow_head',(.035,0,sign*.035),(.07,0,0),.018,mat,library,g)
-def instance(proto,name,position):
+  box('VIS_Hold_bar',(0,0,.024),(.024,.018,.092),mat,library,g)
+  box('VIS_Hold_dot',(0,0,-.052),(.026,.018,.026),mat,library,g)
+def instance(proto,name,position,inset_legs=False):
  group=empty(name,overlay,position=position)
  for child in proto.children:
   ob=child.copy();overlay.objects.link(ob);ob.parent=group;ob['integration_visual']=True
+  if inset_legs and child.name.startswith('VIS_Bench_leg'):
+   ob.location.z+=.0012;ob.scale=(1.0,1.0,(.830-.0024)/.830)
  return group
 def gltf(p):return [p[0],p[2],-p[1]]
 stages={1:(-11,1.65,0),2:(-5.4,2.7,0),3:(1.8,2.7,0),4:(6.0,2.7,0)}
 stations=[]
 for stage,position in stages.items():
- if stage in [1,4]:instance(bench,'VIS_STAGE_'+str(stage)+'_TABLE',position)
+ if stage in [1,4]:instance(bench,'VIS_STAGE_'+str(stage)+'_TABLE',position,inset_legs=True)
  actor=(position[0],position[1]-.65,0);work=(position[0],position[1]-.31,.86)
  a=empty('VIS_STAGE_'+str(stage)+'_WORK',overlay,position=actor,logical_stage=stage,role='manual_work_position')
  empty('VIS_STAGE_'+str(stage)+'_ORDER',overlay,position=work,logical_stage=stage,role='assigned_order_position')
  stations.append({'stage':stage,'actor_anchor':a.name,'actor_position_gltf_m':gltf(actor),'yaw_gltf_rad':math.pi,'order_anchor':'VIS_STAGE_'+str(stage)+'_ORDER','table_height_m':.86,'parallel_slot_spacing_m':[1.6,1.8],'parallel_slot_columns':2})
-robot_table=(3.5,2.7,0);instance(bench,'VIS_ROBOT_PACK_TABLE',robot_table);robot_actor=(3.5,2.05,0)
+robot_table=(3.5,2.7,0);instance(bench,'VIS_ROBOT_PACK_TABLE',robot_table,inset_legs=True);robot_actor=(3.5,2.05,0)
 empty('VIS_ROBOT_WORK',overlay,position=robot_actor,logical_stage=3,role='robot_work_position')
 empty('VIS_ROBOT_ORDER',overlay,position=(3.5,2.39,.86),logical_stage=3,role='robot_owned_order')
-empty('VIS_ROBOT_ASSIST',overlay,position=(2.8,1.95,0),logical_stage=3,role='helper_position')
+helper_pos=(2.8,1.95,0);helper_yaw=math.atan2(3.5-2.8,-2.39-(-1.95))
+assist_ob=empty('VIS_ROBOT_ASSIST',overlay,position=helper_pos,logical_stage=3,role='helper_position',yaw_gltf_rad=helper_yaw);assist_ob.rotation_euler=(0,0,helper_yaw)
 queues={
  'Q1':{'origin':[-11,3.1,.15],'columns':3,'spacing':[.56,.42],'preview_count':6,'bounded':False},
  'Q2':{'origin':[-7.3,-2.3,.86],'columns':4,'spacing':[.56,-.42],'preview_count':12,'bounded':True},
@@ -195,11 +205,18 @@ for name,q in queues.items():
  q['origin_gltf_m']=gltf(origin);q['anchor']='VIS_QUEUE_'+name;q['capacity_source']='passed explicitly from World by the replay adapter; preview_count is not a limit'
 outcomes={'good':[10.0,2.2,.15],'escaped':[10.0,4.4,.15],'scrap':[7.2,-7.0,.02]}
 for state,pos in outcomes.items():empty('VIS_OUTCOME_'+state.upper(),overlay,position=pos,role='terminal_outcome',outcome=state)
-mapping={'format':'four-horses.visual-bindings.v1','source_contract':'User integration document: Robotization Bench v1, claimed commit 1af71b6; private core not available for verification','units':'meters','axes':'glTF Y-up; character forward +Z','simulation_rules_in_this_file':False,'assets':{'environment':'warehouse_environment.glb','layout':'modules/visual_layout.glb','templates':'modules/visual_support.glb','worker':'modules/warehouse_worker.glb','robot':'modules/humanoid_robot.glb'},'stages':stations,'robot':{'stage':3,'actor_anchor':'VIS_ROBOT_WORK','position_gltf_m':gltf(robot_actor),'yaw_gltf_rad':math.pi,'order_anchor':'VIS_ROBOT_ORDER','helper_anchor':'VIS_ROBOT_ASSIST'},'queues':queues,'outcomes':{k:{'anchor':'VIS_OUTCOME_'+k.upper(),'position_gltf_m':gltf(v)} for k,v in outcomes.items()},'order_visual_sizes_m':order_sizes,'worker_states':{'idle':'Idle','walk':'Walk','prepare':'Prepare','pick':'Pick','pack':'Pack','inspect':'Inspect','assist':'Assist','break':'Break'},'robot_states':{'not_purchased':None,'disabled':'Offline','idle':'Idle','pack':'RobotPack','jammed':'Jammed','helper_walking':'Jammed','service':'Service','finished':'Idle'},'production_hide_embedded_props':True,'oversize_clip_suffix':'_Oversize','travel_clip':'Walk','travel_has_order':False,'order_ownership_source':'replay state only; assisting worker does not own the robot order','templates':[ob.name for ob in library.objects if ob.type=='EMPTY']}
-(out/'visual_bindings.json').write_text(json.dumps(mapping,ensure_ascii=False,indent=2));(root/'config/visual_bindings.json').write_text(json.dumps(mapping,ensure_ascii=False,indent=2))
-for col,file in [(library,'visual_support'),(overlay,'visual_layout')]:
- bpy.ops.object.select_all(action='DESELECT')
- for ob in col.objects:ob.select_set(True)
- bpy.ops.export_scene.gltf(filepath=str(out/'modules'/str(file+'.glb')),export_format='GLB',use_selection=True,export_yup=True,export_extras=True,export_animations=False,export_cameras=False,export_lights=False)
-bpy.ops.wm.save_as_mainfile(filepath=bpy.data.filepath)
+rework_station={'bench_node':'BENCH_REWORK','queue_node':'VIS_QUEUE_R','order_position_gltf_m':[1.8,.86,6.35],'worker_position_gltf_m':[1.8,0.0,5.55],'worker_yaw_gltf_rad':0.0}
+scrap_station={'bench_node':'BENCH_SCRAP','bin_node':'SCRAP_BIN','outcome_node':'VIS_OUTCOME_SCRAP','order_position_gltf_m':[8.65,.86,6.35],'worker_position_gltf_m':[8.65,0.0,5.55],'worker_yaw_gltf_rad':0.0}
+mapping={'format':'four-horses.visual-bindings.v1','source_contract':'User integration document: Robotization Bench v1, claimed commit 1af71b6; private core not available for verification','units':'meters','axes':'glTF Y-up; character forward +Z','simulation_rules_in_this_file':False,'assets':{'environment':'warehouse_environment.glb','layout':'modules/visual_layout.glb','templates':'modules/visual_support.glb','worker':'modules/warehouse_worker.glb','robot':'modules/humanoid_robot.glb'},'stages':stations,'robot':{'stage':3,'actor_anchor':'VIS_ROBOT_WORK','position_gltf_m':gltf(robot_actor),'yaw_gltf_rad':math.pi,'order_anchor':'VIS_ROBOT_ORDER','helper_anchor':'VIS_ROBOT_ASSIST','helper_position_gltf_m':gltf(helper_pos),'helper_yaw_gltf_rad':helper_yaw},'rework_station':rework_station,'scrap_station':scrap_station,'queues':queues,'outcomes':{k:{'anchor':'VIS_OUTCOME_'+k.upper(),'position_gltf_m':gltf(v)} for k,v in outcomes.items()},'order_visual_sizes_m':order_sizes,'worker_states':{'idle':'Idle','walk':'Walk','prepare':'Prepare','pick':'Pick','pack':'Pack','inspect':'Inspect','assist':'Assist','break':'Break'},'robot_states':{'not_purchased':None,'disabled':'Offline','idle':'Idle','pack':'RobotPack','jammed':'Jammed','helper_walking':'Jammed','service':'Service','finished':'Idle'},'production_hide_embedded_props':True,'oversize_clip_suffix':'_Oversize','travel_clip':'Walk','travel_has_order':False,'order_ownership_source':'replay state only; assisting worker does not own the robot order','templates':[ob.name for ob in library.objects if ob.type=='EMPTY']}
+out.mkdir(parents=True,exist_ok=True);(out/'config').mkdir(parents=True,exist_ok=True);(out/'modules').mkdir(parents=True,exist_ok=True)
+serialized=json.dumps(mapping,ensure_ascii=False,indent=2)
+(out/'visual_bindings.json').write_text(serialized);(out/'config'/'visual_bindings.json').write_text(serialized)
+if not opt.skip_export_and_save:
+ for col,file in [(library,'visual_support'),(overlay,'visual_layout')]:
+  bpy.ops.object.select_all(action='DESELECT')
+  for ob in col.objects:ob.select_set(True)
+  bpy.ops.export_scene.gltf(filepath=str(out/'modules'/str(file+'.glb')),export_format='GLB',use_selection=True,export_yup=True,export_extras=True,export_animations=False,export_cameras=False,export_lights=False)
+ if bpy.data.filepath:
+  bpy.context.preferences.filepaths.save_version=0
+  bpy.ops.wm.save_as_mainfile(filepath=str(out/'warehouse_environment.blend'))
 print('VISUAL_SUPPORT_COMPLETE',json.dumps({'templates':len(mapping['templates']),'stages':4,'queues':5,'preview_slots':sum(q['preview_count'] for q in queues.values()),'native_objects':len(overlay.objects)}),flush=True)

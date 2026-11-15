@@ -1,0 +1,667 @@
+{
+  "format": "four-horses.workshop-chain.v1",
+  "version": "1.0.0",
+  "units": "meters",
+  "axes": "glTF Y-up; (x, y, z) = (x_blender, z_blender, -y_blender)",
+  "room_envelope_m": {
+    "width": 36.0,
+    "depth": 18.0,
+    "wall_height": 3.6
+  },
+  "entry_nodes": [
+    "S0_INBOUND"
+  ],
+  "terminal_nodes": [
+    "S5A_GOOD",
+    "S5B_ESCAPED",
+    "S5D_SCRAP"
+  ],
+  "auxiliary_nodes": [
+    "S5E_BREAK"
+  ],
+  "stages": [
+    {
+      "id": "S0_INBOUND",
+      "name": "Inbound Arrival & Q1 Staging",
+      "logical_stage": 0,
+      "zone_id": "FLOOR_ZONE_INBOUND_STAGING",
+      "zone_bounds_gltf": {
+        "min": [-18.0, 0.0, -8.45],
+        "max": [-9.5, 3.6, 7.45]
+      },
+      "physical_bridge": "DOCK_01 ([-17.85, 0, +5.15]) -> FLOOR_ZONE_INBOUND_STAGING (WEST_INBOUND_RACK_01..02 + INBOUND_PALLET_STACK_01..04) -> Q1_PAIRED_PALLET_DECK / VIS_QUEUE_Q1 ([-11.0, 0.15, -3.1])",
+      "equipment_nodes": [
+        "DOCK_01",
+        "DOCK_01_BOLLARD_01",
+        "DOCK_01_BOLLARD_02",
+        "PALLET_JACK",
+        "FLOOR_ZONE_INBOUND_STAGING",
+        "INBOUND_TRANSFER_LANE",
+        "WEST_INBOUND_RACK_01",
+        "WEST_INBOUND_RACK_02",
+        "INBOUND_PALLET_STACK_01",
+        "INBOUND_PALLET_STACK_02",
+        "INBOUND_PALLET_STACK_03",
+        "INBOUND_PALLET_STACK_04",
+        "NW_TOTE_RETURN_RACK",
+        "NW_CHARGING_CABINET",
+        "Q1_PAIRED_PALLET_DECK",
+        "VIS_QUEUE_Q1",
+        "VIS_QUEUE_Q1_SLOT_00",
+        "VIS_QUEUE_Q1_SLOT_01",
+        "VIS_QUEUE_Q1_SLOT_02",
+        "VIS_QUEUE_Q1_SLOT_03",
+        "VIS_QUEUE_Q1_SLOT_04",
+        "VIS_QUEUE_Q1_SLOT_05"
+      ],
+      "work_anchor": "DOCK_01",
+      "order_anchor": "VIS_QUEUE_Q1",
+      "character_roles": [
+        "exogenous_arrival",
+        "worker_stage_1"
+      ],
+      "operation_clips": [
+        "Idle"
+      ],
+      "transfer_clips": [
+        "Walk",
+        "PickUp",
+        "CarryWalk",
+        "CarryIdle",
+        "PlaceDown"
+      ],
+      "conveyor_segments": [],
+      "upstream_ids": [],
+      "downstream_ids": [
+        "S1_PREP"
+      ]
+    },
+    {
+      "id": "S1_PREP",
+      "name": "Stage 1 — Carton Preparation (01 PREP)",
+      "logical_stage": 1,
+      "zone_id": "FLOOR_ZONE_01",
+      "zone_bounds_gltf": {
+        "min": [-13.35, 0.0, -4.9],
+        "max": [-8.55, 3.6, 0.45]
+      },
+      "physical_bridge": "VIS_QUEUE_Q1 -> VIS_STAGE_1_TABLE -> INFEED_PREP_C01 roller bridge (y=0.86m) -> CONVEYOR_01..02 -> VIS_QUEUE_Q2_FRAME",
+      "equipment_nodes": [
+        "FLOOR_ZONE_01",
+        "STAGE1_PREP_TABLE",
+        "VIS_STAGE_1_TABLE",
+        "PREP_TOOLING",
+        "INFEED_PREP_C01",
+        "CONVEYOR_01",
+        "CONVEYOR_02"
+      ],
+      "work_anchor": "VIS_STAGE_1_WORK",
+      "order_anchor": "VIS_STAGE_1_ORDER",
+      "character_roles": [
+        "worker_stage_1"
+      ],
+      "operation_clips": [
+        "Prepare",
+        "Prepare_Oversize",
+        "Idle"
+      ],
+      "transfer_clips": [
+        "Walk",
+        "Reach",
+        "PickUp",
+        "CarryWalk",
+        "PlaceDown"
+      ],
+      "conveyor_segments": [
+        "INFEED_PREP_C01",
+        "CONVEYOR_01",
+        "CONVEYOR_02"
+      ],
+      "upstream_ids": [
+        "S0_INBOUND",
+        "S5E_BREAK"
+      ],
+      "downstream_ids": [
+        "S2_PICK",
+        "S5E_BREAK"
+      ]
+    },
+    {
+      "id": "S2_PICK",
+      "name": "Stage 2 — Order Picking (02 PICK)",
+      "logical_stage": 2,
+      "zone_id": "FLOOR_ZONE_02",
+      "zone_bounds_gltf": {
+        "min": [-8.15, 0.0, -6.8],
+        "max": [-3.95, 3.6, 3.4]
+      },
+      "physical_bridge": "VIS_QUEUE_Q2_FRAME (infeed X=-6.46) -> CONVEYOR_03 -> SPUR_PICK ball-transfer take-off -> BENCH_PICK + PICK_BENCH_TOTES + RACK_01..03 -> CONVEYOR_04..05 -> VIS_QUEUE_Q3_FRAME",
+      "equipment_nodes": [
+        "FLOOR_ZONE_02",
+        "VIS_QUEUE_Q2",
+        "VIS_QUEUE_Q2_FRAME",
+        "VIS_QUEUE_Q2_SLOT_00",
+        "VIS_QUEUE_Q2_SLOT_01",
+        "VIS_QUEUE_Q2_SLOT_02",
+        "VIS_QUEUE_Q2_SLOT_03",
+        "VIS_QUEUE_Q2_SLOT_04",
+        "VIS_QUEUE_Q2_SLOT_05",
+        "VIS_QUEUE_Q2_SLOT_06",
+        "VIS_QUEUE_Q2_SLOT_07",
+        "VIS_QUEUE_Q2_SLOT_08",
+        "VIS_QUEUE_Q2_SLOT_09",
+        "VIS_QUEUE_Q2_SLOT_10",
+        "VIS_QUEUE_Q2_SLOT_11",
+        "SPUR_PICK",
+        "BENCH_PICK",
+        "PICK_BENCH_TOTES",
+        "RACK_01",
+        "RACK_02",
+        "RACK_03",
+        "CONVEYOR_03",
+        "CONVEYOR_04",
+        "CONVEYOR_05"
+      ],
+      "work_anchor": "VIS_STAGE_2_WORK",
+      "order_anchor": "VIS_STAGE_2_ORDER",
+      "character_roles": [
+        "worker_stage_2"
+      ],
+      "operation_clips": [
+        "Pick",
+        "Pick_Oversize",
+        "Idle"
+      ],
+      "transfer_clips": [
+        "Walk",
+        "Reach",
+        "PickUp",
+        "CarryWalk",
+        "PlaceDown"
+      ],
+      "conveyor_segments": [
+        "CONVEYOR_03",
+        "SPUR_PICK",
+        "CONVEYOR_04",
+        "CONVEYOR_05"
+      ],
+      "upstream_ids": [
+        "S1_PREP",
+        "S5E_BREAK"
+      ],
+      "downstream_ids": [
+        "S3A_PACK_MANUAL",
+        "S3B_PACK_ROBOT",
+        "S5E_BREAK"
+      ]
+    },
+    {
+      "id": "S3A_PACK_MANUAL",
+      "name": "Stage 3A — Manual Packing & Rework (03 / PACK (MANUAL + AUTO SLOT))",
+      "logical_stage": 3,
+      "zone_id": "FLOOR_ZONE_03",
+      "zone_bounds_gltf": {
+        "min": [-3.55, 0.0, -4.9],
+        "max": [5.4, 3.6, 7.8]
+      },
+      "physical_bridge": "Stage 3 combines manual packing benches with an AI-configurable automation slot (plan.robot: true/false). Priority 1: QUEUE_R_ROLLER_SECTION -> BENCH_REWORK ([1.80, 0, +6.35], worker [1.80, 0, +5.55]); Priority 2: VIS_QUEUE_Q3_FRAME (infeed X=+0.42) -> CONVEYOR_06 -> SPUR_PACK ball-transfer take-off -> BENCH_PACK -> CONVEYOR_07..08 -> VIS_QUEUE_Q4_FRAME",
+      "equipment_nodes": [
+        "FLOOR_ZONE_03",
+        "VIS_QUEUE_Q3",
+        "VIS_QUEUE_Q3_FRAME",
+        "VIS_QUEUE_Q3_SLOT_00",
+        "VIS_QUEUE_Q3_SLOT_01",
+        "VIS_QUEUE_Q3_SLOT_02",
+        "VIS_QUEUE_Q3_SLOT_03",
+        "VIS_QUEUE_Q3_SLOT_04",
+        "VIS_QUEUE_Q3_SLOT_05",
+        "VIS_QUEUE_Q3_SLOT_06",
+        "VIS_QUEUE_Q3_SLOT_07",
+        "VIS_QUEUE_Q3_SLOT_08",
+        "VIS_QUEUE_Q3_SLOT_09",
+        "SPUR_PACK",
+        "BENCH_PACK",
+        "BENCH_REWORK",
+        "PACK_PAPER_ROLL",
+        "SUPPLY_TROLLEY",
+        "QUEUE_R_ROLLER_SECTION",
+        "CONVEYOR_06",
+        "CONVEYOR_07",
+        "CONVEYOR_08"
+      ],
+      "work_anchor": "VIS_STAGE_3_WORK",
+      "order_anchor": "VIS_STAGE_3_ORDER",
+      "character_roles": [
+        "worker_stage_3"
+      ],
+      "operation_clips": [
+        "Pack",
+        "Pack_Oversize",
+        "Idle"
+      ],
+      "transfer_clips": [
+        "Walk",
+        "Reach",
+        "PickUp",
+        "CarryWalk",
+        "PlaceDown"
+      ],
+      "conveyor_segments": [
+        "CONVEYOR_06",
+        "SPUR_PACK",
+        "CONVEYOR_07",
+        "CONVEYOR_08"
+      ],
+      "upstream_ids": [
+        "S2_PICK",
+        "S5C_REWORK_R",
+        "S5E_BREAK"
+      ],
+      "downstream_ids": [
+        "S4_QC",
+        "S5E_BREAK"
+      ]
+    },
+    {
+      "id": "S3B_PACK_ROBOT",
+      "name": "Stage 3B — AI-Configurable Automated Packing Slot (plan.robot: true/false)",
+      "logical_stage": 3,
+      "zone_id": "ENV_ROBOT_CELL",
+      "zone_bounds_gltf": {
+        "min": [2.4, 0.0, -4.9],
+        "max": [5.1, 3.6, 0.45]
+      },
+      "physical_bridge": "AI-configurable Stage-3 automation slot (plan.robot: true/false; offline/bypassed when plan.robot==false): VIS_QUEUE_Q3_FRAME (attempt==0) -> CONVEYOR_06..08 -> SPUR_ROBOT roller bridge (y=0.86m) -> VIS_ROBOT_PACK_TABLE ([3.5, 0.86, -2.39]) -> SPUR_ROBOT -> CONVEYOR_08 -> VIS_QUEUE_Q4_FRAME (or S3C_ROBOT_ASSIST on jam)",
+      "equipment_nodes": [
+        "ENV_ROBOT_CELL",
+        "SPUR_ROBOT",
+        "ROBOT_PACK_TABLE",
+        "ROBOT_TABLE_REINFORCEMENT",
+        "VIS_ROBOT_PACK_TABLE",
+        "VIS_Bench_top_robot_chamfer",
+        "ROBOT_PLC_CABINET",
+        "ANDON_GREEN",
+        "ANDON_AMBER",
+        "ANDON_RED",
+        "VIS_status_offline",
+        "CONVEYOR_06",
+        "CONVEYOR_07",
+        "CONVEYOR_08"
+      ],
+      "work_anchor": "VIS_ROBOT_WORK",
+      "order_anchor": "VIS_ROBOT_ORDER",
+      "character_roles": [
+        "robot"
+      ],
+      "operation_clips": [
+        "RobotPack",
+        "RobotPack_Oversize",
+        "Idle",
+        "Offline"
+      ],
+      "transfer_clips": [
+        "Reach",
+        "PickUp",
+        "PlaceDown"
+      ],
+      "conveyor_segments": [
+        "CONVEYOR_06",
+        "CONVEYOR_07",
+        "CONVEYOR_08",
+        "SPUR_ROBOT"
+      ],
+      "upstream_ids": [
+        "S2_PICK"
+      ],
+      "downstream_ids": [
+        "S4_QC",
+        "S3C_ROBOT_ASSIST"
+      ]
+    },
+    {
+      "id": "S3C_ROBOT_ASSIST",
+      "name": "Stage 3C — Robot Jam & Human Assist",
+      "logical_stage": 3,
+      "zone_id": "ENV_ROBOT_CELL",
+      "zone_bounds_gltf": {
+        "min": [2.4, 0.0, -4.9],
+        "max": [5.1, 3.6, -0.65]
+      },
+      "physical_bridge": "Stage-3 Worker walks to VIS_ROBOT_ASSIST ([2.8, 0, -1.95], yaw=2.131959739083249 rad facing [3.5, 0.86, -2.39]) -> clears jam on VIS_ROBOT_PACK_TABLE / SPUR_ROBOT -> CONVEYOR_08 -> VIS_QUEUE_Q4_FRAME",
+      "equipment_nodes": [
+        "ENV_ROBOT_CELL",
+        "SPUR_ROBOT",
+        "ROBOT_PACK_TABLE",
+        "ROBOT_TABLE_REINFORCEMENT",
+        "VIS_ROBOT_PACK_TABLE",
+        "ANDON_RED",
+        "ANDON_AMBER",
+        "VIS_status_jammed",
+        "VIS_status_service",
+        "CONVEYOR_07",
+        "CONVEYOR_08"
+      ],
+      "work_anchor": "VIS_ROBOT_ASSIST",
+      "order_anchor": "VIS_ROBOT_ORDER",
+      "character_roles": [
+        "robot",
+        "worker_stage_3_helper"
+      ],
+      "operation_clips": [
+        "Assist",
+        "Jammed",
+        "Jammed_Oversize",
+        "Service",
+        "Service_Oversize"
+      ],
+      "transfer_clips": [
+        "Walk",
+        "Reach"
+      ],
+      "conveyor_segments": [
+        "CONVEYOR_07",
+        "CONVEYOR_08",
+        "SPUR_ROBOT"
+      ],
+      "upstream_ids": [
+        "S3B_PACK_ROBOT",
+        "S5E_BREAK"
+      ],
+      "downstream_ids": [
+        "S4_QC",
+        "S5E_BREAK"
+      ]
+    },
+    {
+      "id": "S4_QC",
+      "name": "Stage 4 — Quality Control (04 QC)",
+      "logical_stage": 4,
+      "zone_id": "FLOOR_ZONE_04",
+      "zone_bounds_gltf": {
+        "min": [5.4, 0.0, -4.9],
+        "max": [8.78, 3.6, 3.4]
+      },
+      "physical_bridge": "VIS_QUEUE_Q4_FRAME (infeed X=+6.44) -> CONVEYOR_09 / QC_PORTAL ([5.74, 0, 0]) -> SPUR_QC ball-transfer take-off -> VIS_STAGE_4_TABLE / QC_SCALE_FLUSH -> CONVEYOR_10 or outcome lanes",
+      "equipment_nodes": [
+        "FLOOR_ZONE_04",
+        "VIS_QUEUE_Q4",
+        "VIS_QUEUE_Q4_FRAME",
+        "VIS_QUEUE_Q4_SLOT_00",
+        "VIS_QUEUE_Q4_SLOT_01",
+        "VIS_QUEUE_Q4_SLOT_02",
+        "VIS_QUEUE_Q4_SLOT_03",
+        "VIS_QUEUE_Q4_SLOT_04",
+        "VIS_QUEUE_Q4_SLOT_05",
+        "VIS_QUEUE_Q4_SLOT_06",
+        "VIS_QUEUE_Q4_SLOT_07",
+        "QC_PORTAL",
+        "STOPPER_GATE",
+        "SPUR_QC",
+        "STAGE4_QC_TABLE",
+        "VIS_STAGE_4_TABLE",
+        "QC_TABLE_TOOLING",
+        "QC_SCALE_FLUSH",
+        "QC_TERMINAL",
+        "CONVEYOR_09",
+        "CONVEYOR_10"
+      ],
+      "work_anchor": "VIS_STAGE_4_WORK",
+      "order_anchor": "VIS_STAGE_4_ORDER",
+      "character_roles": [
+        "worker_stage_4"
+      ],
+      "operation_clips": [
+        "Inspect",
+        "Inspect_Oversize",
+        "Idle"
+      ],
+      "transfer_clips": [
+        "Walk",
+        "Reach",
+        "PickUp",
+        "CarryWalk",
+        "PlaceDown"
+      ],
+      "conveyor_segments": [
+        "CONVEYOR_09",
+        "SPUR_QC",
+        "CONVEYOR_10"
+      ],
+      "upstream_ids": [
+        "S3A_PACK_MANUAL",
+        "S3B_PACK_ROBOT",
+        "S3C_ROBOT_ASSIST",
+        "S5E_BREAK"
+      ],
+      "downstream_ids": [
+        "S5A_GOOD",
+        "S5B_ESCAPED",
+        "S5C_REWORK_R",
+        "S5D_SCRAP",
+        "S5E_BREAK"
+      ]
+    },
+    {
+      "id": "S5A_GOOD",
+      "name": "Terminal Outcome — Good Dispatch",
+      "logical_stage": 5,
+      "zone_id": "OUTCOME_FLOOR_GOOD",
+      "zone_bounds_gltf": {
+        "min": [8.78, 0.0, -7.25],
+        "max": [18.0, 3.6, 7.45]
+      },
+      "physical_bridge": "04 QC -> CONVEYOR_10 (X=+9.0) -> OUTFEED_C10_GOOD roller deck + inclined skate-wheel gravity chute -> DISPATCH_PALLET_00 / VIS_OUTCOME_GOOD ([10.0, 0.15, -2.2]) -> FLOOR_ZONE_SHIPPING_STAGING (SHIPPING_PALLET_01..06 + PALLET_STRETCH_WRAPPER + SHIPPING_MANIFEST_PODIUM) -> DOCK_02 ([+17.85, 0, +5.15])",
+      "equipment_nodes": [
+        "CONVEYOR_10",
+        "OUTFEED_C10_GOOD",
+        "OUTCOME_FLOOR_GOOD",
+        "DISPATCH_PALLET_00",
+        "VIS_OUTCOME_GOOD",
+        "VIS_outcome_good",
+        "FLOOR_ZONE_SHIPPING_STAGING",
+        "DISPATCH_TRANSFER_LANE",
+        "FLOOR_ZONE_SHIPPING",
+        "SHIPPING_PALLET_01",
+        "SHIPPING_PALLET_02",
+        "SHIPPING_PALLET_03",
+        "SHIPPING_PALLET_04",
+        "SHIPPING_PALLET_05",
+        "SHIPPING_PALLET_06",
+        "PALLET_STRETCH_WRAPPER",
+        "SHIPPING_MANIFEST_PODIUM",
+        "DOCK_02_BOLLARD_01",
+        "DOCK_02_BOLLARD_02",
+        "DOCK_02"
+      ],
+      "work_anchor": "DOCK_02",
+      "order_anchor": "VIS_OUTCOME_GOOD",
+      "character_roles": [
+        "outbound_dispatch"
+      ],
+      "operation_clips": [],
+      "transfer_clips": [
+        "Walk",
+        "CarryWalk",
+        "PlaceDown"
+      ],
+      "conveyor_segments": [
+        "CONVEYOR_10",
+        "OUTFEED_C10_GOOD"
+      ],
+      "upstream_ids": [
+        "S4_QC"
+      ],
+      "downstream_ids": []
+    },
+    {
+      "id": "S5B_ESCAPED",
+      "name": "Terminal Outcome — Escaped Defect (5% QC Miss)",
+      "logical_stage": 5,
+      "zone_id": "OUTCOME_FLOOR_ESCAPED",
+      "zone_bounds_gltf": {
+        "min": [9.0, 0.0, -5.4],
+        "max": [18.0, 3.6, 6.8]
+      },
+      "physical_bridge": "04 QC -> CONVEYOR_10 -> DISPATCH_PALLET_01 / VIS_OUTCOME_ESCAPED ([10.0, 0.15, -4.4]) -> DOCK_02",
+      "equipment_nodes": [
+        "CONVEYOR_10",
+        "OUTCOME_FLOOR_ESCAPED",
+        "DISPATCH_PALLET_01",
+        "VIS_OUTCOME_ESCAPED",
+        "VIS_outcome_escaped",
+        "DOCK_02"
+      ],
+      "work_anchor": "DOCK_02",
+      "order_anchor": "VIS_OUTCOME_ESCAPED",
+      "character_roles": [
+        "outbound_dispatch"
+      ],
+      "operation_clips": [],
+      "transfer_clips": [
+        "Walk",
+        "CarryWalk",
+        "PlaceDown"
+      ],
+      "conveyor_segments": [
+        "CONVEYOR_10"
+      ],
+      "upstream_ids": [
+        "S4_QC"
+      ],
+      "downstream_ids": []
+    },
+    {
+      "id": "S5C_REWORK_R",
+      "name": "Rework Return Loop (attempt 0 -> 1)",
+      "logical_stage": 5,
+      "zone_id": "FLOOR_ZONE_R",
+      "zone_bounds_gltf": {
+        "min": [0.85, 0.0, -2.5],
+        "max": [8.6, 3.6, 8.6]
+      },
+      "physical_bridge": "04 QC -> East Cross-Aisle & South Corridor -> QUEUE_R_ROLLER_SECTION / VIS_QUEUE_R ([3.8, 0.86, +7.45]) -> BENCH_REWORK ([1.80, 0.0, +6.35], worker [1.80, 0.0, +5.55] yaw=0.0) -> CONVEYOR_07..08 -> VIS_QUEUE_Q4_FRAME (attempt=1, robot excluded)",
+      "equipment_nodes": [
+        "FLOOR_ZONE_R",
+        "BENCH_REWORK",
+        "QUEUE_R_ROLLER_SECTION",
+        "VIS_QUEUE_R",
+        "VIS_QUEUE_R_SLOT_00",
+        "VIS_QUEUE_R_SLOT_01",
+        "VIS_QUEUE_R_SLOT_02",
+        "VIS_QUEUE_R_SLOT_03",
+        "VIS_QUEUE_R_SLOT_04",
+        "VIS_QUEUE_R_SLOT_05"
+      ],
+      "work_anchor": "ANCHOR_BENCH_REWORK_APPROACH",
+      "order_anchor": "VIS_QUEUE_R",
+      "character_roles": [
+        "worker_stage_4",
+        "worker_stage_3"
+      ],
+      "operation_clips": [
+        "Pack",
+        "Pack_Oversize",
+        "Idle"
+      ],
+      "transfer_clips": [
+        "Walk",
+        "PickUp",
+        "CarryWalk",
+        "CarryIdle",
+        "PlaceDown"
+      ],
+      "conveyor_segments": [
+        "QUEUE_R_ROLLER_SECTION"
+      ],
+      "upstream_ids": [
+        "S4_QC"
+      ],
+      "downstream_ids": [
+        "S3A_PACK_MANUAL"
+      ]
+    },
+    {
+      "id": "S5D_SCRAP",
+      "name": "Terminal Outcome — Scrap (attempt 1 Defect Caught)",
+      "logical_stage": 5,
+      "zone_id": "OUTCOME_FLOOR_SCRAP",
+      "zone_bounds_gltf": {
+        "min": [5.8, 0.0, -2.5],
+        "max": [9.65, 3.6, 8.2]
+      },
+      "physical_bridge": "04 QC -> South Reject Corridor -> BENCH_SCRAP ([8.65, 0.0, +6.35], worker [8.65, 0.0, +5.55] yaw=0.0) -> SCRAP_BIN / VIS_OUTCOME_SCRAP ([7.2, 0.02, +7.0])",
+      "equipment_nodes": [
+        "OUTCOME_FLOOR_SCRAP",
+        "BENCH_SCRAP",
+        "SCRAP_BIN",
+        "VIS_OUTCOME_SCRAP",
+        "VIS_outcome_scrap"
+      ],
+      "work_anchor": "ANCHOR_BENCH_SCRAP_APPROACH",
+      "order_anchor": "VIS_OUTCOME_SCRAP",
+      "character_roles": [
+        "worker_stage_4"
+      ],
+      "operation_clips": [],
+      "transfer_clips": [
+        "Walk",
+        "CarryWalk",
+        "PlaceDown"
+      ],
+      "conveyor_segments": [],
+      "upstream_ids": [
+        "S4_QC"
+      ],
+      "downstream_ids": []
+    },
+    {
+      "id": "S5E_BREAK",
+      "name": "Mandatory Shift Break (t >= 440, 40 ticks)",
+      "logical_stage": 5,
+      "zone_id": "BREAK_AND_KPI_ZONE",
+      "zone_bounds_gltf": {
+        "min": [7.35, 0.0, -8.75],
+        "max": [14.5, 3.6, -5.2]
+      },
+      "physical_bridge": "Stages 1..4 <-> North-East ENV_BREAK_AREA (Walk [t, t+2), Break [t+2, end-2), Walk return [end-2, end))",
+      "equipment_nodes": [
+        "ENV_BREAK_AREA",
+        "BREAK_AND_KPI_ZONE",
+        "BREAK_BENCH",
+        "WATER_COOLER",
+        "SQDC_KPI_BOARD",
+        "VIS_status_break"
+      ],
+      "work_anchor": "BREAK_BENCH",
+      "order_anchor": null,
+      "character_roles": [
+        "worker_stage_1",
+        "worker_stage_2",
+        "worker_stage_3",
+        "worker_stage_4"
+      ],
+      "operation_clips": [
+        "Break",
+        "Idle"
+      ],
+      "transfer_clips": [
+        "Walk"
+      ],
+      "conveyor_segments": [],
+      "upstream_ids": [
+        "S1_PREP",
+        "S2_PICK",
+        "S3A_PACK_MANUAL",
+        "S3C_ROBOT_ASSIST",
+        "S4_QC"
+      ],
+      "downstream_ids": [
+        "S1_PREP",
+        "S2_PICK",
+        "S3A_PACK_MANUAL",
+        "S3C_ROBOT_ASSIST",
+        "S4_QC"
+      ]
+    }
+  ]
+}

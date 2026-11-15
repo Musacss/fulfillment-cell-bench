@@ -15,6 +15,19 @@ def supplement_bones(bone,extras):
     bone('prop_box',SOURCE,SOURCE+Vector((0,0,.10)),'root')
     bone('prop_stand',(0,0,0),(0,0,.10),'root')
 
+def curves(action):
+    if hasattr(action,'fcurves'):return list(action.fcurves)
+    return [fc for layer in action.layers for strip in layer.strips for bag in strip.channelbags for fc in bag.fcurves]
+
+def clear_curves(action):
+    if hasattr(action,'fcurves'):
+        for fc in list(action.fcurves):action.fcurves.remove(fc)
+    else:
+        for layer in action.layers:
+            for strip in layer.strips:
+                for bag in strip.channelbags:
+                    for fc in list(bag.fcurves):bag.fcurves.remove(fc)
+
 def ease(t):t=max(0,min(1,t));return t*t*(3-2*t)
 def pose_state(name,t):
     if name in ['Idle','Walk']:return {'center':HELD.copy(),'grip':0.,'approach':0.,'lean':0.,'box':False,'stand':False}
@@ -23,10 +36,10 @@ def pose_state(name,t):
         return {'center':center,'grip':1.,'approach':1.,'lean':0.,'box':True,'stand':False}
     if name=='Reach':
         a=math.sin(math.pi*t)**2
-        return {'center':SOURCE.copy(),'grip':0.,'approach':a,'lean':a,'box':True,'stand':True}
+        return {'center':SOURCE.copy(),'grip':0.,'approach':a,'lean':a,'box':False,'stand':False}
     u=t if name=='PickUp' else 1-t
     approach=ease(u/.32);grip=ease((u-.32)/.15);lift=ease((u-.50)/.40)
-    return {'center':SOURCE.lerp(HELD,lift),'grip':grip,'approach':approach,'lean':approach*(1-lift),'box':True,'stand':True}
+    return {'center':SOURCE.lerp(HELD,lift),'grip':grip,'approach':approach,'lean':approach*(1-lift),'box':True,'stand':False}
 
 def create_motion(rig,body,col,link,kind,extras):
     prefix='Worker' if kind=='worker' else 'Robot';upper=prefix.upper()
@@ -133,14 +146,17 @@ def create_motion(rig,body,col,link,kind,extras):
         for m in mats:mesh.materials.append(m)
         for p,i in zip(mesh.polygons,material_indices):p.material_index=i;p.use_smooth=False
         ob=link(bpy.data.objects.new(name,mesh));ob.parent=rig;ob.vertex_groups.new(name=bone_name).add(list(range(len(vertices))),1,'REPLACE');mod=ob.modifiers.new('Rigid prop binding','ARMATURE');mod.object=rig
-        ob['handling_prop']='box' if bone_name=='prop_box' else 'support';return ob
-    box=rigid_boxes(upper+'_DemoCarton',[(SOURCE,BOX_SIZE,0),(SOURCE+Vector((0,0,.1254)),(.045,.281,.0008),1)],'prop_box',[cardboard,tape])
-    stand=rigid_boxes(upper+'_DemoSupport',[((0,-.34,.8475),(.46,.38,.025),0),((0,-.34,.41),(.085,.085,.82),0),((0,-.34,.018),(.30,.28,.036),0)],'prop_stand',[support])
+        ob['operation_prop']=True;ob['prop_role']=bone_name;ob[f'{kind}_asset']=True
+        mesh['operation_prop']=True;mesh['prop_role']=bone_name;mesh[f'{kind}_asset']=True
+        return ob
+    box=rigid_boxes(upper+'_ClosedCarton',[(SOURCE,BOX_SIZE,0),(SOURCE+Vector((0,0,.1254)),(.045,.281,.0008),1)],'prop_box',[cardboard,tape])
     clips=[];contacts=[]
     for name,duration,loop in CLIPS:
         action=bpy.data.actions.get(prefix+'_'+name) or bpy.data.actions.new(prefix+'_'+name)
-        for fc in list(action.fcurves):action.fcurves.remove(fc)
-        rig.animation_data_create();rig.animation_data.action=action;count=round(duration*30)
+        clear_curves(action)
+        rig.animation_data_create();rig.animation_data.action=action
+        if hasattr(action,'slots') and action.slots:rig.animation_data.action_slot=action.slots[0]
+        count=round(duration*30)
         for frame in range(count+1):
             reset_pose(rig);t=frame/count;phase=2*math.pi*t;state=pose_state(name,t)
             if name=='Idle':
@@ -172,7 +188,7 @@ def create_motion(rig,body,col,link,kind,extras):
             for pb in rig.pose.bones:
                 pb.keyframe_insert('rotation_quaternion',frame=frame,group=pb.name);pb.keyframe_insert('scale',frame=frame,group=pb.name)
                 if pb.name in ['hips','root','prop_box']:pb.keyframe_insert('location',frame=frame,group=pb.name)
-        for fc in action.fcurves:
+        for fc in curves(action):
             for key in fc.keyframe_points:key.interpolation='LINEAR'
             if loop:fc.modifiers.new('CYCLES')
         clips.append({'name':name,'action':action.name,'duration_seconds':duration,'loop':loop,'root_motion':False})

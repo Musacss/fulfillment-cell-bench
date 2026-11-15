@@ -36,9 +36,13 @@
     5.9
   ],
   "floor_axes_removed": true,
+  "side_wall_height_m": 3.6,
+  "side_wall_panels": 4,
+  "former_parapet_gaps_closed": true,
+  "upper_dock_walls_closed": false,
   "zones_blender_bounds_m": {
     "PREP": [
-      -12.4,
+      -13.35,
       -8.55,
       0.65,
       4.9
@@ -64,7 +68,8 @@
   },
   "production_object_fingerprints_preserved": 3527,
   "character_animation_actions_preserved": 31,
-  "glbs_unchanged": 15,
+  "glbs_unchanged": false,
+  "glbs_rebuilt": 13,
   "native_acceptance": "passed",
-  "preview_updated": true
+  "preview_updated": false
 }

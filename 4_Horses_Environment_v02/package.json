@@ -4,6 +4,7 @@
   "private": true,
   "type": "module",
   "scripts": {
+    "test": "node scripts/check_v02.mjs",
     "check": "node scripts/check_v02.mjs",
     "validate": "node scripts/validate_gltf.mjs warehouse_environment.glb modules/visual_layout.glb modules/visual_support.glb modules/warehouse_worker.glb modules/humanoid_robot.glb"
   },
