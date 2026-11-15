@@ -14,6 +14,7 @@ SEEDS_FILE=""
 OUT_DIR="${REPO_ROOT}/artifacts/judge-harbor-eval"
 CONTROLS_ONLY=0
 HARBOR_BIN="${HARBOR_BIN:-harbor}"
+PYTHON_BIN="${PYTHON_BIN:-}"
 
 usage() {
   cat <<'EOF'
@@ -37,26 +38,145 @@ Options:
 EOF
 }
 
+require_opt_arg() {
+  if [[ $# -lt 2 || -z "${2:-}" || "${2:-}" == -* ]]; then
+    echo "Error: Option '$1' requires a non-empty value." >&2
+    usage >&2
+    exit 2
+  fi
+}
+
+canon_path() {
+  local raw="$1"
+  if [[ "$raw" != /* ]]; then
+    raw="$(pwd -P)/${raw}"
+  fi
+  local IFS='/'
+  local -a parts=()
+  local -a norm=()
+  read -r -a parts <<< "$raw"
+  local seg
+  for seg in "${parts[@]}"; do
+    if [[ -z "$seg" || "$seg" == "." ]]; then
+      continue
+    elif [[ "$seg" == ".." ]]; then
+      if [[ ${#norm[@]} -gt 0 ]]; then
+        unset 'norm[${#norm[@]}-1]'
+      fi
+    else
+      norm+=("$seg")
+    fi
+  done
+  if [[ ${#norm[@]} -eq 0 ]]; then
+    echo "/"
+    return 0
+  fi
+  local probe=""
+  local idx=0
+  local last_existing_idx=-1
+  for (( idx=0; idx<${#norm[@]}; idx++ )); do
+    probe="${probe}/${norm[$idx]}"
+    if [[ -e "$probe" || -L "$probe" ]]; then
+      last_existing_idx=$idx
+    else
+      break
+    fi
+  done
+  if [[ $last_existing_idx -lt 0 ]]; then
+    local joined=""
+    for seg in "${norm[@]}"; do
+      joined="${joined}/${seg}"
+    done
+    echo "$joined"
+    return 0
+  fi
+  local existing_prefix=""
+  for (( idx=0; idx<=last_existing_idx; idx++ )); do
+    existing_prefix="${existing_prefix}/${norm[$idx]}"
+  done
+  local resolved_prefix=""
+  if [[ -d "$existing_prefix" ]]; then
+    resolved_prefix="$(cd -P "$existing_prefix" 2>/dev/null && pwd -P)" || resolved_prefix="$existing_prefix"
+  else
+    local parent_dir
+    parent_dir="$(cd -P "$(dirname "$existing_prefix")" 2>/dev/null && pwd -P)" || parent_dir="$(dirname "$existing_prefix")"
+    resolved_prefix="${parent_dir%/}/$(basename "$existing_prefix")"
+  fi
+  local result="${resolved_prefix%/}"
+  for (( idx=last_existing_idx+1; idx<${#norm[@]}; idx++ )); do
+    result="${result}/${norm[$idx]}"
+  done
+  [[ -z "$result" ]] && result="/"
+  echo "$result"
+}
+
+validate_safe_out_dir() {
+  local raw_out="$1"
+  shift
+  if [[ -z "$raw_out" || "$raw_out" == "/" || "$raw_out" == "." || "$raw_out" == ".." ]]; then
+    echo "Error: Unsafe --out directory '$raw_out'." >&2
+    exit 2
+  fi
+  local out_real
+  out_real="$(canon_path "$raw_out")"
+  if [[ -z "$out_real" || "$out_real" == "/" ]]; then
+    echo "Error: Unsafe --out directory '$raw_out' (resolves to '/')." >&2
+    exit 2
+  fi
+  local guarded_raw guarded_real
+  for guarded_raw in "$@"; do
+    [[ -z "$guarded_raw" ]] && continue
+    guarded_real="$(canon_path "$guarded_raw")"
+    if [[ "$out_real" == "$guarded_real" || "$guarded_real" == "${out_real}/"* ]]; then
+      echo "Error: Refusing destructive --out '$raw_out' overlapping protected path '$guarded_raw'." >&2
+      exit 2
+    fi
+  done
+}
+
 while [[ $# -gt 0 ]]; do
   case "$1" in
-    -m|--model) MODEL="$2"; shift 2 ;;
-    -k|--trials) TRIALS="$2"; shift 2 ;;
-    -n|--concurrency) CONCURRENCY="$2"; shift 2 ;;
-    -p|--task-dir) TASK_DIR="$2"; shift 2 ;;
-    --seeds-file) SEEDS_FILE="$2"; shift 2 ;;
-    -o|--out) OUT_DIR="$2"; shift 2 ;;
+    -m|--model) require_opt_arg "$@"; MODEL="$2"; shift 2 ;;
+    -k|--trials) require_opt_arg "$@"; TRIALS="$2"; shift 2 ;;
+    -n|--concurrency) require_opt_arg "$@"; CONCURRENCY="$2"; shift 2 ;;
+    -p|--task-dir) require_opt_arg "$@"; TASK_DIR="$2"; shift 2 ;;
+    --seeds-file) require_opt_arg "$@"; SEEDS_FILE="$2"; shift 2 ;;
+    -o|--out)
+      if [[ $# -lt 2 || -z "${2:-}" || "${2:-}" == -* ]]; then
+        echo "Error: Option '$1' requires a non-empty directory path." >&2
+        usage >&2
+        exit 2
+      fi
+      OUT_DIR="$2"
+      shift 2
+      ;;
     --controls-only) CONTROLS_ONLY=1; shift ;;
     -h|--help) usage; exit 0 ;;
     *) echo "Unknown argument: $1" >&2; usage >&2; exit 2 ;;
   esac
 done
 
+if ! [[ "$TRIALS" =~ ^[1-9][0-9]*$ ]]; then
+  echo "Error: --trials must be an integer >= 1 (got '$TRIALS')." >&2
+  usage >&2
+  exit 2
+fi
+if ! [[ "$CONCURRENCY" =~ ^[1-9][0-9]*$ ]]; then
+  echo "Error: --concurrency must be an integer >= 1 (got '$CONCURRENCY')." >&2
+  usage >&2
+  exit 2
+fi
+
+validate_safe_out_dir "$OUT_DIR" "$REPO_ROOT" "$TASK_DIR"
+
 if ! command -v "$HARBOR_BIN" >/dev/null 2>&1; then
   echo "Error: '$HARBOR_BIN' CLI not found in PATH (install harbor==0.26.0)." >&2
   exit 1
 fi
 
-if command -v uv >/dev/null 2>&1; then
+if [[ -n "$PYTHON_BIN" ]]; then
+  PY_CMD=("$PYTHON_BIN")
+elif command -v uv >/dev/null 2>&1; then
   PY_CMD=(uv run python)
 elif [[ -x "${REPO_ROOT}/.venv/bin/python" ]]; then
   PY_CMD=("${REPO_ROOT}/.venv/bin/python")
@@ -78,6 +198,7 @@ if [[ -n "$SEEDS_FILE" ]]; then
     --seeds-file "$SEEDS_FILE"
 fi
 
+validate_safe_out_dir "$OUT_DIR" "$REPO_ROOT" "$TASK_DIR" "$ACTIVE_TASK"
 rm -rf "$OUT_DIR"
 mkdir -p "$OUT_DIR"
 

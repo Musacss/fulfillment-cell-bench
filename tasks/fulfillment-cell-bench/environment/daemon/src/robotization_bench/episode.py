@@ -257,6 +257,8 @@ class Episode:
                 self._submission = loaded["submission"]
                 self.log = loaded["log"]
                 self._rejected_calls = loaded["rejected_calls"]
+                if self._max_pilots != saved_max:
+                    self._persist()
             else:
                 self._persist()
 
@@ -470,6 +472,8 @@ class QuarterlyEpisode:
                 self._submission = loaded["submission"]
                 self.log = loaded["log"]
                 self._rejected_calls = loaded["rejected_calls"]
+                if self._max_pilots != saved_max:
+                    self._persist()
             else:
                 self._persist()
 

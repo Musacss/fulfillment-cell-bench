@@ -32,7 +32,14 @@ def _resolve_seeds(world: dict, seeds_mode: str, custom_seeds: list[int] | None)
         return list(world["development_seeds"])
     if seeds_mode == "replay":
         return json.loads((ROOT / "evidence" / "replay_seeds.json").read_text(encoding="utf-8"))
-    if seeds_mode == "custom" and custom_seeds:
+    if seeds_mode == "custom":
+        if (
+            not isinstance(custom_seeds, (list, tuple))
+            or not custom_seeds
+            or any(type(s) is not int or s < 0 for s in custom_seeds)
+            or len(set(custom_seeds)) != len(custom_seeds)
+        ):
+            raise ValueError("custom_seeds must be a non-empty list of distinct non-negative integers")
         return list(custom_seeds)
     raise ValueError("seeds_mode must be 'dev', 'replay', or 'custom' with non-empty custom_seeds")
 
@@ -380,11 +387,15 @@ def verify_plan_matrix(
 
 
 def audit_3d_replay_trace(plan: dict, seed: int = 11) -> dict:
+    if type(seed) is not int or seed < 0:
+        raise ValueError("seed must be a non-negative integer")
     world = load_world()
     return _audit_trace(world, plan, seed)
 
 
 def redteam_reward_exploits(seeds_mode: str = "dev", horizon: str = "quarterly") -> dict:
+    if horizon not in ("quarterly", "v1"):
+        raise ValueError("horizon must be 'quarterly' or 'v1'")
     world = load_world()
     seeds = _resolve_seeds(world, seeds_mode, None)
     return _redteam_suite_v1(world, seeds) if horizon == "v1" else _redteam_suite_quarterly(world, seeds)
@@ -398,14 +409,21 @@ async def serve() -> None:
         return TOOLS
 
     @server.call_tool()
-    async def call_tool(name: str, arguments: dict):
+    async def call_tool(name: str, arguments: dict | None):
+        arguments = arguments or {}
+        if type(arguments) is not dict:
+            raise ValueError("arguments must be a JSON object")
         if name == "verify_plan_matrix":
+            if "plan" not in arguments:
+                raise ValueError("Missing required 'plan' argument")
             payload = verify_plan_matrix(
                 arguments["plan"],
                 arguments.get("seeds_mode", "dev"),
                 arguments.get("custom_seeds"),
             )
         elif name == "audit_3d_replay_trace":
+            if "plan" not in arguments:
+                raise ValueError("Missing required 'plan' argument")
             payload = audit_3d_replay_trace(arguments["plan"], arguments.get("seed", 11))
         elif name == "redteam_reward_exploits":
             payload = redteam_reward_exploits(
