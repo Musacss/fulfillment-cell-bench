@@ -644,7 +644,7 @@ launch_gemini_job() {
   rm -rf "$job_dir"
   (
     "$HARBOR_BIN" run -p "$STAGE3_TASK" -a opencode -m "$model_id" --api-key-name GEMINI_API_KEY \
-      -n "$n_trials" -c "$n_trials" -o "$job_dir" --job-name "$group_slug" || true
+      -k "$n_trials" -n "$n_trials" -o "$job_dir" --job-name "$group_slug" || true
   ) >"${TMPDIR}/log_${group_slug}.log" 2>&1 &
   FRONTIER_PIDS+=("$!")
   FRONTIER_SPECS+=("${job_dir}|${group_slug}|${n_trials}")
@@ -658,7 +658,7 @@ launch_anthropic_job() {
   rm -rf "$job_dir"
   (
     "$HARBOR_BIN" run -p "$STAGE3_TASK" -a opencode -m "$model_id" --api-key-name ANTHROPIC_API_KEY \
-      -n "$n_trials" -c "$n_trials" -o "$job_dir" --job-name "$group_slug" || true
+      -k "$n_trials" -n "$n_trials" -o "$job_dir" --job-name "$group_slug" || true
   ) >"${TMPDIR}/log_${group_slug}.log" 2>&1 &
   FRONTIER_PIDS+=("$!")
   FRONTIER_SPECS+=("${job_dir}|${group_slug}|${n_trials}")
@@ -719,19 +719,19 @@ if [[ "$OPEN_EVAL_MODE" == "opencode" ]] && "$RL_PYTHON" -c "import vllm" >/dev/
   export OPENAI_API_KEY="local-vllm"
   JOB_BASE="${TMPDIR}/harbor-base-open"
   rm -rf "$JOB_BASE"
-  "$HARBOR_BIN" run -p "$STAGE3_TASK" -a opencode -m "openai/${RESOLVED_MODEL_ID}" -n "$OPEN_TRIALS" -c "$OPEN_TRIALS" -o "$JOB_BASE" || true
+  "$HARBOR_BIN" run -p "$STAGE3_TASK" -a opencode -m "openai/${RESOLVED_MODEL_ID}" -k "$OPEN_TRIALS" -n "$OPEN_TRIALS" -o "$JOB_BASE" || true
   harvest_harbor_job_trials "$JOB_BASE" "qwen3.5-9b_base" "$OPEN_TRIALS" 0
 
   if [[ -d "$ADAPTER_DIR" ]]; then
     JOB_POST="${TMPDIR}/harbor-post-rl"
     rm -rf "$JOB_POST"
-    "$HARBOR_BIN" run -p "$STAGE3_TASK" -a opencode -m "openai/post-rl" -n "$OPEN_TRIALS" -c "$OPEN_TRIALS" -o "$JOB_POST" || true
+    "$HARBOR_BIN" run -p "$STAGE3_TASK" -a opencode -m "openai/post-rl" -k "$OPEN_TRIALS" -n "$OPEN_TRIALS" -o "$JOB_POST" || true
     harvest_harbor_job_trials "$JOB_POST" "qwen3.5-9b_post_rl_grpo" "$OPEN_TRIALS" 0
   fi
   kill "$VLLM_PID" >/dev/null 2>&1 || true
 elif "$RL_PYTHON" -c "import vllm" >/dev/null 2>&1; then
-  PYTHONPATH="${REPO_ROOT}/src" "$RL_PYTHON" - \
-    "$RESOLVED_MODEL_ID" "$ADAPTER_DIR" "$STAGE3_TASK" "$OUT_DIR" "$HARBOR_RUNS_DIR" "$TMPDIR" "$REPO_ROOT" <<'PY'
+  QWEN_EVAL_SCRIPT="${TMPDIR}/_eval_qwen_blind_vllm.py"
+  cat > "$QWEN_EVAL_SCRIPT" <<'PY'
 import gc
 import json
 import os
@@ -740,6 +740,7 @@ import re
 import shutil
 import subprocess
 import sys
+import time
 
 import torch
 from peft import PeftModel
@@ -749,14 +750,6 @@ from vllm import LLM, SamplingParams
 from robotization_bench.contracts import load_world
 from robotization_bench.episode import QuarterlyEpisode
 from robotization_bench.validation import parse_quarterly_plan
-
-model_id = sys.argv[1]
-adapter_dir = Path(sys.argv[2])
-stage3_task = Path(sys.argv[3])
-out_dir = Path(sys.argv[4])
-harbor_runs_dir = Path(sys.argv[5])
-tmpdir = Path(sys.argv[6])
-repo_root = Path(sys.argv[7])
 
 SYSTEM_PROMPT = (
     "You are the Principal Fulfillment-Cell Operations Engineer designing a 12-week quarterly automation rollout "
@@ -814,7 +807,7 @@ def summarize_pilot(pub_w: dict, ep: QuarterlyEpisode, plan_dict: dict, pilot_se
     }
 
 
-def build_episode_prompt(world: dict, pilot_seed: int) -> tuple[list[dict[str, str]], QuarterlyEpisode]:
+def build_episode_prompt(world: dict, pilot_seed: int, repo_root: Path) -> tuple[list[dict[str, str]], QuarterlyEpisode]:
     ep = QuarterlyEpisode(world, rules_path=repo_root / "docs" / "SPEC.md")
     obs = ep.observe()
     pub_w = obs["world"]
@@ -869,7 +862,17 @@ def build_episode_prompt(world: dict, pilot_seed: int) -> tuple[list[dict[str, s
     return [{"role": "system", "content": SYSTEM_PROMPT}, {"role": "user", "content": user_text}], ep
 
 
-def eval_qwen_group(group_slug: str, lora_dir: Path | None) -> None:
+def eval_qwen_group(
+    group_slug: str,
+    lora_dir: Path | None,
+    *,
+    model_id: str,
+    stage3_task: Path,
+    out_dir: Path,
+    harbor_runs_dir: Path,
+    tmpdir: Path,
+    repo_root: Path,
+) -> None:
     world = load_world()
     tok = AutoTokenizer.from_pretrained(model_id)
     merge_dir = tmpdir / f"merged_{group_slug}"
@@ -898,15 +901,15 @@ def eval_qwen_group(group_slug: str, lora_dir: Path | None) -> None:
     dev_seeds = list(world["development_seeds"])[:3]
     prompts, episodes = [], []
     for ds in dev_seeds:
-        msgs, ep = build_episode_prompt(world, ds)
+        msgs, ep = build_episode_prompt(world, ds, repo_root)
         prompts.append(tok.apply_chat_template(msgs, tokenize=False, add_generation_prompt=True))
         episodes.append((ds, ep))
 
     llm = LLM(
         model=vllm_model,
         tensor_parallel_size=1,
-        gpu_memory_utilization=float(os.environ.get("VLLM_GPU_MEM_UTIL", "0.30")),
-        max_model_len=int(os.environ.get("VLLM_EVAL_MAX_MODEL_LEN", "12288")),
+        gpu_memory_utilization=float(os.environ.get("BENCH_QWEN_GPU_UTIL", "0.30")),
+        max_model_len=int(os.environ.get("BENCH_QWEN_MAX_MODEL_LEN", "12288")),
         dtype="bfloat16",
         trust_remote_code=True,
     )
@@ -914,7 +917,7 @@ def eval_qwen_group(group_slug: str, lora_dir: Path | None) -> None:
         n=1,
         temperature=0.2,
         top_p=0.95,
-        max_tokens=int(os.environ.get("VLLM_EVAL_MAX_TOKENS", "8192")),
+        max_tokens=int(os.environ.get("BENCH_QWEN_MAX_TOKENS", "8192")),
         seed=4242,
     )
     outputs = llm.generate(prompts, sp)
@@ -975,13 +978,34 @@ def eval_qwen_group(group_slug: str, lora_dir: Path | None) -> None:
         print(f"[qwen-blind] {group_slug}/{trial_tag} (pilot_seed={ds}): reward={rew}")
 
 
-import time
+def main() -> None:
+    model_id = sys.argv[1]
+    adapter_dir = Path(sys.argv[2])
+    stage3_task = Path(sys.argv[3])
+    out_dir = Path(sys.argv[4])
+    harbor_runs_dir = Path(sys.argv[5])
+    tmpdir = Path(sys.argv[6])
+    repo_root = Path(sys.argv[7])
+    common = dict(
+        model_id=model_id,
+        stage3_task=stage3_task,
+        out_dir=out_dir,
+        harbor_runs_dir=harbor_runs_dir,
+        tmpdir=tmpdir,
+        repo_root=repo_root,
+    )
+    eval_qwen_group("qwen3.5-9b_base", None, **common)
+    if adapter_dir.is_dir():
+        time.sleep(1.5)
+        eval_qwen_group("qwen3.5-9b_post_rl_grpo", adapter_dir, **common)
 
-eval_qwen_group("qwen3.5-9b_base", None)
-if adapter_dir.is_dir():
-    time.sleep(1.5)
-    eval_qwen_group("qwen3.5-9b_post_rl_grpo", adapter_dir)
+
+if __name__ == "__main__":
+    main()
 PY
+  PYTHONPATH="${REPO_ROOT}/src" "$RL_PYTHON" "$QWEN_EVAL_SCRIPT" \
+    "$RESOLVED_MODEL_ID" "$ADAPTER_DIR" "$STAGE3_TASK" "$OUT_DIR" "$HARBOR_RUNS_DIR" "$TMPDIR" "$REPO_ROOT"
+  rm -f "$QWEN_EVAL_SCRIPT"
 fi
 
 # Wait for all parallel Frontier Harbor jobs and harvest their trial directories
